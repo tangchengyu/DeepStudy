@@ -1028,6 +1028,7 @@ ipcMain.handle("window:open-timer", (_event, mode) => {
     minWidth: 420,
     minHeight: 520,
     show: false,
+    alwaysOnTop: true,
     title: mode === "stopwatch" ? "秒表" : "倒计时",
     backgroundColor: "#f0f7f4",
     icon: windowIcon(),

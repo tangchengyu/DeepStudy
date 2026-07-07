@@ -1315,7 +1315,6 @@ const AudioControls = (() => {
   }
   menuButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    toggleMute();
     setMenuOpen(popover.hidden);
   });
   popover.addEventListener("click", (event) => event.stopPropagation());
