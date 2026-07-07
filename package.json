@@ -1,0 +1,77 @@
+{
+  "name": "deepstudy",
+  "version": "1.2.5",
+  "description": "Focus management desktop app with planning, recovery, and time auditing",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "pack": "npm run pack:win",
+    "pack:win": "node scripts/pack.js --win nsis --publish never",
+    "pack:linux": "node scripts/pack.js --linux tar.gz --x64",
+    "pack:linux:appimage": "node scripts/pack.js --linux AppImage --x64",
+    "pack:mac": "node scripts/pack.js --mac dmg --x64 --publish never",
+    "pack:release:local": "npm run pack:win && npm run pack:linux",
+    "pack:dir": "node scripts/pack.js --win --dir",
+    "desktop:shortcut": "node scripts/create-desktop-shortcut.js",
+    "pack:desktop": "npm run pack && npm run desktop:shortcut"
+  },
+  "author": "",
+  "license": "SEE LICENSE IN LICENSE",
+  "devDependencies": {
+    "7zip-bin": "^5.2.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.deepstudy.focus",
+    "productName": "deepstudy",
+    "artifactName": "${productName}-${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/deepstudy.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "identity": null,
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "tar.gz"
+      ],
+      "category": "Utility",
+      "icon": "build/icons"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "build/**",
+      "renderer/**",
+      "node_modules/**"
+    ],
+    "asar": false,
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "deepstudy",
+      "installerIcon": "build/deepstudy.ico",
+      "uninstallerIcon": "build/deepstudy.ico",
+      "installerHeaderIcon": "build/deepstudy.ico"
+    }
+  }
+}

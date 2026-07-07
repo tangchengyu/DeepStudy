@@ -1,0 +1,71 @@
+{
+  "name": "deepstudy-vue",
+  "version": "1.0.0",
+  "description": "DeepStudy - Focus management desktop application",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.deepstudy.app",
+    "productName": "DeepStudy",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "../frontend/dist/**/*",
+      "resources/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "artifactName": "DeepStudy_Setup_${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "identity": null,
+      "category": "public.app-category.productivity",
+      "artifactName": "DeepStudy_${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "installerIcon": "resources/icon.ico"
+    },
+    "extraResources": [
+      {
+        "from": "../backend/target/deepstudy-backend.jar",
+        "to": "backend/deepstudy-backend.jar"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

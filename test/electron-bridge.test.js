@@ -1,0 +1,30 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { createElectronBridge } = require("../renderer/electron-bridge");
+
+test("reports a clear launch instruction when Electron preload is missing", async () => {
+  const bridge = createElectronBridge(undefined);
+  assert.equal(bridge.available, false);
+  await assert.rejects(
+    bridge.getPlannerConfig(),
+    /deepstudy\.exe 或桌面快捷方式启动应用/,
+  );
+});
+
+test("forwards planner calls when Electron preload is available", async () => {
+  const calls = [];
+  const electronAPI = {
+    getPlannerConfig: async () => ({ mode: "api" }),
+    savePlannerConfig: async (value) => (calls.push(value), value),
+    deletePlannerApiProfile: async (id) => ({ deleted: id }),
+    openFreeApiTutorial: async () => true,
+    chatWithPlanner: async () => ({ content: "ok" }),
+  };
+  const bridge = createElectronBridge(electronAPI);
+  assert.equal(bridge.available, true);
+  assert.deepEqual(await bridge.getPlannerConfig(), { mode: "api" });
+  await bridge.savePlannerConfig({ mode: "api" });
+  assert.deepEqual(await bridge.deletePlannerApiProfile("profile-1"), { deleted: "profile-1" });
+  assert.equal(await bridge.openFreeApiTutorial(), true);
+  assert.deepEqual(calls, [{ mode: "api" }]);
+});

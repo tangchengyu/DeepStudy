@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'" />
+  <title>长期任务备忘录</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="long-tasks.css" />
+</head>
+<body class="long-task-window">
+  <main class="long-task-app">
+    <header class="long-task-header">
+      <div><div class="eyebrow">LONG-TERM BOARD</div><h1>长期任务备忘录</h1><p>按重要性与紧迫性安排未来，而不是只处理眼前。</p></div>
+      <div class="long-task-header-actions"><button id="long-ai-toggle" class="secondary-btn" type="button">AI 对话</button><button id="long-add" class="primary-btn" type="button">新增任务</button></div>
+    </header>
+    <section id="quadrant-board" class="quadrant-board" aria-label="长期任务四象限">
+      <article class="quadrant q1" data-quadrant="important-urgent"><header><span>01</span><div><h2>重要且紧急</h2><p>立即推进，避免失控</p></div></header><div class="quadrant-list" data-list="important-urgent"></div></article>
+      <article class="quadrant q2" data-quadrant="important-not-urgent"><header><span>02</span><div><h2>重要不紧急</h2><p>持续投入，建立长期优势</p></div></header><div class="quadrant-list" data-list="important-not-urgent"></div></article>
+      <article class="quadrant q3" data-quadrant="urgent-not-important"><header><span>03</span><div><h2>不重要但紧急</h2><p>快速处理或减少投入</p></div></header><div class="quadrant-list" data-list="urgent-not-important"></div></article>
+      <article class="quadrant q4" data-quadrant="not-important-not-urgent"><header><span>04</span><div><h2>不重要不紧急</h2><p>谨慎保留，定期清理</p></div></header><div class="quadrant-list" data-list="not-important-not-urgent"></div></article>
+    </section>
+  </main>
+
+  <aside id="long-ai-panel" class="long-ai-panel" hidden>
+    <header>
+      <div><strong>长期任务 AI 助手</strong><p>变更会先预览，确认后才执行。</p><small id="long-ai-config-summary" class="ai-config-summary"></small></div>
+      <div class="long-ai-header-actions">
+        <button id="long-ai-new" class="secondary-btn compact-action" type="button">新对话</button>
+        <button id="long-ai-settings" class="secondary-btn compact-action" type="button">设置</button>
+        <button id="long-ai-close" class="icon-btn compact" type="button" aria-label="关闭">×</button>
+      </div>
+    </header>
+    <div id="long-ai-messages" class="long-ai-messages" aria-live="polite"></div>
+    <div id="long-ai-preview" class="long-ai-preview" hidden></div>
+    <form id="long-ai-form"><textarea id="long-ai-input" rows="4" maxlength="1000" placeholder="例如：下周三晚上提交论文初稿，提前一天提醒我"></textarea><button id="long-ai-send" class="primary-btn" type="submit">生成变更</button></form>
+  </aside>
+
+  <div id="long-ai-settings-modal" class="modal" hidden>
+    <section class="modal-card long-ai-settings-card" role="dialog" aria-modal="true" aria-labelledby="long-ai-settings-title">
+      <div class="settings-heading"><div><div class="eyebrow">AI MODEL</div><h2 id="long-ai-settings-title">长期任务 AI 设置</h2><p>已保存的 API 配置与 AI 计划助手共享，可跨设置通用。</p></div><button id="long-ai-settings-close" class="icon-btn compact" type="button" aria-label="关闭设置">×</button></div>
+      <button id="long-free-api-tutorial" class="tutorial-button" type="button">免费 API 配置教程</button>
+      <div id="long-api-settings" class="settings-panel">
+        <div class="saved-profile-row">
+          <label>已保存的 API<select id="long-api-profile"><option value="">选择已保存 API</option></select></label>
+          <button id="long-api-new" class="secondary-btn" type="button">新建 API 配置</button>
+          <button id="long-api-delete" class="secondary-btn danger-lite" type="button" disabled>删除此 API</button>
+        </div>
+        <label>配置名称<input id="long-api-label" maxlength="60" placeholder="例如：长期任务 DeepSeek" /></label>
+        <label>常用模型<select id="long-api-model-preset"><option value="custom">自定义模型</option></select></label>
+        <label>API Base URL<input id="long-api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
+        <label>模型名称<input id="long-api-model" spellcheck="false" placeholder="例如 deepseek-chat" /></label>
+        <label id="long-api-key-row">API Key<input id="long-api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
+        <p id="long-api-saved-hint" class="settings-help" hidden>已保存安全凭据，可直接使用。</p>
+      </div>
+      <div id="long-ai-settings-status" class="settings-status" role="status"></div>
+      <div class="modal-actions"><button id="long-ai-settings-cancel" class="secondary-btn" type="button">取消</button><button id="long-ai-settings-save" class="primary-btn" type="button">保存并使用</button></div>
+    </section>
+  </div>
+
+  <div id="long-task-modal" class="modal" hidden>
+    <form id="long-task-form" class="modal-card long-task-form" role="dialog" aria-modal="true" aria-labelledby="long-task-form-title">
+      <div class="settings-heading"><div><div class="eyebrow">TASK</div><h2 id="long-task-form-title">新增长期任务</h2></div><button id="long-task-close" class="icon-btn compact" type="button" aria-label="关闭">×</button></div>
+      <input id="long-task-id" type="hidden" />
+      <label>任务名称<input id="long-task-title" maxlength="120" required /></label>
+      <label>备注<textarea id="long-task-notes" rows="3" maxlength="1000"></textarea></label>
+      <label>所属象限<select id="long-task-quadrant"><option value="important-urgent">重要且紧急</option><option value="important-not-urgent">重要不紧急</option><option value="urgent-not-important">不重要但紧急</option><option value="not-important-not-urgent">不重要不紧急</option></select></label>
+      <label>提醒方式<select id="long-reminder-kind"><option value="none">不提醒</option><option value="once">单次提醒</option><option value="daily">每天</option><option value="weekly">每周</option></select></label>
+      <label id="long-reminder-once" hidden>日期和时间<input id="long-reminder-at" type="datetime-local" /></label>
+      <label id="long-reminder-time" hidden>提醒时间<input id="long-reminder-clock" type="time" value="09:00" /></label>
+      <fieldset id="long-reminder-weekdays" hidden><legend>重复星期</legend><div class="weekday-options"><label><input type="checkbox" value="1">一</label><label><input type="checkbox" value="2">二</label><label><input type="checkbox" value="3">三</label><label><input type="checkbox" value="4">四</label><label><input type="checkbox" value="5">五</label><label><input type="checkbox" value="6">六</label><label><input type="checkbox" value="0">日</label></div></fieldset>
+      <div class="modal-actions"><button id="long-task-cancel" class="secondary-btn" type="button">取消</button><button class="primary-btn" type="submit">保存任务</button></div>
+    </form>
+  </div>
+  <script src="planner-utils.js"></script>
+  <script src="long-task-utils.js"></script>
+  <script src="long-tasks.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { applyPriorityDecision, dueTasks, fallbackAiOperationsFromText, nextReminderAt, normalizeAiOperations, normalizeTask } = require("../renderer/long-task-utils");
+
+test("normalizes a long task and its reminder", () => {
+  const task = normalizeTask({ title: "  写论文  ", quadrant: "important-urgent", reminder: { kind: "weekly", time: "18:30", weekdays: [1, 3, 3] } }, 10);
+  assert.equal(task.title, "写论文");
+  assert.deepEqual(task.reminder.weekdays, [1, 3]);
+});
+
+test("preserves planned long tasks without treating them as completed", () => {
+  const task = normalizeTask({ title: "写论文", status: "planned", completedAt: 100 }, 10);
+  assert.equal(task.status, "planned");
+  assert.equal(task.completedAt, null);
+});
+
+test("computes daily and weekly reminder occurrences", () => {
+  const from = new Date("2026-06-22T08:00:00+08:00").getTime();
+  assert.equal(new Date(nextReminderAt({ kind: "daily", time: "09:15" }, from)).getHours(), 9);
+  assert.equal(new Date(nextReminderAt({ kind: "weekly", time: "10:00", weekdays: [2] }, from)).getDay(), 2);
+});
+
+test("finds a due one-time reminder once", () => {
+  const at = new Date("2026-06-22T09:00:00+08:00").toISOString();
+  const task = normalizeTask({ title: "任务", reminder: { kind: "once", at } }, 1);
+  assert.equal(dueTasks([task], Date.parse(at) + 1000).length, 1);
+  task.reminder.lastTriggeredAt = Date.parse(at);
+  assert.equal(dueTasks([task], Date.parse(at) + 1000).length, 0);
+});
+
+test("parses confirmed AI operations and rejects unknown ids", () => {
+  const existing = [normalizeTask({ id: "a", title: "任务 A" }, 1)];
+  assert.equal(normalizeAiOperations('{"operations":[{"action":"update","id":"a","task":{"title":"任务 A+","quadrant":"important-urgent"}}]}', existing)[0].task.title, "任务 A+");
+  assert.throws(() => normalizeAiOperations('{"operations":[{"action":"delete","id":"missing"}]}', existing));
+});
+
+test("demotes the selected priority when adding a worthy task", () => {
+  const tasks = [1, 2, 3].map((id) => ({ id: String(id), text: `任务 ${id}`, priority: true }));
+  const result = applyPriorityDecision(tasks, { id: "4", text: "长期任务" }, { worthy: true, demoteId: "3" });
+  assert.equal(result.find((task) => task.id === "3").priority, false);
+  assert.equal(result.find((task) => task.id === "4").priority, true);
+});
+
+test("does not cap manually selected priority tasks", () => {
+  const tasks = [1, 2, 3].map((id) => ({ id: String(id), text: `任务 ${id}`, priority: true }));
+  const result = applyPriorityDecision(tasks, { id: "4", text: "长期任务" }, { worthy: true });
+  assert.equal(result.filter((task) => task.priority).length, 4);
+});
+
+test("creates a fallback long-task operation when the model returns empty content", () => {
+  const now = new Date("2026-06-23T10:00:00+08:00").getTime();
+  const operations = fallbackAiOperationsFromText("下周三晚上提交论文初稿，提前一天提醒我", now);
+  assert.equal(operations.length, 1);
+  assert.equal(operations[0].action, "create");
+  assert.equal(operations[0].task.title, "提交论文初稿");
+  assert.equal(operations[0].task.notes, "");
+  assert.equal(operations[0].task.quadrant, "important-urgent");
+  assert.equal(operations[0].task.reminder.kind, "once");
+  assert.equal(new Date(operations[0].task.reminder.at).getDay(), 2);
+  assert.equal(new Date(operations[0].task.reminder.at).getHours(), 20);
+});

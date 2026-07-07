@@ -1,0 +1,354 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+}
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+input, textarea, select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  outline: none;
+  transition: border var(--transition), box-shadow var(--transition);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Buttons */
+.primary-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+  transition: all var(--transition);
+}
+.primary-btn:hover { background: var(--green-hover); transform: translateY(-1px); }
+.primary-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+.primary-btn.compact { min-height: 32px; padding: 0 10px; font-size: 12px; }
+
+.secondary-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: 600;
+  transition: all var(--transition);
+}
+.secondary-btn:hover { border-color: var(--accent); color: var(--accent-hover); background: var(--accent-soft); }
+.secondary-btn.compact { min-height: 32px; padding: 0 10px; font-size: 12px; }
+
+.danger-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  background: var(--red);
+  color: white;
+  font-weight: 700;
+  transition: all var(--transition);
+}
+.danger-btn:hover { background: var(--red-hover); }
+.danger-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ghost-btn {
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12px;
+  transition: all var(--transition);
+}
+.ghost-btn:hover { border-color: var(--accent); color: var(--accent-hover); }
+.ghost-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.ghost-btn:disabled { opacity: 0.45; }
+
+.icon-btn {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: 600;
+  transition: all var(--transition);
+}
+.icon-btn:hover, .icon-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+.icon-btn.compact { width: 34px; padding: 0; }
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--accent-hover);
+  font-weight: 800;
+}
+
+.subtle {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.danger-lite {
+  border-color: rgba(191, 76, 76, 0.28);
+  color: var(--red-hover);
+}
+.danger-lite:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* Card */
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 7px 24px rgba(44, 62, 56, 0.045);
+  padding: 19px;
+  margin-top: 16px;
+}
+
+.card h3 { font-size: 18px; }
+.card p { margin-top: 4px; color: var(--text-muted); font-size: 13px; }
+.card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(44, 62, 56, 0.58);
+  backdrop-filter: blur(5px);
+  z-index: 50;
+}
+
+/* Timer */
+.large-timer {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 48px;
+  font-weight: 300;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.large-timer.centered { text-align: center; margin: 25px 0; }
+
+/* Empty state */
+.empty {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+
+/* Utility */
+.flex-center { display: flex; align-items: center; justify-content: center; gap: 9px; flex-wrap: wrap; }
+.mt-16 { margin-top: 16px; }
+
+@keyframes quote-roll-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reminder-pulse {
+  to { box-shadow: 0 0 0 5px rgba(232, 136, 138, 0.22); filter: brightness(1.12); }
+}
+
+/* 卡片界面（最小化模式）全局紧凑样式 */
+/* 使用 .app-shell.is-minimized 提高优先级，确保覆盖 Vue 组件 scoped 样式 */
+.app-shell.is-minimized .mode-panel {
+  padding: 4px 0 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+/* 卡片模式下侧边栏收缩 */
+.app-shell.is-minimized #workspace {
+  grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
+}
+.app-shell.is-minimized #daily-plan-sidebar {
+  gap: 6px;
+  padding: 10px;
+}
+.app-shell.is-minimized .sidebar-heading h1 {
+  font-size: 16px;
+}
+.app-shell.is-minimized .plan-date {
+  font-size: 11px;
+}
+.app-shell.is-minimized .quick-add input,
+.app-shell.is-minimized .sidebar-input {
+  font-size: 12px;
+  height: 28px;
+}
+.app-shell.is-minimized .plan-list-wrap {
+  max-height: 110px;
+  min-height: 40px;
+}
+.app-shell.is-minimized .plan-item {
+  padding: 6px 7px;
+  gap: 5px;
+}
+.app-shell.is-minimized .plan-check {
+  font-size: 12px;
+}
+.app-shell.is-minimized .sidebar-actions {
+  gap: 4px;
+}
+.app-shell.is-minimized .ghost-btn {
+  height: 26px;
+  font-size: 11px;
+  padding: 0 6px;
+}
+.app-shell.is-minimized .planner-chat {
+  max-height: 28vh;
+}
+.app-shell.is-minimized .large-timer.centered {
+  margin: 4px 0;
+  font-size: 26px;
+}
+.app-shell.is-minimized .rest-mode {
+  gap: 6px;
+  padding: 4px 0;
+}
+.app-shell.is-minimized .rest-message {
+  padding: 4px 8px;
+  font-size: 11px;
+  gap: 4px;
+}
+.app-shell.is-minimized .rest-custom-time {
+  margin: 4px 0;
+}
+.app-shell.is-minimized .rest-custom-label strong {
+  font-size: 13px;
+}
+.app-shell.is-minimized .rest-custom-label span {
+  font-size: 11px;
+}
+.app-shell.is-minimized .time-inputs input {
+  width: 48px;
+  padding: 4px;
+  font-size: 13px;
+}
+.app-shell.is-minimized .center-actions {
+  gap: 6px;
+}
+.app-shell.is-minimized .center-actions button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.app-shell.is-minimized .breathing-card {
+  margin-top: 4px;
+  padding: 6px 8px;
+}
+.app-shell.is-minimized .breathing-card h3 {
+  font-size: 15px;
+}
+.app-shell.is-minimized .breathing-card p {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.app-shell.is-minimized .breathing-options {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.app-shell.is-minimized .breathing-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  min-height: 30px;
+}
+.app-shell.is-minimized .breathing-circle {
+  width: 120px;
+  height: 120px;
+}
+.app-shell.is-minimized .breathing-label {
+  font-size: 18px;
+}
+.app-shell.is-minimized .mode-sticky-header {
+  margin-bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  gap: 8px;
+  min-height: 0;
+}
+.app-shell.is-minimized .mode-sticky-header.collapsed {
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.app-shell.is-minimized #back-to-gate {
+  height: 28px;
+  min-width: 60px;
+  padding: 0 8px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.app-shell.is-minimized #mode-shell {
+  padding: 0 8px;
+}
+.app-shell.is-minimized #main-area {
+  padding: 0 8px 6px;
+}
+/* 卡片界面下允许 gate-view 滚动（mode-shell 通过 flex:1 + overflow:auto 自行处理滚动，不会出现双滚动条） */
+.app-shell.is-minimized .mode-shell-wrapper {
+  overflow: auto;
+}
+/* 卡片界面：进一步压缩休息模式，确保呼吸按钮可见 */
+.app-shell.is-minimized .rest-custom-label {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.app-shell.is-minimized .time-inputs {
+  gap: 6px;
+}
+.app-shell.is-minimized .breathing-stage {
+  margin-top: 12px;
+  gap: 8px;
+}
+.app-shell.is-minimized #breathing-stop {
+  margin-top: 6px;
+}

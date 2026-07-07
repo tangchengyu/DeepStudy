@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <title>计时器</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="timer-window standalone-timer-window">
+    <main class="standalone-timer-shell">
+      <header class="standalone-timer-header">
+        <div>
+          <div id="timer-eyebrow" class="eyebrow">TIMER</div>
+          <h1 id="timer-title">计时器</h1>
+        </div>
+        <label class="aot-label">
+          <input id="always-on-top" type="checkbox" /> 窗口置顶
+        </label>
+      </header>
+
+      <section id="stopwatch-panel" class="timer-panel" hidden>
+        <div id="sw-time" class="large-timer centered">00:00:00.00</div>
+        <div class="center-actions">
+          <button id="sw-start" class="primary-btn" type="button">开始</button>
+          <button id="sw-stop" class="danger-btn" type="button" disabled>停止</button>
+          <button id="sw-reset" class="secondary-btn" type="button">重置</button>
+          <button id="sw-lap" class="secondary-btn" type="button" disabled>计次</button>
+        </div>
+        <ul id="lap-list" class="lap-list"></ul>
+      </section>
+
+      <section id="countdown-panel" class="timer-panel" hidden>
+        <div class="preset-row">
+          <button data-seconds="60" type="button">1 分</button>
+          <button data-seconds="300" type="button">5 分</button>
+          <button data-seconds="900" type="button">15 分</button>
+          <button data-seconds="1500" type="button">25 分</button>
+        </div>
+        <div class="time-inputs">
+          <input id="cd-h" type="number" min="0" max="99" value="0" />
+          <span>:</span>
+          <input id="cd-m" type="number" min="0" max="59" value="1" />
+          <span>:</span>
+          <input id="cd-s" type="number" min="0" max="59" value="0" />
+        </div>
+        <div id="cd-time" class="large-timer centered">00:01:00</div>
+        <div class="progress-track"><div id="cd-progress"></div></div>
+        <div class="center-actions">
+          <button id="cd-start" class="primary-btn" type="button">开始</button>
+          <button id="cd-pause" class="danger-btn" type="button" disabled>暂停</button>
+          <button id="cd-reset" class="secondary-btn" type="button">重置</button>
+        </div>
+      </section>
+    </main>
+    <script src="timer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:"
+    />
+    <title>deepstudy</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="top-bar">
+        <div class="brand">
+          <span class="brand-dot"></span><strong>deepstudy</strong>
+        </div>
+        <div class="top-controls">
+          <button id="soul-open" class="tool-btn soul-btn" type="button">
+            灵魂按摩间
+          </button>
+          <div id="noise-control" class="noise-control">
+            <button id="noise-menu-button" class="audio-btn" type="button" aria-expanded="false">
+              我的白噪音
+            </button>
+            <div id="noise-popover" class="noise-popover" hidden>
+              <div id="noise-list" class="noise-list"></div>
+              <!-- 音频控制：播放速率 + 音量 (移入白噪音面板) -->
+              <div class="noise-audio-controls">
+                <div class="noise-rate-row">
+                  <label>播放速率</label>
+                  <div class="segmented" aria-label="播放速率">
+                    <button class="audio-rate active" data-rate="1" type="button">1x</button>
+                    <button class="audio-rate" data-rate="1.5" type="button">1.5x</button>
+                    <button class="audio-rate" data-rate="2" type="button">2x</button>
+                  </div>
+                </div>
+                <div class="noise-volume-row">
+                  <label>白噪音音量 <span id="volume-value">70%</span></label>
+                  <input id="noise-volume" type="range" min="0" max="100" value="70" />
+                </div>
+              </div>
+              <button id="noise-custom-toggle" class="secondary-btn compact" type="button">
+                自定义白噪音
+              </button>
+              <div id="noise-custom-panel" class="noise-custom-panel" hidden>
+                <div id="noise-dropzone" class="noise-dropzone">
+                  拖入音频文件
+                  <small>MP3 / WAV / OGG / FLAC / M4A</small>
+                </div>
+                <input id="noise-file-input" type="file" accept="audio/*" hidden />
+                <div class="noise-custom-actions">
+                  <button id="noise-pick-file" class="secondary-btn compact" type="button">选择文件</button>
+                  <button id="noise-add-file" class="primary-btn compact" type="button" disabled>添加</button>
+                </div>
+                <div id="noise-status" class="subtle" role="status"></div>
+              </div>
+            </div>
+          </div>
+          <button id="open-stopwatch" class="tool-btn" type="button">
+            ⏱ 秒表
+          </button>
+          <button id="open-countdown" class="tool-btn" type="button">
+            ⏲ 倒计时
+          </button>
+          <button id="long-tasks-open" class="tool-btn long-task-launch" type="button">
+            <span class="long-task-launch-mark" aria-hidden="true"></span>
+            长期任务
+          </button>
+          <label class="aot-label"
+            ><input id="always-on-top" type="checkbox" /> 窗口置顶</label
+          >
+          <label class="aot-label"
+            ><input id="auto-minimize" type="checkbox" /> 卡片界面</label
+          >
+        </div>
+      </header>
+
+      <div id="workspace">
+        <aside id="daily-plan-sidebar">
+          <div class="sidebar-heading">
+            <div>
+              <div class="eyebrow">TODAY</div>
+              <h1>每日计划</h1>
+            </div>
+            <div class="sidebar-heading-actions">
+              <button id="chat-toggle" class="icon-btn" type="button" aria-pressed="false">AI 对话</button>
+              <button id="collapse-tabs" class="collapse-btn" type="button" title="收起">▾</button>
+            </div>
+          </div>
+          <div id="plan-date" class="plan-date"></div>
+          <form id="plan-add-form" class="quick-add">
+            <input
+              id="plan-input"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="添加今日任务，回车添加"
+            />
+          </form>
+          <div class="plan-list-wrap">
+            <ul id="plan-list"></ul>
+            <p id="plan-empty" class="empty">还没有计划</p>
+          </div>
+          <div class="sidebar-actions">
+            <button id="clear-completed" class="ghost-btn" type="button">
+              清除已完成
+            </button>
+            <button id="reset-plan" class="ghost-btn danger" type="button">
+              重置
+            </button>
+          </div>
+          <section id="planner-chat" class="planner-chat" hidden>
+            <div class="chat-header">
+              <strong>AI 计划助手</strong>
+              <div class="chat-header-actions">
+                <button
+                  id="chat-new"
+                  class="icon-btn compact"
+                  type="button"
+                  aria-label="清除上下文并开始新聊天"
+                  title="新聊天"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 5h14v11H9l-4 3V5Z" />
+                    <path d="M12 8v5M9.5 10.5h5" />
+                  </svg>
+                </button>
+                <button
+                  id="planner-settings-open"
+                  class="icon-btn compact"
+                  type="button"
+                  aria-label="AI 模型设置"
+                  title="AI 模型设置"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" />
+                    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.6v-.1A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.1 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.3V9.6h.1A1.7 1.7 0 0 0 4.1 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06L6.56 3.7l.06.06A1.7 1.7 0 0 0 8.5 4.1a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1v-.1h4v.1A1.7 1.7 0 0 0 15 4.1a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 8.5a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
+                  </svg>
+                </button>
+                <button id="chat-close" class="icon-btn compact" type="button" aria-label="关闭 AI 对话">
+                  ×
+                </button>
+              </div>
+            </div>
+            <div id="planner-config" class="subtle">正在读取 API 配置…</div>
+            <div
+              id="planner-messages"
+              class="planner-messages"
+              aria-live="polite"
+            ></div>
+            <form id="planner-form" class="planner-form">
+              <textarea
+                id="planner-input"
+                rows="3"
+                maxlength="1000"
+                placeholder="告诉我今天想完成什么"
+              ></textarea>
+              <button id="planner-send" class="primary-btn" type="submit">
+                生成计划
+              </button>
+            </form>
+          </section>
+        </aside>
+
+        <main id="main-area">
+          <section id="gate-view" class="gate-view">
+            <figure class="attention-arena">
+              <img
+                src="assets/focus-gate.png"
+                alt="你的注意力空间"
+                decoding="async"
+              />
+            </figure>
+            <div
+              id="focus-quote-screen"
+              class="quote-screen"
+              role="button"
+              tabindex="0"
+              aria-label="随机刷新一句好句子"
+              aria-live="polite"
+              title="点击随机刷新一句好句子"
+            >
+              <div id="focus-quote-text" class="quote-screen-text">Attention Is All You Need</div>
+            </div>
+            <p>确保至少 5 分钟闭眼静心，清除注意力残留后，进入注意力空间。</p>
+            <button id="enter-gate" class="gate-button" type="button">
+              进入注意力空间
+            </button>
+            <small>守门员不是消灭分心，而是觉察它，并把注意力带回来。</small>
+          </section>
+
+          <section id="mode-shell" hidden>
+            <div class="mode-sticky-header">
+              <button id="back-to-gate" class="back-to-gate" type="button" title="返回注意力空间大门">
+                <span class="mode-control-icon" aria-hidden="true">←</span>
+                <span>返回</span>
+              </button>
+              <nav class="mode-tabs">
+                <button
+                  class="mode-tab active"
+                  data-mode="focus"
+                  type="button"
+                  title="专注模式：大脑像聚光灯般调动前额叶皮层，沿熟悉的神经通路集中精力解决具体问题。"
+                >
+                  <span class="mode-tab-icon" aria-hidden="true">◉</span>
+                  <span>专注模式</span>
+                </button>
+                <button
+                  class="mode-tab"
+                  data-mode="rest"
+                  type="button"
+                  title="分散模式：大脑在放松状态下让思维发散，促使不同脑区产生随机连接，从而激发灵感与宏观洞察。"
+                >
+                  <span class="mode-tab-icon" aria-hidden="true">☕</span>
+                  <span>休息模式</span>
+                </button>
+                <button class="mode-tab" data-mode="habit" type="button">
+                  <span class="mode-tab-icon" aria-hidden="true">↗</span>
+                  <span>长期习惯构建</span>
+                </button>
+              </nav>
+            </div>
+
+            <section id="focus-mode" class="mode-panel active">
+              <div class="section-header">
+                <div>
+                  <div class="eyebrow">DEEP WORK</div>
+                  <h2>现在，只做一件事</h2>
+                </div>
+                <div id="focus-timer" class="large-timer">25:00</div>
+              </div>
+              <div class="focus-actions">
+                <button id="focus-start" class="primary-btn" type="button">
+                  开始专注
+                </button>
+                <button
+                  id="focus-pause"
+                  class="secondary-btn"
+                  type="button"
+                  disabled
+                >
+                  暂停
+                </button>
+                <button id="focus-reset" class="secondary-btn" type="button">
+                  重置
+                </button>
+              </div>
+              <div class="work-type-card">
+                <div>
+                  <strong>当前任务类型</strong>
+                  <p id="work-type-description">
+                    核心工作：高认知要求、直接推进目标
+                  </p>
+                </div>
+                <label class="switch-row"
+                  ><span>维持性</span
+                  ><input id="work-type-toggle" type="checkbox" /><span
+                    class="switch"
+                    ><span></span></span
+                  ><span>核心</span></label
+                >
+              </div>
+              <div class="loop-banner">
+                <span>专注中</span><b>→</b><span>被干扰</span><b>→</b
+                ><span>觉察分心</span><b>→</b><span>注意力转回</span>
+              </div>
+              <section class="card distraction-card">
+                <div class="card-title-row">
+                  <div>
+                    <h3>分心清单</h3>
+                    <p>按可控性与趣味性分类，找到下一次的应对方式。</p>
+                  </div>
+                  <button
+                    id="quick-distraction"
+                    class="danger-btn"
+                    type="button"
+                  >
+                    快速添加干扰
+                  </button>
+                </div>
+                <form id="distraction-form" class="distraction-form">
+                  <input
+                    id="distraction-input"
+                    maxlength="120"
+                    placeholder="刚才是什么打断了你？"
+                  />
+                  <select id="distraction-control">
+                    <option value="controllable">可控</option>
+                    <option value="uncontrollable">不可控</option>
+                  </select>
+                  <select id="distraction-interest">
+                    <option value="interesting">有意思</option>
+                    <option value="boring">没意思</option>
+                  </select>
+                  <button class="secondary-btn" type="submit">记录</button>
+                </form>
+                <div id="distraction-grid" class="distraction-grid"></div>
+              </section>
+            </section>
+
+            <section id="rest-mode" class="mode-panel">
+              <div class="rest-message">
+                <span>把注意力从<span class="term-tip" tabindex="0" title="专注模式：大脑像聚光灯般调动前额叶皮层，沿熟悉的神经通路集中精力解决具体问题。">专注模式</span>切换到<span class="term-tip" tabindex="0" title="分散模式：大脑在放松状态下让思维发散，促使不同脑区产生随机连接，从而激发灵感与宏观洞察。">分散模式</span>。</span>
+                <span>在不使用电子产品娱乐的前提下，去做习惯性的、体力性的、亲近自然的、喜欢的事吧！</span>
+              </div>
+              <div id="rest-timer" class="large-timer centered">15:00</div>
+              <div class="center-actions">
+                <button id="rest-start" class="primary-btn" type="button">
+                  开始休息</button
+                ><button
+                  id="rest-pause"
+                  class="secondary-btn"
+                  type="button"
+                  disabled
+                >
+                  暂停</button
+                ><button id="rest-reset" class="secondary-btn" type="button">
+                  重置
+                </button>
+              </div>
+              <section id="breathing-card" class="card breathing-card">
+                <h3>呼吸练习</h3>
+                <p>跟随圆圈节奏呼吸，音频会在本机播放。</p>
+                <div class="breathing-options">
+                  <button
+                    class="breathing-btn"
+                    data-kind="box"
+                    type="button"
+                    title="4-4-4-4 腹式呼吸法：每次专注结束后的快速高效放松练习。"
+                  >
+                    🧘 <span class="term-tip">4-4-4-4 腹式呼吸</span></button
+                  ><button
+                    class="breathing-btn"
+                    data-kind="wim"
+                    type="button"
+                    title="冰人呼吸法：适用于身体已经很疲惫，但有紧急任务必须专注完成的情况。可触发大量肾上腺素释放，短期内显著激活身体。避免饭后立即练习。如有不适，应立即停止练习。不建议长期高频使用。"
+                  >
+                    ❄️ <span class="term-tip">冰人呼吸法</span>
+                  </button>
+                </div>
+                <div id="breathing-stage" class="breathing-stage" hidden>
+                  <div id="breathing-circle">
+                    <span id="breathing-label">准备</span>
+                  </div>
+                  <div id="breathing-count">循环 0 / 5</div>
+                  <button id="breathing-stop" class="danger-btn" type="button">
+                    停止呼吸练习
+                  </button>
+                </div>
+              </section>
+            </section>
+
+            <section id="habit-mode" class="mode-panel">
+              <div class="target-banner">
+                <strong>长期目标</strong
+                ><span>争取每日总专注时长达到 6 小时，每周达到 40 小时。</span>
+              </div>
+              <section class="card">
+                <div class="card-title-row">
+                  <div>
+                    <h3>时间审计</h3>
+                    <p>核心工作、维持工作、主动休息与分心的真实分配。</p>
+                  </div>
+                  <span id="audit-refresh-status" class="subtle"></span>
+                </div>
+                <div id="time-audit"></div>
+              </section>
+              <section class="card reflection-card">
+                <h3>每日反思</h3>
+                <p>每周末可将前 7 天记录导出，交给自动化整理成周报。</p>
+                <textarea
+                  id="reflection-input"
+                  maxlength="500"
+                  placeholder="今天在专注力管理方面有什么心得？今天又学到了哪些知识？见识了哪些风景？遇到了哪些挫折？哪些地方可以改进？"
+                ></textarea>
+                <div class="reflection-footer">
+                  <span id="reflection-count">0 / 300–500</span>
+                  <div>
+                    <button
+                      id="reflection-cancel"
+                      class="secondary-btn"
+                      type="button"
+                      hidden
+                    >
+                      取消编辑
+                    </button>
+                    <button
+                      id="reflection-save"
+                      class="primary-btn"
+                      type="button"
+                    >
+                      保存</button
+                    ><button
+                      id="reflection-export"
+                      class="secondary-btn"
+                      type="button"
+                    >
+                      导出全部 TXT
+                    </button>
+                  </div>
+                </div>
+                <div class="recent-reflections">
+                  <div class="history-header">
+                    <h4>历史记录</h4>
+                    <div class="history-actions">
+                      <button id="reflection-select-all" class="secondary-btn compact" type="button">全选</button>
+                      <button id="reflection-deselect-all" class="secondary-btn compact" type="button">取消全选</button>
+                      <button id="reflection-export-selected" class="secondary-btn compact" type="button">导出选中 TXT</button>
+                      <button id="reflection-delete-selected" class="secondary-btn danger-lite compact" type="button">删除选中</button>
+                    </div>
+                  </div>
+                  <div id="reflection-list"></div>
+                </div>
+              </section>
+            </section>
+          </section>
+
+          <div id="focus-duration-modal" class="modal" hidden>
+            <form id="focus-duration-form" class="modal-card focus-duration-form" role="dialog" aria-modal="true" aria-labelledby="focus-duration-title">
+              <div class="settings-heading">
+                <div>
+                  <div class="eyebrow">FOCUS TIMER</div>
+                  <h2 id="focus-duration-title">选择专注时长</h2>
+                </div>
+                <button id="focus-duration-close" class="icon-btn compact" type="button" aria-label="关闭">×</button>
+              </div>
+              <div class="focus-duration-presets" role="group" aria-label="常用专注时长">
+                <button class="focus-duration-preset active" data-minutes="25" type="button">25 分钟</button>
+                <button class="focus-duration-preset" data-minutes="45" type="button">45 分钟</button>
+              </div>
+              <label class="focus-duration-custom">
+                <span>自定义专注时间</span>
+                <input id="focus-duration-input" type="number" min="1" max="240" value="25" inputmode="numeric" />
+                <small>分钟</small>
+              </label>
+              <div class="modal-actions">
+                <button id="focus-duration-cancel" class="secondary-btn" type="button">取消</button>
+                <button class="primary-btn" type="submit">开始专注</button>
+              </div>
+            </form>
+          </div>
+
+          <section id="timer-only" hidden>
+            <section id="stopwatch-panel" class="timer-panel">
+              <div class="eyebrow">STOPWATCH</div>
+              <div id="sw-time" class="large-timer centered">00:00:00.00</div>
+              <div class="center-actions">
+                <button id="sw-start" class="primary-btn" type="button">
+                  开始</button
+                ><button id="sw-stop" class="danger-btn" type="button" disabled>
+                  停止</button
+                ><button id="sw-reset" class="secondary-btn" type="button">
+                  重置</button
+                ><button
+                  id="sw-lap"
+                  class="secondary-btn"
+                  type="button"
+                  disabled
+                >
+                  计次
+                </button>
+              </div>
+              <ul id="lap-list" class="lap-list"></ul>
+            </section>
+            <section id="countdown-panel" class="timer-panel">
+              <div class="eyebrow">COUNTDOWN</div>
+              <div class="preset-row">
+                <button data-seconds="60">1 分</button
+                ><button data-seconds="300">5 分</button
+                ><button data-seconds="900">15 分</button
+                ><button data-seconds="1500">25 分</button>
+              </div>
+              <div class="time-inputs">
+                <input
+                  id="cd-h"
+                  type="number"
+                  min="0"
+                  max="99"
+                  value="0"
+                /><span>:</span
+                ><input
+                  id="cd-m"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value="1"
+                /><span>:</span
+                ><input id="cd-s" type="number" min="0" max="59" value="0" />
+              </div>
+              <div id="cd-time" class="large-timer centered">00:01:00</div>
+              <div class="progress-track"><div id="cd-progress"></div></div>
+              <div class="center-actions">
+                <button id="cd-start" class="primary-btn" type="button">
+                  开始</button
+                ><button
+                  id="cd-pause"
+                  class="danger-btn"
+                  type="button"
+                  disabled
+                >
+                  暂停</button
+                ><button id="cd-reset" class="secondary-btn" type="button">
+                  重置
+                </button>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div id="distraction-modal" class="modal" hidden>
+      <div class="modal-card">
+        <div class="modal-alert">注意力正在离开球门</div>
+        <h2>先停一下，觉察发生了什么</h2>
+        <div id="modal-timer" class="modal-timer">02:00</div>
+        <p id="modal-help">两分钟内处理或记下干扰，然后回到当前任务。</p>
+        <input
+          id="modal-distraction-text"
+          maxlength="120"
+          placeholder="这次干扰是什么？"
+        />
+        <div class="modal-selects">
+          <select id="modal-control">
+            <option value="controllable">可控</option>
+            <option value="uncontrollable">不可控</option></select
+          ><select id="modal-interest">
+            <option value="interesting">有意思</option>
+            <option value="boring">没意思</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button id="modal-end" class="primary-btn" type="button">
+            结束分心</button
+          ><button id="modal-continue" class="danger-btn" type="button">
+            继续解决干扰
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="planner-settings-modal" class="modal" hidden>
+      <section
+        class="modal-card settings-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="planner-settings-title"
+      >
+        <div class="settings-heading">
+          <div>
+            <div class="eyebrow">AI MODEL</div>
+            <h2 id="planner-settings-title">AI 计划助手设置</h2>
+            <p>仅使用 API 模型，支持 OpenAI 兼容接口。</p>
+          </div>
+          <button id="planner-settings-close" class="icon-btn compact" type="button" aria-label="关闭设置">×</button>
+        </div>
+
+        <button id="free-api-tutorial" class="tutorial-button" type="button">
+          免费 API 配置教程
+        </button>
+
+        <div id="api-settings" class="settings-panel">
+          <p class="settings-help">支持 OpenAI 兼容接口，例如 OpenRouter、OpenAI、DeepSeek、通义千问及自建服务。</p>
+          <div class="saved-profile-row">
+            <label>已保存的 API<select id="api-profile-select"><option value="">选择已保存 API</option></select></label>
+            <button id="api-profile-new" class="secondary-btn" type="button">新建 API 配置</button>
+            <button id="api-profile-delete" class="secondary-btn danger-lite" type="button" disabled>删除此 API</button>
+          </div>
+          <div id="api-saved-credential" class="saved-credential" hidden>
+            <span>此配置的凭据已安全保存，可直接使用</span>
+            <button id="api-key-change" class="reflection-action edit" type="button">更换 API Key</button>
+          </div>
+          <label>配置名称<input id="api-profile-name" maxlength="60" placeholder="例如：工作用 DeepSeek" /></label>
+          <label>常用模型<select id="api-model-preset"><option value="custom">自定义模型</option></select></label>
+          <label>API Base URL<input id="api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
+          <label>模型名称<input id="api-model" spellcheck="false" placeholder="例如 gpt-4.1-mini" /></label>
+          <label id="api-key-entry">API Key<input id="api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
+        </div>
+
+        <div id="planner-settings-status" class="settings-status" role="status"></div>
+        <div class="modal-actions">
+          <button id="planner-settings-cancel" class="secondary-btn" type="button">取消</button>
+          <button id="planner-settings-save" class="primary-btn" type="button">保存并使用</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="soul-modal" class="modal" hidden>
+      <section
+        class="modal-card soul-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="soul-title"
+      >
+        <div class="settings-heading">
+          <div>
+            <div class="eyebrow">SOUL ROOM</div>
+            <h2 id="soul-title">灵魂按摩间</h2>
+          </div>
+          <button id="soul-close" class="icon-btn compact" type="button" aria-label="关闭灵魂按摩间">×</button>
+        </div>
+
+        <form id="soul-form" class="soul-form">
+          <input id="soul-edit-id" type="hidden" />
+          <label>
+            <span>好句子</span>
+            <textarea id="soul-input" rows="3" maxlength="240" placeholder="写下一句你想保存的话"></textarea>
+          </label>
+          <div class="soul-form-actions">
+            <button id="soul-cancel-edit" class="secondary-btn" type="button" hidden>取消修改</button>
+            <button id="soul-save" class="primary-btn" type="submit">添加句子</button>
+          </div>
+        </form>
+
+        <div id="soul-list" class="soul-list" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <div id="reset-confirm-modal" class="modal" hidden>
+      <section
+        class="modal-card confirm-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-confirm-title"
+      >
+        <h2 id="reset-confirm-title">清空今天的计划？</h2>
+        <p>确认后会移除今日所有任务，操作只影响每日计划列表。</p>
+        <div class="modal-actions">
+          <button id="reset-confirm-cancel" class="secondary-btn" type="button">取消</button>
+          <button id="reset-confirm-ok" class="danger-btn" type="button">确认清空</button>
+        </div>
+      </section>
+    </div>
+
+    <audio id="audio-muyu" src="assets/audio/muyu.mp3" loop></audio>
+    <audio id="audio-rain" src="assets/audio/rain.mp3" loop></audio>
+    <audio id="audio-breathing" src="assets/audio/4-4-4-4.MP3"></audio>
+    <audio id="audio-wim" src="assets/audio/wim_hof_3groups_v3_faster_22_24_final_320k.mp3"></audio>
+    <audio id="audio-focus-rest-prompt" src="assets/audio/brain_cache_rest_charge.mp3"></audio>
+    <script src="planner-utils.js"></script>
+    <script src="electron-bridge.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
