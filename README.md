@@ -11,11 +11,11 @@
 | **Windows** | [最新版安装包 `.exe`](https://github.com/tangchengyu/DeepStudy/releases/latest) | 安装向导，可选择安装路径 |
 | **macOS** | [最新版 `.dmg`](https://github.com/tangchengyu/DeepStudy/releases/latest) | 拖入 `/Applications` 即可 |
 
-**Windows 用户**：下载 `DeepStudy-Setup-*.exe`，双击启动安装向导，选择安装路径后由安装程序创建 `DeepStudy` 桌面快捷方式。
+**Windows 用户**：下载 `DeepStudy-Setup-*.exe`，双击启动安装向导，选择安装路径后由安装程序创建 `DeepStudy` 桌面快捷方式。发布页提供当前代码版本对应的 Windows 安装包和 macOS `.dmg` 文件。
 
-### 🤖 AI Agent 一键安装（Windows）
+### 自动化安装（Windows）
 
-> **把这段发给 Codex / Claude Code / Cursor 等 AI 工具，它们会自动帮你下载安装：**
+> **把这段发给自动化工具，它们会自动帮你下载安装：**
 
 ```text
 请帮我在 Windows 上安装 DeepStudy。访问 https://github.com/tangchengyu/DeepStudy/releases/latest，
@@ -38,6 +38,10 @@ Invoke-WebRequest $exe.browser_download_url -OutFile $target; Start-Process $tar
 DeepStudy is a desktop focus-management app for daily planning, focus sessions, rest recovery, long-term task tracking, white noise, and time review.
 
 DeepStudy 是一款桌面端专注力管理软件，用于每日计划、专注计时、休息恢复、长期任务、白噪音和时间复盘。
+
+The latest GitHub Release provides the Windows installer and macOS `.dmg` built from the current release code.
+
+最新 GitHub Release 提供当前发布代码对应的 Windows 安装包和 macOS `.dmg` 文件。
 
 ## English
 
@@ -64,7 +68,7 @@ DeepStudy 是一款桌面端专注力管理软件，用于每日计划、专注�
    - Windows: run the installer, choose an install directory, and let the installer create the `DeepStudy` desktop shortcut.
    - macOS: open the `.dmg`, drag `deepstudy.app` to `/Applications`, then open it. Because the package is unsigned, first launch may require **Control-click -> Open**.
 
-### Agent-Friendly Install
+### Automated Install
 
 Use this section when an automation agent needs to install DeepStudy on Windows.
 
@@ -217,7 +221,7 @@ The required notice is in [NOTICE](NOTICE).
    - Windows：运行安装程序，选择安装目录，由安装程序创建 `DeepStudy` 桌面快捷方式。
    - macOS：打开 `.dmg`，把 `deepstudy.app` 拖到 `/Applications`，再打开。由于当前包未签名，首次启动可能需要按住 Control 点击并选择“打开”。
 
-### 给自动化 Agent 的 Windows 安装命令
+### 给自动化工具的 Windows 安装命令
 
 ```powershell
 $release = Invoke-RestMethod "https://api.github.com/repos/tangchengyu/DeepStudy/releases/latest"
