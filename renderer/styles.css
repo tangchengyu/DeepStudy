@@ -120,42 +120,76 @@ select:focus {
 }
 /* 卡片界面模式：紧凑化模式面板和休息模式 */
 .is-minimized #workspace {
-  grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 .is-minimized #daily-plan-sidebar {
-  gap: 6px;
-  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(188px, 0.78fr) minmax(0, 1.22fr);
+  grid-template-rows: auto auto auto;
+  grid-template-areas:
+    "heading list"
+    "add list"
+    "actions list";
+  align-items: start;
+  gap: 7px 10px;
+  max-height: 188px;
+  padding: 10px 12px;
+  border-right: 0;
+  border-bottom: 1px solid var(--border);
+}
+.is-minimized .sidebar-heading {
+  grid-area: heading;
+  gap: 8px;
+}
+.is-minimized .sidebar-heading-actions {
+  gap: 7px;
 }
 .is-minimized .sidebar-heading h1 {
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.05;
 }
 .is-minimized .plan-date {
-  font-size: 11px;
+  display: none;
+}
+.is-minimized .quick-add {
+  grid-area: add;
+  min-width: 0;
 }
 .is-minimized .quick-add input {
-  font-size: 12px;
-  padding: 5px 8px;
+  height: 38px;
+  font-size: 16px;
+  padding: 0 10px;
 }
 .is-minimized .plan-list-wrap {
-  max-height: 110px;
-  min-height: 40px;
+  grid-area: list;
+  align-self: stretch;
+  min-height: 68px;
+  max-height: 146px;
+  overflow-y: auto;
 }
 .is-minimized .plan-item {
-  padding: 6px 7px;
-  gap: 5px;
+  min-height: 42px;
+  padding: 7px 8px;
+  gap: 7px;
 }
 .is-minimized .plan-check {
-  font-size: 12px;
+  font-size: 14px;
 }
 .is-minimized .sidebar-actions {
-  gap: 4px;
+  grid-area: actions;
+  gap: 7px;
+  min-width: 0;
 }
 .is-minimized .ghost-btn {
-  height: 26px;
-  font-size: 11px;
-  padding: 0 6px;
+  flex: 1 1 80px;
+  min-width: 0;
+  height: 32px;
+  font-size: 13px;
+  padding: 0 8px;
 }
 .is-minimized .planner-chat {
+  grid-column: 1 / -1;
   max-height: 28vh;
 }
 .is-minimized .mode-sticky-header {
@@ -179,8 +213,17 @@ select:focus {
   overflow: hidden;
 }
 .is-minimized #main-area {
-  padding: 0 8px 8px;
+  padding: 0 12px 8px;
   overflow: auto;
+}
+.is-minimized .gate-view {
+  justify-content: flex-start;
+  gap: 8px;
+  padding-top: 10px;
+}
+.is-minimized .attention-arena {
+  width: 100%;
+  border-radius: 22px;
 }
 .is-minimized .mode-panel {
   padding: 2px 0 8px;
