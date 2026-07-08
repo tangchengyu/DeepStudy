@@ -111,15 +111,18 @@ async function waitFor(predicate, timeout = 15000) {
   if (!noiseState.open || !noiseState.customPanel || !["木鱼白噪音", "雨声白噪音"].every(label => noiseState.labels.includes(label))) throw new Error("White-noise menu is incomplete");
   const volumeToggle = await evaluate(main, `(() => {
     const input = document.querySelector('#noise-volume');
-    const button = document.querySelector('#volume-button');
+    const popover = document.querySelector('#noise-popover');
+    const button = document.querySelector('#noise-mute-button');
     input.value = '72';
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    popover.hidden = true;
     button.click();
     const muted = {
       input: input.value,
       value: document.querySelector('#volume-value').textContent,
-      icon: button.textContent,
-      pressed: button.getAttribute('aria-pressed')
+      icon: button.textContent.trim(),
+      open: !popover.hidden,
+      label: button.getAttribute('aria-label')
     };
     button.click();
     return {
@@ -127,12 +130,14 @@ async function waitFor(predicate, timeout = 15000) {
       restored: {
         input: input.value,
         value: document.querySelector('#volume-value').textContent,
-        pressed: button.getAttribute('aria-pressed')
+        icon: button.textContent.trim(),
+        open: !popover.hidden,
+        label: button.getAttribute('aria-label')
       }
     };
   })()`);
-  if (volumeToggle.muted.input !== "0" || volumeToggle.muted.value !== "0%" || volumeToggle.muted.icon !== "🔇" || volumeToggle.muted.pressed !== "true") throw new Error("White-noise volume button did not mute");
-  if (volumeToggle.restored.input !== "72" || volumeToggle.restored.value !== "72%" || volumeToggle.restored.pressed !== "false") throw new Error("White-noise volume button did not restore the previous volume");
+  if (volumeToggle.muted.input !== "0" || volumeToggle.muted.value !== "0%" || volumeToggle.muted.icon !== "🔇" || volumeToggle.muted.open || volumeToggle.muted.label !== "恢复白噪音音量") throw new Error("White-noise mute button did not mute cleanly");
+  if (volumeToggle.restored.input !== "72" || volumeToggle.restored.value !== "72%" || volumeToggle.restored.icon !== "🔊" || volumeToggle.restored.open || volumeToggle.restored.label !== "静音白噪音") throw new Error("White-noise mute button did not restore the previous volume");
   const focusDurationFlow = await evaluate(main, `(async () => {
     if (!document.querySelector('#gate-view').hidden) document.querySelector('#enter-gate').click();
     document.querySelector('[data-mode="focus"]').click();

@@ -21,9 +21,14 @@
             灵魂按摩间
           </button>
           <div id="noise-control" class="noise-control">
-            <button id="noise-menu-button" class="audio-btn" type="button" aria-expanded="false">
-              我的白噪音
-            </button>
+            <div class="noise-button-group">
+              <button id="noise-menu-button" class="audio-btn" type="button" aria-expanded="false">
+                我的白噪音
+              </button>
+              <button id="noise-mute-button" class="noise-mute-button" type="button" aria-label="静音白噪音" title="静音白噪音">
+                🔊
+              </button>
+            </div>
             <div id="noise-popover" class="noise-popover" hidden>
               <div id="noise-list" class="noise-list"></div>
               <!-- 音频控制：播放速率 + 音量 (移入白噪音面板) -->

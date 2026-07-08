@@ -1162,7 +1162,7 @@ const AudioControls = (() => {
   const status = $("#noise-status");
   const volumeInput = $("#noise-volume");
   const volumeValue = $("#volume-value");
-  const noiseMenuButton = $("#noise-menu-button");
+  const muteButton = $("#noise-mute-button");
   const VOLUME_KEY = "deepstudy.noiseVolume.v1";
   const LAST_VOLUME_KEY = "deepstudy.lastNoiseVolume.v1";
   let rate = 1;
@@ -1184,7 +1184,11 @@ const AudioControls = (() => {
     volumeInput.value = String(Math.round(volume * 100));
     volumeValue.textContent = `${Math.round(volume * 100)}%`;
     const volIcon = volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊";
-    noiseMenuButton.textContent = `我的白噪音 ${volIcon}`;
+    const muteTitle = volume === 0 ? "恢复白噪音音量" : "静音白噪音";
+    muteButton.textContent = volIcon;
+    muteButton.title = muteTitle;
+    muteButton.setAttribute("aria-label", muteTitle);
+    muteButton.classList.toggle("active", volume === 0);
   }
   function setVolume(nextVolume) {
     volume = Math.max(0, Math.min(1, Number(nextVolume) || 0));
@@ -1316,6 +1320,10 @@ const AudioControls = (() => {
   menuButton.addEventListener("click", (event) => {
     event.stopPropagation();
     setMenuOpen(popover.hidden);
+  });
+  muteButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleMute();
   });
   popover.addEventListener("click", (event) => event.stopPropagation());
   document.addEventListener("click", (event) => {

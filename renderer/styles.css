@@ -96,6 +96,7 @@ select:focus {
 }
 .is-minimized .tool-btn,
 .is-minimized .audio-btn,
+.is-minimized .noise-mute-button,
 .is-minimized .segmented button {
   height: 26px;
   font-size: 11px;
@@ -337,6 +338,7 @@ select:focus {
   min-width: 0;
 }
 .audio-btn,
+.noise-mute-button,
 .tool-btn,
 .segmented button,
 .icon-btn,
@@ -353,13 +355,16 @@ select:focus {
   transition: all var(--transition);
 }
 .audio-btn,
+.noise-mute-button,
 .tool-btn {
   height: 34px;
   padding: 0 11px;
 }
 .audio-btn:hover,
+.noise-mute-button:hover,
 .tool-btn:hover,
-.audio-btn.active {
+.audio-btn.active,
+.noise-mute-button.active {
   border-color: var(--accent);
   color: var(--accent-hover);
   background: var(--accent-soft);
@@ -398,6 +403,25 @@ select:focus {
 }
 .noise-control {
   position: relative;
+}
+.noise-button-group {
+  display: inline-flex;
+  align-items: center;
+}
+.noise-button-group .audio-btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.noise-mute-button {
+  width: 34px;
+  padding: 0;
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  line-height: 1;
+}
+.is-minimized .noise-mute-button {
+  width: 26px;
 }
 #noise-popover {
   position: absolute;
