@@ -27,9 +27,13 @@ function findLatestExe() {
     throw new Error(`Build output directory not found: ${distDir}`);
   }
 
-  const unpackedExe = path.join(distDir, "win-unpacked", "deepstudy.exe");
-  if (fs.existsSync(unpackedExe)) {
-    return unpackedExe;
+  const unpackedDir = path.join(distDir, "win-unpacked");
+  const unpackedExeNames = ["DeepStudy.exe", "deepstudy.exe"];
+  for (const exeName of unpackedExeNames) {
+    const unpackedExe = path.join(unpackedDir, exeName);
+    if (fs.existsSync(unpackedExe)) {
+      return unpackedExe;
+    }
   }
 
   const candidates = fs

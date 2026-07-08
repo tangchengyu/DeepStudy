@@ -25,8 +25,8 @@
   },
   "build": {
     "appId": "com.deepstudy.focus",
-    "productName": "deepstudy",
-    "artifactName": "${productName}-${version}.${ext}",
+    "productName": "DeepStudy",
+    "artifactName": "DeepStudy-Setup-${version}.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -66,9 +66,9 @@
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "deepstudy",
+      "shortcutName": "DeepStudy",
       "installerIcon": "build/deepstudy.ico",
       "uninstallerIcon": "build/deepstudy.ico",
       "installerHeaderIcon": "build/deepstudy.ico"

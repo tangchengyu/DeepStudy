@@ -8,10 +8,10 @@
 
 | 系统 | 下载 | 说明 |
 |------|------|------|
-| **Windows** | [最新版 `.exe`](https://github.com/tangchengyu/DeepStudy/releases/latest) | 双击即用，便携版 |
+| **Windows** | [最新版安装包 `.exe`](https://github.com/tangchengyu/DeepStudy/releases/latest) | 安装向导，可选择安装路径 |
 | **macOS** | [最新版 `.dmg`](https://github.com/tangchengyu/DeepStudy/releases/latest) | 拖入 `/Applications` 即可 |
 
-**Windows 用户**：下载 `deepstudy-*.exe` 到任意目录，双击启动。首次运行自动创建桌面快捷方式。
+**Windows 用户**：下载 `DeepStudy-Setup-*.exe`，双击启动安装向导，选择安装路径后由安装程序创建 `DeepStudy` 桌面快捷方式。
 
 ### 🤖 AI Agent 一键安装（Windows）
 
@@ -19,16 +19,16 @@
 
 ```text
 请帮我在 Windows 上安装 DeepStudy。访问 https://github.com/tangchengyu/DeepStudy/releases/latest，
-下载最新的 deepstudy-*.exe，保存到 %LOCALAPPDATA%\Programs\DeepStudy\deepstudy.exe，然后运行它。
+下载最新的 DeepStudy-Setup-*.exe，保存到下载目录，然后启动安装向导。
 ```
 
 或直接复制以下 PowerShell 命令执行：
 
 ```powershell
 $repo="tangchengyu/DeepStudy"; $rel=Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest"
-$exe=$rel.assets|?{$_.name-like"deepstudy-*.exe"}|Select -First 1
-$dir="$env:LOCALAPPDATA\Programs\DeepStudy"; New-Item -ItemType Directory -Force -Path $dir|Out-Null
-Invoke-WebRequest $exe.browser_download_url -OutFile "$dir\deepstudy.exe"; Start-Process "$dir\deepstudy.exe"
+$exe=$rel.assets|?{$_.name-like"DeepStudy-Setup-*.exe"}|Select -First 1
+$target="$env:USERPROFILE\Downloads\$($exe.name)"
+Invoke-WebRequest $exe.browser_download_url -OutFile $target; Start-Process $target
 ```
 
 ---
@@ -51,17 +51,17 @@ DeepStudy 是一款桌面端专注力管理软件，用于每日计划、专注�
 - Fast single-instance restore when the desktop shortcut is double-clicked while the app is already hidden or minimized.
 - Responsive daily-plan layout that keeps the input, task list, clear/reset buttons, and AI assistant from overlapping in narrow docked windows.
 - Local data storage, no account required.
-- Windows portable executable and macOS DMG release workflow.
+- Windows installer and macOS DMG release workflow.
 
 ### Download and Install
 
 1. Open the latest release:
    [https://github.com/tangchengyu/DeepStudy/releases/latest](https://github.com/tangchengyu/DeepStudy/releases/latest)
 2. Download the file for your system:
-   - Windows: `deepstudy-*.exe`
+   - Windows: `DeepStudy-Setup-*.exe`
    - macOS: `deepstudy-*.dmg`
 3. Install or run:
-   - Windows: place the `.exe` in a stable folder such as `%LOCALAPPDATA%\Programs\DeepStudy\deepstudy.exe`, then double-click it. DeepStudy creates or repairs the desktop shortcut on first launch.
+   - Windows: run the installer, choose an install directory, and let the installer create the `DeepStudy` desktop shortcut.
    - macOS: open the `.dmg`, drag `deepstudy.app` to `/Applications`, then open it. Because the package is unsigned, first launch may require **Control-click -> Open**.
 
 ### Agent-Friendly Install
@@ -70,12 +70,10 @@ Use this section when an automation agent needs to install DeepStudy on Windows.
 
 ```powershell
 $release = Invoke-RestMethod "https://api.github.com/repos/tangchengyu/DeepStudy/releases/latest"
-$asset = $release.assets | Where-Object { $_.name -like "deepstudy-*.exe" } | Select-Object -First 1
-if (-not $asset) { throw "No Windows deepstudy-*.exe asset was found." }
+$asset = $release.assets | Where-Object { $_.name -like "DeepStudy-Setup-*.exe" } | Select-Object -First 1
+if (-not $asset) { throw "No Windows DeepStudy-Setup-*.exe asset was found." }
 
-$installDir = Join-Path $env:LOCALAPPDATA "Programs\DeepStudy"
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-$target = Join-Path $installDir "deepstudy.exe"
+$target = Join-Path ([Environment]::GetFolderPath("UserProfile")) "Downloads\$($asset.name)"
 Invoke-WebRequest $asset.browser_download_url -OutFile $target
 Start-Process $target
 ```
@@ -83,7 +81,6 @@ Start-Process $target
 Verify the executable and shortcut:
 
 ```powershell
-Get-Item "$env:LOCALAPPDATA\Programs\DeepStudy\deepstudy.exe"
 $shortcut = "$env:USERPROFILE\Desktop\DeepStudy.lnk"
 if (Test-Path $shortcut) {
   $s = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
@@ -113,7 +110,7 @@ Validate:
 npm test
 ```
 
-Build Windows portable executable:
+Build Windows installer:
 
 ```powershell
 npm run pack:win
@@ -184,7 +181,7 @@ git push origin main --tags
 
 GitHub Actions builds:
 
-- Windows: `dist/deepstudy-*.exe`
+- Windows: `dist/DeepStudy-Setup-*.exe`
 - macOS: `dist/deepstudy-*.dmg`
 
 Both artifacts are uploaded to the GitHub Release for the tag.
@@ -207,29 +204,27 @@ The required notice is in [NOTICE](NOTICE).
 - 应用已隐藏或最小化时，再次双击桌面快捷方式会快速恢复已有窗口。
 - 每日计划在窄屏或右侧停靠窗口中保持响应式排列，输入框、任务列表、清除/重置按钮和 AI 助手不会互相覆盖。
 - 本地数据保存，不需要账号。
-- 支持 Windows 便携版 `.exe`，并提供 macOS `.dmg` 的 GitHub Actions 发布流程。
+- 支持 Windows 安装向导 `.exe`，并提供 macOS `.dmg` 的 GitHub Actions 发布流程。
 
 ### 下载安装
 
 1. 打开最新发布页：
    [https://github.com/tangchengyu/DeepStudy/releases/latest](https://github.com/tangchengyu/DeepStudy/releases/latest)
 2. 下载对应平台文件：
-   - Windows：`deepstudy-*.exe`
+   - Windows：`DeepStudy-Setup-*.exe`
    - macOS：`deepstudy-*.dmg`
 3. 安装或运行：
-   - Windows：建议把 `.exe` 放到稳定目录，例如 `%LOCALAPPDATA%\Programs\DeepStudy\deepstudy.exe`，然后双击运行。首次运行会自动创建或修复桌面快捷方式。
+   - Windows：运行安装程序，选择安装目录，由安装程序创建 `DeepStudy` 桌面快捷方式。
    - macOS：打开 `.dmg`，把 `deepstudy.app` 拖到 `/Applications`，再打开。由于当前包未签名，首次启动可能需要按住 Control 点击并选择“打开”。
 
 ### 给自动化 Agent 的 Windows 安装命令
 
 ```powershell
 $release = Invoke-RestMethod "https://api.github.com/repos/tangchengyu/DeepStudy/releases/latest"
-$asset = $release.assets | Where-Object { $_.name -like "deepstudy-*.exe" } | Select-Object -First 1
-if (-not $asset) { throw "No Windows deepstudy-*.exe asset was found." }
+$asset = $release.assets | Where-Object { $_.name -like "DeepStudy-Setup-*.exe" } | Select-Object -First 1
+if (-not $asset) { throw "No Windows DeepStudy-Setup-*.exe asset was found." }
 
-$installDir = Join-Path $env:LOCALAPPDATA "Programs\DeepStudy"
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-$target = Join-Path $installDir "deepstudy.exe"
+$target = Join-Path ([Environment]::GetFolderPath("UserProfile")) "Downloads\$($asset.name)"
 Invoke-WebRequest $asset.browser_download_url -OutFile $target
 Start-Process $target
 ```
@@ -237,7 +232,6 @@ Start-Process $target
 验证可执行文件和桌面快捷方式：
 
 ```powershell
-Get-Item "$env:LOCALAPPDATA\Programs\DeepStudy\deepstudy.exe"
 $shortcut = "$env:USERPROFILE\Desktop\DeepStudy.lnk"
 if (Test-Path $shortcut) {
   $s = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
@@ -267,7 +261,7 @@ npm start
 npm test
 ```
 
-打包 Windows 便携版：
+打包 Windows 安装包：
 
 ```powershell
 npm run pack:win
@@ -338,7 +332,7 @@ git push origin main --tags
 
 GitHub Actions 会构建：
 
-- Windows：`dist/deepstudy-*.exe`
+- Windows：`dist/DeepStudy-Setup-*.exe`
 - macOS：`dist/deepstudy-*.dmg`
 
 两个文件会上传到对应 tag 的 GitHub Release。

@@ -1,9 +1,11 @@
 const { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu, Notification, nativeImage, powerMonitor, shell, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
+const APP_DATA_DIR_NAME = "deepstudy";
+
+app.setPath("userData", path.join(app.getPath("appData"), APP_DATA_DIR_NAME));
 
 if (process.platform === "win32") {
   app.setAppUserModelId(APP_USER_MODEL_ID);
@@ -64,78 +66,6 @@ function appIconImage(size = 16) {
   return image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: size, height: size });
 }
 
-function psString(value) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
-
-function writeShortcutWithPowerShell(shortcutPath, target, cwd) {
-  const command = [
-    "$shell = New-Object -ComObject WScript.Shell",
-    `$shortcut = $shell.CreateShortcut(${psString(shortcutPath)})`,
-    `$shortcut.TargetPath = ${psString(target)}`,
-    `$shortcut.WorkingDirectory = ${psString(cwd)}`,
-    `$shortcut.IconLocation = ${psString(`${target},0`)}`,
-    "$shortcut.Save()",
-  ].join("; ");
-
-  const result = spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
-    { windowsHide: true },
-  );
-  return result.status === 0;
-}
-
-function preferredShortcutTarget() {
-  if (process.env.PORTABLE_EXECUTABLE_FILE) {
-    const portableDir = path.dirname(process.env.PORTABLE_EXECUTABLE_FILE);
-    const unpackedExe = path.join(portableDir, "win-unpacked", "deepstudy.exe");
-    if (fs.existsSync(unpackedExe)) return unpackedExe;
-    return process.env.PORTABLE_EXECUTABLE_FILE;
-  }
-  return process.execPath;
-}
-
-function ensureDesktopShortcut() {
-  if (process.platform !== "win32") return;
-  try {
-    const shortcutPath = path.join(app.getPath("desktop"), "DeepStudy.lnk");
-    const target = preferredShortcutTarget();
-    const cwd = path.dirname(target);
-    let existing = null;
-    try {
-      existing = fs.existsSync(shortcutPath)
-        ? shell.readShortcutLink(shortcutPath)
-        : null;
-    } catch {
-      existing = null;
-    }
-    const alreadyCorrect =
-      existing &&
-      path.resolve(existing.target || "") === path.resolve(target) &&
-      path.resolve(existing.cwd || "") === path.resolve(cwd) &&
-      path.resolve(existing.icon || "") === path.resolve(target);
-
-    if (alreadyCorrect) return;
-
-    const createdByElectron = shell.writeShortcutLink(shortcutPath, existing ? "replace" : "create", {
-      target,
-      cwd,
-      description: "DeepStudy focus management",
-      icon: app.isPackaged ? target : APP_ICON_PATH,
-      iconIndex: 0,
-      appUserModelId: APP_USER_MODEL_ID,
-    });
-    const created = createdByElectron || writeShortcutWithPowerShell(shortcutPath, target, cwd);
-
-    if (!created) {
-      console.warn(`Desktop shortcut was not created: ${shortcutPath}`);
-    }
-  } catch (error) {
-    console.warn("Unable to create desktop shortcut:", error);
-  }
-}
-
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1180,
@@ -143,7 +73,7 @@ function createWindow() {
     minWidth: 520,
     minHeight: 420,
     resizable: true,
-    title: "deepstudy",
+    title: "DeepStudy",
     backgroundColor: "#f0f7f4",
     icon: windowIcon(),
     webPreferences: {
@@ -282,7 +212,7 @@ function modelHeaders(settings) {
   };
   if (/openrouter\.ai/i.test(settings.api.baseUrl)) {
     headers["HTTP-Referer"] = "https://my.feishu.cn/docx/Sr9RdRzFaop9BSxBgcAcdxDonOc";
-    headers["X-Title"] = "deepstudy";
+    headers["X-Title"] = "DeepStudy";
   }
   return headers;
 }
@@ -1121,7 +1051,6 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(() => {
-  ensureDesktopShortcut();
   createWindow();
   createTray();
   checkReminders();
