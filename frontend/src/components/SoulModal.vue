@@ -17,6 +17,17 @@
       <div class="soul-form-actions">
         <button id="soul-cancel-edit" class="secondary-btn" type="button" v-if="editingId" @click="cancelEdit">取消修改</button>
         <button id="soul-save" class="primary-btn" type="submit">{{ editingId ? '更新句子' : '添加句子' }}</button>
+        <button
+          id="soul-default-library-toggle"
+          class="secondary-btn soul-library-toggle"
+          :class="{ active: defaultLibraryEnabled }"
+          type="button"
+          :aria-pressed="String(defaultLibraryEnabled)"
+          :title="defaultLibraryEnabled ? '已启用默认好句库；再次点击后，欢迎界面只随机展示自定义好句子。' : '点击后，欢迎界面会从默认好句库和自定义好句子中随机展示；默认库句子不会出现在下方列表。'"
+          @click="toggleDefaultLibrary"
+        >
+          {{ defaultLibraryEnabled ? '取消默认的“好句库”' : '使用默认的“好句库”' }}
+        </button>
       </div>
     </form>
 
@@ -38,21 +49,49 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { api } from '@/api'
-import { todayKey } from '@/utils/format'
+import { KEYS } from '@/utils/constants'
+
+const DEFAULT_QUOTE = 'Attention Is All You Need'
 
 const soulQuotes = ref([])
 const loading = ref(false)
 const newQuoteText = ref('')
 const editingId = ref(null)
+const defaultLibraryEnabled = ref(readDefaultLibraryEnabled())
+
+function readDefaultLibraryEnabled() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.defaultSoulQuotesEnabled)) === true
+  } catch {
+    return false
+  }
+}
+
+function normalizeQuote(item) {
+  const text = typeof item === 'string' ? item : item?.text
+  return String(text || '').replace(/\s+/g, ' ').trim()
+}
+
+async function seedDefaultQuote() {
+  const existing = soulQuotes.value.some(q => normalizeQuote(q).toLowerCase() === DEFAULT_QUOTE.toLowerCase())
+  if (existing) return
+  try {
+    const saved = await api.createQuote({ text: DEFAULT_QUOTE })
+    soulQuotes.value = [saved]
+  } catch {
+    soulQuotes.value = [{ id: 'default-attention', text: DEFAULT_QUOTE }]
+  }
+}
 
 async function loadQuotes() {
   loading.value = true
   try {
     const data = await api.getAllQuotes()
     soulQuotes.value = Array.isArray(data) ? data : []
+    if (soulQuotes.value.length === 0) await seedDefaultQuote()
   } catch (e) {
     console.error('Failed to load soul quotes:', e)
-    soulQuotes.value = []
+    soulQuotes.value = [{ id: 'default-attention', text: DEFAULT_QUOTE }]
   } finally {
     loading.value = false
   }
@@ -109,6 +148,12 @@ function closeModal() {
   // Parent component should close the modal via v-model
 }
 
+function toggleDefaultLibrary() {
+  defaultLibraryEnabled.value = !defaultLibraryEnabled.value
+  localStorage.setItem(KEYS.defaultSoulQuotesEnabled, JSON.stringify(defaultLibraryEnabled.value))
+  window.dispatchEvent(new CustomEvent('deepstudy:soul-library-changed'))
+}
+
 watch(() => soulQuotes.value, (quotes) => {
   // Persist to localStorage if needed (but we have backend)
 }, { deep: true })
@@ -125,7 +170,7 @@ loadQuotes()
   padding: 24px;
   border-color: var(--border);
   background: var(--surface);
-  box-shadow: 0 24px 80px rgba(44, 62, 56, 0.24);
+  box-shadow: 0 10px 30px rgba(50, 68, 59, 0.12);
 }
 
 .soul-form {
@@ -155,7 +200,14 @@ loadQuotes()
 .soul-form-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.soul-library-toggle.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
 }
 
 .soul-list {

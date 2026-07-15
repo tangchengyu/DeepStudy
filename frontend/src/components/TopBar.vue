@@ -13,7 +13,7 @@
 
       <!-- 白噪音控制 -->
       <div class="noise-control" @click="toggleNoiseMenu">
-        <button id="noise-menu-button" class="audio-btn" type="button" :class="{ active: noiseMenuOpen || activeTrackId }">
+        <button id="noise-menu-button" class="audio-btn" type="button" :class="{ active: noiseMenuOpen || activeTrackId }" title="【稳定背景声可通过掩蔽突发环境噪音，减少外界刺激对注意力的捕获。】">
           我的白噪音
         </button>
         <div v-show="noiseMenuOpen || activeTrackId" class="noise-popover">
@@ -66,7 +66,7 @@
       </button>
 
       <!-- 长期任务 -->
-      <button id="long-tasks-open" class="tool-btn long-task-launch" type="button" @click="openLongTasks">
+      <button id="long-tasks-open" class="tool-btn long-task-launch" type="button" @click="openLongTasks" title="【基于艾森豪威尔优先级管理理论，结合认知负荷理论与行为科学，通过区分任务的重要性和紧急性，帮助减少决策疲劳，提升长期目标投入。】">
         <span class="long-task-launch-mark" aria-hidden="true"></span>
         长期任务
       </button>
@@ -258,8 +258,10 @@ onMounted(() => {
   gap: 8px 18px;
   min-height: 58px;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 253, 249, 0.94);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 8px rgba(57, 78, 67, 0.035);
+  backdrop-filter: blur(10px);
   white-space: normal;
 }
 
@@ -362,7 +364,7 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow);
   opacity: 0;
   visibility: hidden;
   transform: translate(-50%, -5px);
@@ -501,18 +503,18 @@ onMounted(() => {
   gap: 7px;
   min-width: 118px;
   padding-inline: 13px;
-  border-color: rgba(91, 184, 160, 0.46);
-  background: linear-gradient(180deg, #ffffff, #f3fbf7);
-  color: #3f7f6e;
-  box-shadow: 0 4px 14px rgba(44, 62, 56, 0.05);
+  border-color: rgba(112, 173, 153, 0.4);
+  background: linear-gradient(180deg, var(--surface), #f4f8f2);
+  color: #527d6d;
+  box-shadow: 0 2px 8px rgba(57, 78, 67, 0.045);
 }
 
 .long-task-launch:hover,
 .long-task-launch:focus-visible {
   border-color: var(--accent);
-  background: linear-gradient(180deg, #ffffff, #e8f7f1);
+  background: linear-gradient(180deg, var(--surface), #edf5ee);
   color: var(--accent-hover);
-  box-shadow: 0 8px 20px rgba(91, 184, 160, 0.16);
+  box-shadow: 0 3px 10px rgba(72, 111, 93, 0.07);
 }
 
 .long-task-launch-mark {

@@ -5,7 +5,6 @@
       :class="{ active: modelValue === 'focus' }"
       type="button"
       @click="$emit('update:modelValue', 'focus')"
-      title="专注模式"
     >
       <span class="mode-tab-icon" aria-hidden="true">◉</span>
       <span>专注模式</span>
@@ -15,7 +14,6 @@
       :class="{ active: modelValue === 'rest' }"
       type="button"
       @click="$emit('update:modelValue', 'rest')"
-      title="休息模式"
     >
       <span class="mode-tab-icon" aria-hidden="true">☕</span>
       <span>休息模式</span>
@@ -25,7 +23,7 @@
       :class="{ active: modelValue === 'habit' }"
       type="button"
       @click="$emit('update:modelValue', 'habit')"
-      title="长期习惯"
+      title="【习惯形成依赖稳定情境线索与重复行为绑定，持续记录能提高行为自动化的概率。】"
     >
       <span class="mode-tab-icon" aria-hidden="true">↗</span>
       <span>长期习惯构建</span>
@@ -52,7 +50,7 @@ defineEmits(['update:modelValue'])
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 253, 249, 0.8);
   overflow: hidden;
 }
 
@@ -80,7 +78,7 @@ defineEmits(['update:modelValue'])
 .mode-tab.active {
   border-right-color: transparent;
   border-radius: 12px;
-  background: linear-gradient(180deg, #63c3a9, var(--accent));
+  background: linear-gradient(180deg, #7db7a4, var(--accent));
   color: white;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }

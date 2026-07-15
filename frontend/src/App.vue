@@ -164,7 +164,10 @@ onMounted(async () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(80, 104, 91, 0.016) 0, rgba(80, 104, 91, 0.016) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0, rgba(255, 255, 255, 0.22) 1px, transparent 1px, transparent 7px);
   overflow: hidden;
 }
 

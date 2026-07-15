@@ -31,7 +31,7 @@ function confirm() { emit('confirm'); emit('update:visible', false) }
   z-index: 50;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(50, 68, 59, 0.34);
   backdrop-filter: blur(2px);
 }
 .modal-card {
@@ -41,7 +41,7 @@ function confirm() { emit('confirm'); emit('update:visible', false) }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 24px 80px rgba(44,62,56,0.24);
+  box-shadow: 0 10px 30px rgba(50, 68, 59, 0.12);
 }
 .settings-heading { margin-bottom: 16px; }
 .reset-confirm-text {

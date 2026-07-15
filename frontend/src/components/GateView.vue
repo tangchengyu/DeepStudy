@@ -20,7 +20,7 @@
       <div class="quote-screen-text">{{ currentQuote }}</div>
     </div>
     <p>确保至少 5 分钟闭眼静心，清除注意力残留后，进入注意力空间。</p>
-    <button id="enter-gate" class="gate-button" type="button" @click="$emit('start')">
+    <button id="enter-gate" class="gate-button" type="button" @click="$emit('start')" title="进入前先清空上一任务的注意力残留。【注意力残留理论认为，开始新任务时，未完成思绪会占用认知资源，短暂静心有助于降低切换成本。】">
       进入注意力空间
     </button>
     <small>守门员不是消灭分心，而是觉察它，并把注意力带回来。</small>
@@ -28,8 +28,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/api'
+import { DEFAULT_SOUL_QUOTES } from '@/utils/defaultSoulQuotes'
+import { KEYS } from '@/utils/constants'
 
 const props = defineProps({
   defaultQuote: { type: String, default: 'Attention Is All You Need' }
@@ -38,42 +40,67 @@ const props = defineProps({
 const emit = defineEmits(['start'])
 
 const currentQuote = ref(props.defaultQuote)
+const customQuotes = ref([])
 
-async function fetchRandomQuote() {
+function normalizeQuote(item) {
+  const text = typeof item === 'string' ? item : item?.text
+  return String(text || '').replace(/\s+/g, ' ').trim()
+}
+
+function defaultLibraryEnabled() {
   try {
-    const quote = await api.getRandomQuote()
-    if (quote?.text) {
-      currentQuote.value = quote.text
-    }
+    return JSON.parse(localStorage.getItem(KEYS.defaultSoulQuotesEnabled)) === true
   } catch {
-    // 使用默认值
-    currentQuote.value = props.defaultQuote
+    return false
+  }
+}
+
+function quotePool() {
+  const texts = customQuotes.value.map(normalizeQuote).filter(Boolean)
+  if (defaultLibraryEnabled()) texts.push(...DEFAULT_SOUL_QUOTES)
+  if (!texts.length) texts.push(props.defaultQuote)
+  const seen = new Set()
+  return texts.filter((text) => {
+    const key = text.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+async function loadCustomQuotes() {
+  try {
+    const data = await api.getAllQuotes()
+    customQuotes.value = Array.isArray(data) ? data : []
+  } catch {
+    customQuotes.value = []
   }
 }
 
 function refreshQuote() {
-  currentQuote.value = ''
-  // 如果 API 不可用，循环默认名言
-  const fallbacks = [
-    'Attention Is All You Need',
-    'Stay hungry, stay foolish.',
-    '行胜于言',
-    '知行合一'
-  ]
-  const current = currentQuote.value || props.defaultQuote
-  let next = fallbacks[Math.floor(Math.random() * fallbacks.length)]
-  while (next === current && fallbacks.length > 1) {
-    next = fallbacks[Math.floor(Math.random() * fallbacks.length)]
-  }
+  const pool = quotePool()
+  const current = currentQuote.value
+  let next = pool[Math.floor(Math.random() * pool.length)] || props.defaultQuote
+  while (next === current && pool.length > 1) next = pool[Math.floor(Math.random() * pool.length)]
   currentQuote.value = next
+}
+
+async function refreshLibraryState() {
+  await loadCustomQuotes()
+  refreshQuote()
 }
 
 function onImgError(e) {
   e.target.style.display = 'none'
 }
 
-onMounted(() => {
-  fetchRandomQuote()
+onMounted(async () => {
+  await refreshLibraryState()
+  window.addEventListener('deepstudy:soul-library-changed', refreshLibraryState)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('deepstudy:soul-library-changed', refreshLibraryState)
 })
 </script>
 
@@ -102,12 +129,12 @@ onMounted(() => {
 
 .attention-arena {
   width: min(760px, 100%);
-  aspect-ratio: 1830 / 856;
+  aspect-ratio: 1844 / 853;
   margin-bottom: 4px;
   overflow: hidden;
   border-radius: 28px;
-  background: #d9f7f6;
-  box-shadow: 0 20px 55px rgba(54, 129, 125, 0.2);
+  background: #e3f2ef;
+  box-shadow: 0 7px 22px rgba(63, 111, 98, 0.09);
 }
 
 .attention-arena img {
@@ -139,7 +166,7 @@ onMounted(() => {
     inset 0 0 0 10px rgba(255, 255, 255, 0.58),
     inset 0 0 0 13px rgba(100, 204, 202, 0.34),
     inset 0 0 0 20px rgba(255, 255, 255, 0.46),
-    0 18px 42px rgba(76, 132, 128, 0.18);
+    0 7px 22px rgba(63, 111, 98, 0.08);
   cursor: pointer;
   transition: transform var(--transition), box-shadow var(--transition);
 }
@@ -150,8 +177,7 @@ onMounted(() => {
     inset 0 0 0 10px rgba(255, 255, 255, 0.64),
     inset 0 0 0 13px rgba(100, 204, 202, 0.44),
     inset 0 0 0 20px rgba(255, 255, 255, 0.5),
-    0 22px 48px rgba(76, 132, 128, 0.22);
-  transform: translateY(-1px);
+    0 8px 24px rgba(63, 111, 98, 0.1);
 }
 
 .quote-screen:focus-visible {
@@ -188,16 +214,16 @@ onMounted(() => {
   min-width: 280px;
   padding: 15px 30px;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--accent), var(--blue));
+  background: linear-gradient(135deg, #7db7a4, #83aac6);
   color: white;
   font-size: 18px;
   font-weight: 800;
-  box-shadow: 0 12px 30px rgba(91, 184, 160, 0.28);
+  box-shadow: 0 5px 16px rgba(63, 111, 98, 0.12);
   transition: 0.25s;
 }
 
 .gate-button:hover {
-  transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 16px 34px rgba(91, 184, 160, 0.35);
+  background: linear-gradient(135deg, #70ad99, #789eb9);
+  box-shadow: 0 6px 18px rgba(63, 111, 98, 0.14);
 }
 </style>

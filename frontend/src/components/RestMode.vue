@@ -67,7 +67,7 @@
           class="breathing-btn"
           :data-kind="'box'"
           @click="startBreathing('box')"
-          title="4-4-4-4 腹式呼吸法：每次专注结束后的快速高效放松练习。"
+          title="每次专注结束后的快速高效放松练习。4-4-4-4指的是使用腹式呼吸，吸气4秒，憋气4秒，呼气4秒，憋气4秒，依次循环的过程。【通过缓慢、规律且等时的吸气—屏息—呼气—屏息调节呼吸节律，可增强迷走神经活动、降低交感神经兴奋性，从而改善自主神经平衡，促进身心放松和注意力集中。】"
         >
           🧘 <span class="term-tip">4-4-4-4 腹式呼吸</span>
         </ElButton>
@@ -75,7 +75,7 @@
           class="breathing-btn"
           :data-kind="'wim'"
           @click="startBreathing('wim')"
-          title="冰人呼吸法：适用于身体已经很疲惫，但有紧急任务必须专注完成的情况。可触发大量肾上腺素释放，短期内显著激活身体。避免饭后立即练习。如有不适，应立即停止练习。不建议长期高频使用。"
+          title="适用于身体已经很疲惫，但有紧急任务必须专注完成的情况。短时间内可显著激活身体。但避免饭后立即练习，如有不适，应立即停止练习。不建议长期高频使用。【通过控制性过度通气（hyperventilation）与屏息交替，短暂激活交感神经系统并提高肾上腺素水平，从而增强机体对应激和炎症反应的调节能力。】"
         >
           ❄️ <span class="term-tip">冰人呼吸法</span>
         </ElButton>
@@ -507,10 +507,14 @@ onMounted(() => {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  transition: border-color var(--transition), background var(--transition), color var(--transition);
 }
 
 .breathing-btn:hover {
   border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
 }
 
 #breathing-stage {
@@ -530,6 +534,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   transition: transform 0.3s ease;
+  box-shadow: 0 6px 20px rgba(63, 111, 98, 0.08);
 }
 
 .breathing-label {

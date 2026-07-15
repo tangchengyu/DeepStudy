@@ -9,7 +9,10 @@
 html, body {
   height: 100%;
   font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(80, 104, 91, 0.016) 0, rgba(80, 104, 91, 0.016) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0, rgba(255, 255, 255, 0.22) 1px, transparent 1px, transparent 7px);
   color: var(--text);
   overflow: hidden;
 }
@@ -55,7 +58,7 @@ input:focus, textarea:focus, select:focus {
   font-weight: 700;
   transition: all var(--transition);
 }
-.primary-btn:hover { background: var(--green-hover); transform: translateY(-1px); }
+.primary-btn:hover { background: var(--green-hover); }
 .primary-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
 .primary-btn.compact { min-height: 32px; padding: 0 10px; font-size: 12px; }
 
@@ -135,7 +138,7 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 7px 24px rgba(44, 62, 56, 0.045);
+  box-shadow: var(--shadow);
   padding: 19px;
   margin-top: 16px;
 }

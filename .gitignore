@@ -3,6 +3,7 @@ frontend/node_modules/
 electron-shell/node_modules/
 
 dist/
+output/
 frontend/dist/
 electron-shell/dist/
 electron-shell/release/

@@ -22,7 +22,7 @@
           </button>
           <div id="noise-control" class="noise-control">
             <div class="noise-button-group">
-              <button id="noise-menu-button" class="audio-btn" type="button" aria-expanded="false">
+              <button id="noise-menu-button" class="audio-btn" type="button" aria-expanded="false" title="【稳定背景声可通过掩蔽突发环境噪音，减少外界刺激对注意力的捕获。】">
                 我的白噪音
               </button>
               <button id="noise-mute-button" class="noise-mute-button" type="button" aria-label="静音白噪音" title="静音白噪音">
@@ -69,7 +69,7 @@
           <button id="open-countdown" class="tool-btn" type="button">
             ⏲ 倒计时
           </button>
-          <button id="long-tasks-open" class="tool-btn long-task-launch" type="button">
+          <button id="long-tasks-open" class="tool-btn long-task-launch" type="button" title="【基于艾森豪威尔优先级管理理论，结合认知负荷理论与行为科学，通过区分任务的重要性和紧急性，帮助减少决策疲劳，提升长期目标投入。】">
             <span class="long-task-launch-mark" aria-hidden="true"></span>
             长期任务
           </button>
@@ -189,7 +189,7 @@
               <div id="focus-quote-text" class="quote-screen-text">Attention Is All You Need</div>
             </div>
             <p>确保至少 5 分钟闭眼静心，清除注意力残留后，进入注意力空间。</p>
-            <button id="enter-gate" class="gate-button" type="button">
+            <button id="enter-gate" class="gate-button" type="button" title="进入前先清空上一任务的注意力残留。【注意力残留理论认为，开始新任务时，未完成思绪会占用认知资源，短暂静心有助于降低切换成本。】">
               进入注意力空间
             </button>
             <small>守门员不是消灭分心，而是觉察它，并把注意力带回来。</small>
@@ -206,7 +206,6 @@
                   class="mode-tab active"
                   data-mode="focus"
                   type="button"
-                  title="专注模式：大脑像聚光灯般调动前额叶皮层，沿熟悉的神经通路集中精力解决具体问题。"
                 >
                   <span class="mode-tab-icon" aria-hidden="true">◉</span>
                   <span>专注模式</span>
@@ -215,12 +214,11 @@
                   class="mode-tab"
                   data-mode="rest"
                   type="button"
-                  title="分散模式：大脑在放松状态下让思维发散，促使不同脑区产生随机连接，从而激发灵感与宏观洞察。"
                 >
                   <span class="mode-tab-icon" aria-hidden="true">☕</span>
                   <span>休息模式</span>
                 </button>
-                <button class="mode-tab" data-mode="habit" type="button">
+                <button class="mode-tab" data-mode="habit" type="button" title="【习惯形成依赖稳定情境线索与重复行为绑定，持续记录能提高行为自动化的概率。】">
                   <span class="mode-tab-icon" aria-hidden="true">↗</span>
                   <span>长期习惯构建</span>
                 </button>
@@ -236,7 +234,7 @@
                 <div id="focus-timer" class="large-timer">25:00</div>
               </div>
               <div class="focus-actions">
-                <button id="focus-start" class="primary-btn" type="button">
+                <button id="focus-start" class="primary-btn" type="button" title="启动一段不被打断的单任务时间。【时间分块与番茄工作法通过明确时间边界，降低启动阻力并提升持续投入。】">
                   开始专注
                 </button>
                 <button
@@ -251,7 +249,7 @@
                   重置
                 </button>
               </div>
-              <div class="work-type-card">
+              <div class="work-type-card" title="区分核心工作与维持性工作，方便复盘时间投入结构。【基于目标导向行为理论，明确任务类型有助于把高认知资源优先分配给真正推进目标的活动。】">
                 <div>
                   <strong>当前任务类型</strong>
                   <p id="work-type-description">
@@ -273,13 +271,14 @@
               <section class="card distraction-card">
                 <div class="card-title-row">
                   <div>
-                    <h3>分心清单</h3>
+                    <h3 title="把分心先记录下来，而不是立刻处理。【外部化记录可降低工作记忆负担，减少反复惦记未处理事项带来的认知占用。】">分心清单</h3>
                     <p>按可控性与趣味性分类，找到下一次的应对方式。</p>
                   </div>
                   <button
                     id="quick-distraction"
                     class="danger-btn"
                     type="button"
+                    title="先捕捉分心，再回到当前任务。【元认知监控能帮助个体觉察注意力偏移，并更快恢复到原定目标。】"
                   >
                     快速添加干扰
                   </button>
@@ -332,14 +331,14 @@
                     class="breathing-btn"
                     data-kind="box"
                     type="button"
-                    title="4-4-4-4 腹式呼吸法：每次专注结束后的快速高效放松练习。"
+                    title="每次专注结束后的快速高效放松练习。4-4-4-4指的是使用腹式呼吸，吸气4秒，憋气4秒，呼气4秒，憋气4秒，依次循环的过程。【通过缓慢、规律且等时的吸气—屏息—呼气—屏息调节呼吸节律，可增强迷走神经活动、降低交感神经兴奋性，从而改善自主神经平衡，促进身心放松和注意力集中。】"
                   >
                     🧘 <span class="term-tip">4-4-4-4 腹式呼吸</span></button
                   ><button
                     class="breathing-btn"
                     data-kind="wim"
                     type="button"
-                    title="冰人呼吸法：适用于身体已经很疲惫，但有紧急任务必须专注完成的情况。可触发大量肾上腺素释放，短期内显著激活身体。避免饭后立即练习。如有不适，应立即停止练习。不建议长期高频使用。"
+                    title="适用于身体已经很疲惫，但有紧急任务必须专注完成的情况。短时间内可显著激活身体。但避免饭后立即练习，如有不适，应立即停止练习。不建议长期高频使用。【通过控制性过度通气（hyperventilation）与屏息交替，短暂激活交感神经系统并提高肾上腺素水平，从而增强机体对应激和炎症反应的调节能力。】"
                   >
                     ❄️ <span class="term-tip">冰人呼吸法</span>
                   </button>
@@ -358,13 +357,13 @@
 
             <section id="habit-mode" class="mode-panel">
               <div class="target-banner">
-                <strong>长期目标</strong
+                <strong title="【清晰且可量化的长期目标能增强目标承诺，并为每日行为提供持续反馈参照。】">长期目标</strong
                 ><span>争取每日总专注时长达到 6 小时，每周达到 40 小时。</span>
               </div>
               <section class="card">
                 <div class="card-title-row">
                   <div>
-                    <h3>时间审计</h3>
+                    <h3 title="【时间追踪能提升自我监控精度，帮助发现计划时间与实际时间之间的偏差。】">时间审计</h3>
                     <p>核心工作、维持工作、主动休息与分心的真实分配。</p>
                   </div>
                   <span id="audit-refresh-status" class="subtle"></span>
@@ -372,7 +371,7 @@
                 <div id="time-audit"></div>
               </section>
               <section class="card reflection-card">
-                <h3>每日反思</h3>
+                <h3 title="【反思性写作能促进经验编码与自我调节，把当天事件转化为可改进的行为线索。】">每日反思</h3>
                 <p>每周末可将前 7 天记录导出，交给自动化整理成周报。</p>
                 <textarea
                   id="reflection-input"
@@ -615,6 +614,7 @@
           <div class="soul-form-actions">
             <button id="soul-cancel-edit" class="secondary-btn" type="button" hidden>取消修改</button>
             <button id="soul-save" class="primary-btn" type="submit">添加句子</button>
+            <button id="soul-default-library-toggle" class="secondary-btn soul-library-toggle" type="button" aria-pressed="false">使用默认的“好句库”</button>
           </div>
         </form>
 
@@ -645,6 +645,7 @@
     <audio id="audio-focus-rest-prompt" src="assets/audio/brain_cache_rest_charge.mp3"></audio>
     <script src="planner-utils.js"></script>
     <script src="electron-bridge.js"></script>
+    <script src="default-quotes.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

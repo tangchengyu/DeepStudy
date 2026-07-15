@@ -27,7 +27,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { inject, onMounted } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useFocusStore } from '@/stores/focus'
 import { useDailyPlanStore } from '@/stores/plan'
@@ -45,6 +45,7 @@ const focusStore = useFocusStore()
 const planStore = useDailyPlanStore()
 const distractionStore = useDistractionStore()
 const soulStore = useSoulStore()
+const tabCollapsed = inject('tabCollapsed', false)
 
 async function onStartFocus() {
   runtime.exitGate()
@@ -103,10 +104,10 @@ onMounted(async () => {
   gap: 18px;
   margin-bottom: 20px;
   padding: 8px 10px;
-  border: 1px solid rgba(208, 229, 216, 0.9);
+  border: 1px solid rgba(214, 228, 216, 0.92);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 16px 38px rgba(44, 62, 56, 0.08);
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: 0 4px 15px rgba(57, 78, 67, 0.055);
   backdrop-filter: blur(12px);
 }
 
@@ -126,7 +127,7 @@ onMounted(async () => {
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 253, 249, 0.78);
   color: var(--text-muted);
   font-size: 18px;
   font-weight: 700;

@@ -1,5 +1,7 @@
 <template>
-  <section class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="planner-settings-title">
+  <Teleport to="body">
+    <div v-if="visible" class="modal-overlay" @click.self="closeModal">
+      <section class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="planner-settings-title">
     <div class="settings-heading">
       <div>
         <div class="eyebrow">AI MODEL</div>
@@ -36,31 +38,25 @@
       <button id="planner-settings-cancel" class="secondary-btn" type="button">取消</button>
       <button id="planner-settings-save" class="primary-btn" type="button">保存并使用</button>
     </div>
-  </section>
+      </section>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { api } from '@/api'
 
-const props = defineProps({
-  modelValue: {
+defineProps({
+  visible: {
     type: Boolean,
     default: false
   }
 })
 
-const emit = defineEmits(['update:modelValue'])
-
-const showPlannerSettings = ref(props.modelValue)
-
-watch(() => props.modelValue, (newVal) => {
-  showPlannerSettings.value = newVal
-})
+const emit = defineEmits(['update:visible'])
 
 function closeModal() {
-  showPlannerSettings.value = false
-  emit('update:modelValue', false)
+  emit('update:visible', false)
 }
 
 // We'll implement the actual API config logic in a real implementation
@@ -75,7 +71,7 @@ function closeModal() {
   padding: 24px;
   border-color: var(--border);
   background: var(--surface);
-  box-shadow: 0 24px 80px rgba(44, 62, 56, 0.24);
+  box-shadow: 0 10px 30px rgba(50, 68, 59, 0.12);
 }
 
 .settings-heading {
@@ -139,15 +135,14 @@ function closeModal() {
   border-radius: var(--radius-sm);
   background: linear-gradient(135deg, var(--accent), #2f8f7b);
   color: white;
-  box-shadow: 0 12px 26px rgba(72, 168, 142, 0.26);
+  box-shadow: 0 4px 14px rgba(72, 111, 93, 0.12);
   cursor: pointer;
   font-size: 14px;
   font-weight: 850;
 }
 
 .tutorial-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 32px rgba(72, 168, 142, 0.32);
+  box-shadow: 0 5px 16px rgba(72, 111, 93, 0.14);
 }
 
 .saved-profile-row {

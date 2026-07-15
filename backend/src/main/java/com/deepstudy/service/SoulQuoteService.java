@@ -28,7 +28,7 @@ public class SoulQuoteService {
             // Return default quote if no quotes exist
             SoulQuote defaultQuote = new SoulQuote();
             defaultQuote.setId("default");
-            defaultQuote.setText("专注当下，持续进步。");
+            defaultQuote.setText("Attention Is All You Need");
             defaultQuote.setCreatedAt(System.currentTimeMillis());
             return defaultQuote;
         }

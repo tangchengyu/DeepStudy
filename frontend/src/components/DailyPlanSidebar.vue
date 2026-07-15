@@ -567,7 +567,10 @@ onMounted(async () => {
   min-height: 0;
   overflow: hidden;
   padding: 18px;
-  background: var(--sidebar);
+  background-color: var(--sidebar);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(75, 104, 87, 0.018) 0, rgba(75, 104, 87, 0.018) 1px, transparent 1px, transparent 5px),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.22), transparent 52%);
   border-right: 1px solid var(--border);
 }
 
@@ -968,7 +971,6 @@ onMounted(async () => {
 
 .primary-btn:hover {
   background: var(--green-hover);
-  transform: translateY(-1px);
 }
 
 .danger-btn {

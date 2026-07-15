@@ -207,8 +207,7 @@ timer-container {
 }
 
 .preset-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--accent-soft);
+  box-shadow: 0 2px 8px rgba(63, 111, 98, 0.08);
 }
 
 .preset-button.active {
@@ -252,14 +251,13 @@ timer-container {
 }
 
 .start-btn {
-  background: linear-gradient(135deg, var(--accent), #2f7e6e);
+  background: linear-gradient(135deg, #70ad99, #568f7c);
   color: white;
-  box-shadow: 0 8px 24px var(--accent-soft);
+  box-shadow: 0 4px 14px rgba(63, 111, 98, 0.12);
 }
 
 .start-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px var(--accent-soft);
+  box-shadow: 0 5px 16px rgba(63, 111, 98, 0.14);
 }
 
 .stop-btn {
@@ -272,11 +270,11 @@ timer-container {
   margin: 2rem auto;
   padding: 30px 20px;
   border-radius: 24px;
-  background: linear-gradient(145deg, rgba(78, 206, 190, 0.12), rgba(41, 73, 59, 0.12));
+  background: linear-gradient(145deg, rgba(112, 173, 153, 0.12), rgba(131, 170, 198, 0.1));
   backdrop-filter: blur(10px);
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px rgba(50, 68, 59, 0.1);
 }
 
 .clock-display {

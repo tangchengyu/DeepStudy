@@ -8,7 +8,7 @@
       <div id="focus-timer" class="large-timer">{{ displayTimer }}</div>
     </div>
     <div class="focus-actions">
-      <button class="primary-btn" :disabled="isRunning" @click="startFocus">
+      <button class="primary-btn" :disabled="isRunning" @click="startFocus" title="启动一段不被打断的单任务时间。【时间分块与番茄工作法通过明确时间边界，降低启动阻力并提升持续投入。】">
         开始专注
       </button>
       <button class="secondary-btn" :disabled="!isRunning || isPaused" @click="pauseFocus">
@@ -18,7 +18,7 @@
         重置
       </button>
     </div>
-    <div class="work-type-card">
+    <div class="work-type-card" title="区分核心工作与维持性工作，方便复盘时间投入结构。【基于目标导向行为理论，明确任务类型有助于把高认知资源优先分配给真正推进目标的活动。】">
       <div>
         <strong>当前任务类型</strong>
         <p id="work-type-description">
@@ -40,11 +40,11 @@
     <section class="card distraction-card">
       <div class="card-title-row">
         <div>
-          <h3>分心清单</h3>
+          <h3 title="把分心先记录下来，而不是立刻处理。【外部化记录可降低工作记忆负担，减少反复惦记未处理事项带来的认知占用。】">分心清单</h3>
           <p>按可控性与趣味性分类，找到下一次的应对方式。</p>
         </div>
-        <button class="danger-btn" @click="showDistractionModal = true">
-          �真实干扰</button>
+        <button class="danger-btn" @click="showDistractionModal = true" title="先捕捉分心，再回到当前任务。【元认知监控能帮助个体觉察注意力偏移，并更快恢复到原定目标。】">
+          快速添加干扰</button>
       </div>
       <form id="distraction-form" class="distraction-form" @submit.prevent="onSubmitDistraction">
         <input
@@ -64,7 +64,7 @@
         <button class="secondary-btn" type="submit">记录</button>
       </form>
       <div id="distraction-grid" class="distraction-grid">
-        <template v-for="[key, items] in distractionsByQuadrant" :key="key">
+        <template v-for="(items, key) in distractionsByQuadrant" :key="key">
           <details class="quadrant" :open="items.length > 0">
             <summary class="quadrant-head">
               <span class="quadrant-count">{{ items.length }}</span>
@@ -421,7 +421,7 @@ focusStore.fetchActiveSession()
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 7px 24px rgba(44, 62, 56, 0.045);
+  box-shadow: var(--shadow);
 }
 
 .distraction-card {

@@ -1,14 +1,14 @@
 <template>
   <section class="habit-mode">
     <div class="target-banner">
-      <strong>长期目标</strong>
+      <strong title="【清晰且可量化的长期目标能增强目标承诺，并为每日行为提供持续反馈参照。】">长期目标</strong>
       <span>争取每日总专注时长达到 6 小时，每周达到 40 小时。</span>
     </div>
 
     <ElCard class="card time-audit-card">
       <div class="card-title-row">
         <div>
-          <h3>时间审计</h3>
+          <h3 title="【时间追踪能提升自我监控精度，帮助发现计划时间与实际时间之间的偏差。】">时间审计</h3>
           <p>核心工作、维持工作、主动休息与分心的真实分配。</p>
         </div>
         <span id="audit-refresh-status" class="subtle"></span>
@@ -17,7 +17,7 @@
     </ElCard>
 
     <ElCard class="card reflection-card">
-      <h3>每日反思</h3>
+      <h3 title="【反思性写作能促进经验编码与自我调节，把当天事件转化为可改进的行为线索。】">每日反思</h3>
       <p>每周末可将前 7 天记录导出，交给自动化整理成周报。</p>
 
       <ElInput
@@ -449,7 +449,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 7px 24px rgba(44, 62, 56, 0.045);
+  box-shadow: var(--shadow);
   padding: 24px;
 }
 

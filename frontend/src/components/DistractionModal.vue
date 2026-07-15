@@ -66,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElButton, ElInput, ElSelect, ElOption } from 'element-plus'
 import { useFocusStore } from '@/stores/focus'
 import { formatClock } from '@/utils/format'
@@ -78,7 +78,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'confirm'])
+const emit = defineEmits(['update:visible', 'close', 'confirm'])
 
 // Store
 const focusStore = useFocusStore()
@@ -157,6 +157,7 @@ function handleOverlayClick() {
 }
 
 function close() {
+  emit('update:visible', false)
   emit('close')
 }
 
@@ -192,7 +193,7 @@ async function handleEndDistraction() {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(44, 62, 56, 0.58);
+  background: rgba(50, 68, 59, 0.38);
   backdrop-filter: blur(5px);
   z-index: 50;
   isolation: isolate;
@@ -214,7 +215,8 @@ async function handleEndDistraction() {
   max-height: min(90vh, 540px);
   background: var(--surface);
   border-radius: var(--radius);
-  box-shadow: 0 10px 40px rgba(44, 62, 56, 0.32);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(50, 68, 59, 0.12);
   padding: 28px;
   overflow-y: auto;
   display: flex;

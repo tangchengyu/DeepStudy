@@ -8,6 +8,7 @@ export const KEYS = {
   reflections: 'mytimer.dailyReflection.v1',
   gate: 'mytimer.gateEntered.v1',
   soulQuotes: 'deepstudy.soulQuotes.v1',
+  defaultSoulQuotesEnabled: 'deepstudy.defaultSoulQuotes.enabled.v1',
   noiseVolume: 'deepstudy.noiseVolume.v1',
   lastNoiseVolume: 'deepstudy.lastNoiseVolume.v1',
   workType: 'mytimer.workType.v1'

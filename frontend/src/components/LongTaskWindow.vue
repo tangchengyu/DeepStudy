@@ -325,7 +325,8 @@ function refreshTasks() {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: repeating-linear-gradient(0deg, rgba(80, 104, 91, 0.016) 0, rgba(80, 104, 91, 0.016) 1px, transparent 1px, transparent 4px);
 }
 
 /* 窗口头部 */
@@ -405,7 +406,7 @@ function refreshTasks() {
 }
 
 .task-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(57, 78, 67, 0.055);
 }
 
 .task-card-completed .task-card-title {

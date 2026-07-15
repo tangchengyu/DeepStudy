@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api'
+import { DEFAULT_SOUL_QUOTES } from '@/utils/defaultSoulQuotes'
+import { KEYS } from '@/utils/constants'
 
 export const useSoulStore = defineStore('soul', () => {
   const quotes = ref([])
@@ -21,15 +23,37 @@ export const useSoulStore = defineStore('soul', () => {
     }
   }
 
+  function defaultLibraryEnabled() {
+    try {
+      return JSON.parse(localStorage.getItem(KEYS.defaultSoulQuotesEnabled)) === true
+    } catch {
+      return false
+    }
+  }
+
+  function localQuotePool() {
+    const texts = quotes.value.map(q => String(q?.text || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+    if (defaultLibraryEnabled()) texts.push(...DEFAULT_SOUL_QUOTES)
+    if (!texts.length) texts.push('Attention Is All You Need')
+    const seen = new Set()
+    return texts.filter((text) => {
+      const key = text.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
   async function fetchRandom() {
     try {
-      const quote = await api.getRandomQuote()
-      if (quote?.text) {
-        currentQuote.value = quote.text
-        return quote
-      }
+      if (!quotes.value.length) await fetchAll()
+      const pool = localQuotePool()
+      const text = pool[Math.floor(Math.random() * pool.length)]
+      currentQuote.value = text
+      return { text }
     } catch (e) {
-      // Use fallback
+      const pool = localQuotePool()
+      currentQuote.value = pool[Math.floor(Math.random() * pool.length)]
     }
     return null
   }

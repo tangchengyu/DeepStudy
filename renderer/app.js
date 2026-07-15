@@ -10,6 +10,7 @@ const KEYS = {
   reflections: "mytimer.dailyReflection.v1",
   gate: "mytimer.gateEntered.v1",
   soulQuotes: "deepstudy.soulQuotes.v1",
+  defaultSoulQuotesEnabled: "deepstudy.defaultSoulQuotes.enabled.v1",
 };
 
 function readJSON(key, fallback) {
@@ -949,10 +950,15 @@ const SoulQuotes = (() => {
   const editIdInput = $("#soul-edit-id");
   const textInput = $("#soul-input");
   const saveButton = $("#soul-save");
+  const defaultLibraryButton = $("#soul-default-library-toggle");
   const cancelEditButton = $("#soul-cancel-edit");
   const list = $("#soul-list");
   const quoteScreen = $("#focus-quote-screen");
   const quoteText = $("#focus-quote-text");
+  const defaultLibrary = Array.isArray(window.DeepStudyDefaultQuotes)
+    ? window.DeepStudyDefaultQuotes.map((text) => String(text || "").replace(/\s+/g, " ").trim()).filter(Boolean)
+    : [];
+  let defaultLibraryEnabled = readJSON(KEYS.defaultSoulQuotesEnabled, false) === true;
   let fitFrame = 0;
 
   function normalizeItem(item) {
@@ -984,6 +990,28 @@ const SoulQuotes = (() => {
   function save() {
     writeJSON(KEYS.soulQuotes, quotes);
   }
+  function quotePool() {
+    const texts = quotes.map((quote) => quote.text);
+    if (defaultLibraryEnabled) texts.push(...defaultLibrary);
+    const seen = new Set();
+    return texts.filter((text) => {
+      const key = text.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  function renderDefaultLibraryButton() {
+    if (!defaultLibraryButton) return;
+    defaultLibraryButton.textContent = defaultLibraryEnabled
+      ? "取消默认的“好句库”"
+      : "使用默认的“好句库”";
+    defaultLibraryButton.classList.toggle("active", defaultLibraryEnabled);
+    defaultLibraryButton.setAttribute("aria-pressed", String(defaultLibraryEnabled));
+    defaultLibraryButton.title = defaultLibraryEnabled
+      ? "已启用默认好句库；再次点击后，欢迎界面只随机展示自定义好句子。"
+      : "点击后，欢迎界面会从默认好句库和自定义好句子中随机展示；默认库句子不会出现在下方列表。";
+  }
   function clearForm() {
     editIdInput.value = "";
     textInput.value = "";
@@ -993,6 +1021,7 @@ const SoulQuotes = (() => {
   function setModalOpen(open) {
     modal.hidden = !open;
     if (open) {
+      renderDefaultLibraryButton();
       renderList();
       textInput.focus();
     } else {
@@ -1000,12 +1029,13 @@ const SoulQuotes = (() => {
     }
   }
   function pickRandomQuote(currentText = "") {
-    if (!quotes.length) return DEFAULT_QUOTE;
+    const pool = quotePool();
+    if (!pool.length) return DEFAULT_QUOTE;
     const candidates =
-      quotes.length > 1
-        ? quotes.filter((quote) => quote.text !== currentText)
-        : quotes;
-    return candidates[Math.floor(Math.random() * candidates.length)]?.text || DEFAULT_QUOTE;
+      pool.length > 1
+        ? pool.filter((text) => text !== currentText)
+        : pool;
+    return candidates[Math.floor(Math.random() * candidates.length)] || DEFAULT_QUOTE;
   }
   function fitGateQuote() {
     const maxSize = 34;
@@ -1117,6 +1147,12 @@ const SoulQuotes = (() => {
   openButton.addEventListener("click", () => setModalOpen(true));
   closeButton.addEventListener("click", () => setModalOpen(false));
   cancelEditButton.addEventListener("click", clearForm);
+  defaultLibraryButton?.addEventListener("click", () => {
+    defaultLibraryEnabled = !defaultLibraryEnabled;
+    writeJSON(KEYS.defaultSoulQuotesEnabled, defaultLibraryEnabled);
+    renderDefaultLibraryButton();
+    renderGateQuote();
+  });
   quoteScreen.addEventListener("click", (event) => {
     if (event.button === 0) renderGateQuote();
   });
@@ -1136,6 +1172,7 @@ const SoulQuotes = (() => {
     new ResizeObserver(scheduleGateQuoteFit).observe(quoteScreen);
   }
   document.fonts?.ready?.then(scheduleGateQuoteFit).catch(() => {});
+  renderDefaultLibraryButton();
   renderGateQuote();
   renderList();
   return { fitGateQuote: scheduleGateQuoteFit };
