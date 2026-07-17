@@ -1439,6 +1439,7 @@ function setGateVisible(visible) {
   $("#gate-view").hidden = !visible;
   $("#mode-shell").hidden = visible;
   $("#soul-open").hidden = !visible;
+  $("#tutorial-open").hidden = !visible;
 }
 
 $$(".mode-tab").forEach((button) =>

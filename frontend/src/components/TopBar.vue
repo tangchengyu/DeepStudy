@@ -1,5 +1,5 @@
 <template>
-  <div class="top-bar">
+  <div id="top-bar" class="top-bar">
     <div class="brand">
       <span class="brand-dot"></span>
       <strong>deepstudy</strong>
@@ -7,12 +7,15 @@
 
     <div class="top-controls">
       <!-- 工具栏按钮 -->
+      <button v-if="runtime.showGate" id="tutorial-open" class="tool-btn tutorial-launch" type="button" @click="emit('start-tutorial')">
+        使用教程
+      </button>
       <button v-if="runtime.showGate" id="soul-open" class="tool-btn soul-btn" type="button" @click="openSoul">
         灵魂按摩间
       </button>
 
       <!-- 白噪音控制 -->
-      <div class="noise-control" @click="toggleNoiseMenu">
+      <div id="noise-control" class="noise-control" @click="toggleNoiseMenu">
         <button id="noise-menu-button" class="audio-btn" type="button" :class="{ active: noiseMenuOpen || activeTrackId }" title="【稳定背景声可通过掩蔽突发环境噪音，减少外界刺激对注意力的捕获。】">
           我的白噪音
         </button>
@@ -95,7 +98,7 @@ import { useElectron } from '@/composables/useElectron'
 const runtime = useRuntimeStore()
 const audioStore = useAudioStore()
 const electron = useElectron()
-const emit = defineEmits(['open-soul', 'minimize-changed'])
+const emit = defineEmits(['open-soul', 'minimize-changed', 'start-tutorial'])
 
 // 卡片界面折叠状态
 const tabCollapsed = inject('tabCollapsed', ref(false))

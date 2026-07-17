@@ -42,6 +42,40 @@ async function waitFor(predicate, timeout = 15000) {
 (async () => {
   const main = await waitFor(async () => (await targets()).find((target) => target.url.endsWith("renderer/index.html")));
   await waitFor(async () => evaluate(main, `document.readyState !== 'loading' && Boolean(document.querySelector('#long-tasks-open')) && Boolean(document.querySelector('#planner-settings-open'))`));
+  const tutorialFlow = await evaluate(main, `(async () => {
+    const key = 'deepstudy.tutorial.seen.v1';
+    const originalSeen = localStorage.getItem(key);
+    document.querySelector('.tutorial-close')?.click();
+    document.querySelector('#tutorial-open').click();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const layer = document.querySelector('.tutorial-layer');
+    const initial = {
+      visible: !layer.hidden,
+      title: document.querySelector('.tutorial-title')?.textContent.trim(),
+      highlighted: document.querySelector('.tutorial-focus-ring')?.getBoundingClientRect().width > 0
+    };
+    for (let i = 0; i < 11; i += 1) {
+      document.querySelector('.tutorial-next').click();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+    const shortcutStep = {
+      title: document.querySelector('.tutorial-title')?.textContent.trim(),
+      mentionsShortcut: document.querySelector('.tutorial-description')?.textContent.includes('Ctrl') && document.querySelector('.tutorial-description')?.textContent.includes('D'),
+      focusPreview: document.querySelector('#gate-view').hidden && !document.querySelector('#mode-shell').hidden
+    };
+    document.querySelector('.tutorial-close').click();
+    const restored = {
+      gate: !document.querySelector('#gate-view').hidden,
+      tutorialButton: !document.querySelector('#tutorial-open').hidden,
+      seen: localStorage.getItem(key) === 'true'
+    };
+    if (originalSeen === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, originalSeen);
+    return { initial, shortcutStep, restored };
+  })()`);
+  if (!tutorialFlow.initial.visible || tutorialFlow.initial.title !== "欢迎来到 DeepStudy" || !tutorialFlow.initial.highlighted) throw new Error("Product tutorial did not open with a highlighted target");
+  if (tutorialFlow.shortcutStep.title !== "捕捉干扰，不跟着它走" || !tutorialFlow.shortcutStep.mentionsShortcut || !tutorialFlow.shortcutStep.focusPreview) throw new Error("Product tutorial did not explain the Ctrl+D distraction shortcut");
+  if (!tutorialFlow.restored.gate || !tutorialFlow.restored.tutorialButton || !tutorialFlow.restored.seen) throw new Error("Product tutorial did not exit cleanly");
   const mainState = await evaluate(main, `(() => {
     let reflections = [];
     try {

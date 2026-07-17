@@ -1,7 +1,8 @@
 <template>
   <div class="app-shell" :class="{ 'timer-window': isTimerWindow, 'standalone-timer-window': isTimerWindow, 'is-minimized': tabCollapsed }">
-    <TopBar @open-timer="openTimer" @open-long-tasks="openLongTasks" @open-soul="openSoulModal" @minimize-changed="onMinimizeChanged" />
+    <TopBar @open-timer="openTimer" @open-long-tasks="openLongTasks" @open-soul="openSoulModal" @start-tutorial="productTour?.start()" @minimize-changed="onMinimizeChanged" />
     <router-view />
+    <ProductTour ref="productTour" />
     <PlannerSettingsModal v-model:visible="showPlannerSettings" />
     <DistractionModal v-model:visible="showDistractionForm" @confirm="onDistractionConfirm" />
     <SoulModal v-if="showSoulModal" @close="closeSoulModal" />
@@ -48,6 +49,7 @@ import PlannerSettingsModal from '@/components/PlannerSettingsModal.vue'
 import DistractionModal from '@/components/DistractionModal.vue'
 import SoulModal from '@/components/SoulModal.vue'
 import ResetConfirmModal from '@/components/ResetConfirmModal.vue'
+import ProductTour from '@/components/ProductTour.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,6 +57,7 @@ const planStore = useDailyPlanStore()
 const focusStore = useFocusStore()
 const runtime = useRuntimeStore()
 const electron = useElectron()
+const productTour = ref(null)
 
 const isTimerWindow = computed(() => route.path === '/timer')
 const longTasks = ref([])

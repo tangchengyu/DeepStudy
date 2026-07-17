@@ -43,7 +43,7 @@
           <h3 title="把分心先记录下来，而不是立刻处理。【外部化记录可降低工作记忆负担，减少反复惦记未处理事项带来的认知占用。】">分心清单</h3>
           <p>按可控性与趣味性分类，找到下一次的应对方式。</p>
         </div>
-        <button class="danger-btn" @click="showDistractionModal = true" title="先捕捉分心，再回到当前任务。【元认知监控能帮助个体觉察注意力偏移，并更快恢复到原定目标。】">
+        <button id="quick-distraction" class="danger-btn" @click="showDistractionModal = true" title="先捕捉分心，再回到当前任务。【元认知监控能帮助个体觉察注意力偏移，并更快恢复到原定目标。】">
           快速添加干扰</button>
       </div>
       <form id="distraction-form" class="distraction-form" @submit.prevent="onSubmitDistraction">
