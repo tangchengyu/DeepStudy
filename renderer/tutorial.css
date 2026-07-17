@@ -1,14 +1,14 @@
 .tutorial-launch {
   min-width: 94px;
-  border-color: rgba(112, 100, 220, 0.34);
-  color: #6259b8;
+  border-color: rgba(112, 173, 153, 0.44);
+  color: #4f8f7a;
 }
 
 .tutorial-launch:hover,
 .tutorial-launch:focus-visible {
-  border-color: #7569db;
-  background: #f0edff;
-  color: #5046a3;
+  border-color: #70ad99;
+  background: #edf7f2;
+  color: #366f5c;
 }
 
 .tutorial-layer[hidden] {
@@ -19,7 +19,7 @@
   position: fixed;
   inset: 0;
   z-index: 4000;
-  color: #f7f6ff;
+  color: #30433b;
 }
 
 .tutorial-scrim,
@@ -31,7 +31,7 @@
 
 .tutorial-scrim {
   z-index: 4000;
-  background: rgba(12, 13, 27, 0.76);
+  background: rgba(33, 49, 42, 0.68);
   backdrop-filter: blur(2px);
 }
 
@@ -42,34 +42,34 @@
 
 .tutorial-focus-ring {
   z-index: 4002;
-  border: 2px solid #9388ff;
+  border: 2px solid #70ad99;
   border-radius: 15px;
   box-shadow:
-    0 0 0 4px rgba(147, 136, 255, 0.2),
-    0 0 28px rgba(147, 136, 255, 0.48);
+    0 0 0 4px rgba(112, 173, 153, 0.22),
+    0 0 28px rgba(112, 173, 153, 0.46);
   pointer-events: none;
   transition: top 180ms ease-out, left 180ms ease-out, width 180ms ease-out, height 180ms ease-out;
 }
 
 .tutorial-card {
   z-index: 4003;
-  width: min(370px, calc(100vw - 28px));
+  width: min(460px, calc(100vw - 28px));
   padding: 0;
   overflow: hidden;
-  border: 1px solid rgba(166, 157, 255, 0.42);
+  border: 1px solid rgba(112, 173, 153, 0.38);
   border-radius: 17px;
-  background: #191b2d;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  background: rgba(255, 253, 249, 0.98);
+  box-shadow: 0 24px 70px rgba(57, 78, 67, 0.22);
 }
 
 .tutorial-progress-track {
   height: 4px;
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(112, 173, 153, 0.14);
 }
 
 .tutorial-progress {
   height: 100%;
-  background: linear-gradient(90deg, #8479ee, #a79fff);
+  background: linear-gradient(90deg, #70ad99, #a6cdbd);
   transition: width 180ms ease-out;
 }
 
@@ -86,7 +86,7 @@
 
 .tutorial-kicker {
   margin-bottom: 5px;
-  color: #aaa3f7;
+  color: #5d9f88;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -94,7 +94,7 @@
 
 .tutorial-title {
   margin: 0;
-  color: #ffffff;
+  color: #254338;
   font-size: 19px;
   line-height: 1.35;
 }
@@ -106,10 +106,10 @@
   height: 30px;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(112, 173, 153, 0.28);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #d9d7ea;
+  background: #f4f8f2;
+  color: #5c7469;
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -117,14 +117,14 @@
 
 .tutorial-close:hover,
 .tutorial-close:focus-visible {
-  border-color: rgba(167, 159, 255, 0.7);
-  background: rgba(147, 136, 255, 0.14);
-  color: #ffffff;
+  border-color: rgba(112, 173, 153, 0.7);
+  background: #e7f4ee;
+  color: #254338;
 }
 
 .tutorial-description {
   margin: 12px 0 17px;
-  color: #c6c4d5;
+  color: #53695f;
   font-size: 14px;
   line-height: 1.7;
 }
@@ -133,11 +133,11 @@
   display: inline-block;
   margin: 0 2px;
   padding: 1px 7px;
-  border: 1px solid rgba(167, 159, 255, 0.45);
+  border: 1px solid rgba(112, 173, 153, 0.42);
   border-bottom-width: 2px;
   border-radius: 6px;
-  background: rgba(147, 136, 255, 0.13);
-  color: #eeecff;
+  background: rgba(112, 173, 153, 0.13);
+  color: #315c4e;
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
 }
@@ -150,7 +150,7 @@
 }
 
 .tutorial-count {
-  color: #858397;
+  color: #7b9589;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -164,10 +164,10 @@
 .tutorial-action {
   min-height: 36px;
   padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(112, 173, 153, 0.28);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #d9d7e6;
+  background: #f7faf5;
+  color: #4f6c60;
   font-weight: 700;
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
@@ -175,19 +175,21 @@
 
 .tutorial-action:hover,
 .tutorial-action:focus-visible {
-  border-color: rgba(167, 159, 255, 0.7);
-  color: #ffffff;
+  border-color: rgba(112, 173, 153, 0.76);
+  background: #edf7f2;
+  color: #254338;
 }
 
 .tutorial-action.primary {
-  border-color: #9388ff;
-  background: #8b80ef;
-  color: #10111d;
+  border-color: #70ad99;
+  background: #70ad99;
+  color: #ffffff;
 }
 
 .tutorial-action.primary:hover,
 .tutorial-action.primary:focus-visible {
-  background: #a79fff;
+  background: #568f7c;
+  color: #ffffff;
 }
 
 .tutorial-action:disabled {
@@ -197,7 +199,7 @@
 
 .tutorial-action:focus-visible,
 .tutorial-close:focus-visible {
-  outline: 2px solid #c4beff;
+  outline: 2px solid rgba(112, 173, 153, 0.5);
   outline-offset: 2px;
 }
 
@@ -222,4 +224,3 @@
     transition: none;
   }
 }
-

@@ -53,7 +53,7 @@ const runtime = useRuntimeStore()
 const route = useRoute()
 
 const steps = [
-  { target: '#top-bar', title: '欢迎来到 DeepStudy', description: '这是一段可随时退出的交互式教程。我们会依次认识计划、专注、恢复和复盘工具；教程不会替你修改任务，也不会启动计时。', view: 'gate' },
+  { target: '#top-bar', title: '欢迎来到DeepStudy', description: 'DeepStudy——一款“超级专注力管理”桌面应用。精选最科学、最有效的专注力管理办法，形成一个完整的专注力工作流。将“每日计划 + AI 辅助规划、短期 + 长期任务规划、专注计时 + 分心记录、呼吸练习 + 白噪音、时间审计 + 周报总结”等功能整合在一个应用中，助你在信息爆炸的时代做回专注的自己。', view: 'gate' },
   { target: '#daily-plan-sidebar', title: '先把今天变得清晰', description: '在每日计划中输入任务并按回车添加，勾选即可完成。优先任务、重置和清除已完成操作都集中在这里。', view: 'gate' },
   { target: '#chat-toggle', title: '让 AI 帮你拆解计划', description: '打开 AI 对话后，可以描述今天的目标，由计划助手整理成可执行任务；右上角设置按钮用于配置你自己的 API。', view: 'gate' },
   { target: '#noise-control', title: '用稳定声音保护注意力', description: '“我的白噪音”提供内置音轨、音量和倍速控制，也支持拖入本地音频。它适合掩蔽突发环境噪声。', view: 'gate' },

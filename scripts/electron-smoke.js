@@ -73,7 +73,7 @@ async function waitFor(predicate, timeout = 15000) {
     else localStorage.setItem(key, originalSeen);
     return { initial, shortcutStep, restored };
   })()`);
-  if (!tutorialFlow.initial.visible || tutorialFlow.initial.title !== "欢迎来到 DeepStudy" || !tutorialFlow.initial.highlighted) throw new Error("Product tutorial did not open with a highlighted target");
+  if (!tutorialFlow.initial.visible || tutorialFlow.initial.title !== "欢迎来到DeepStudy" || !tutorialFlow.initial.highlighted) throw new Error("Product tutorial did not open with a highlighted target");
   if (tutorialFlow.shortcutStep.title !== "捕捉干扰，不跟着它走" || !tutorialFlow.shortcutStep.mentionsShortcut || !tutorialFlow.shortcutStep.focusPreview) throw new Error("Product tutorial did not explain the Ctrl+D distraction shortcut");
   if (!tutorialFlow.restored.gate || !tutorialFlow.restored.tutorialButton || !tutorialFlow.restored.seen) throw new Error("Product tutorial did not exit cleanly");
   const mainState = await evaluate(main, `(() => {
