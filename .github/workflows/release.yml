@@ -24,10 +24,10 @@ jobs:
         include:
           - os: windows-latest
             script: npm run pack:win
-            artifact: dist/*.exe
+            artifact: dist/*.exe*
           - os: macos-latest
             script: npm run pack:mac
-            artifact: dist/*.dmg
+            artifact: dist/*.dmg*
 
     steps:
       - name: Checkout
