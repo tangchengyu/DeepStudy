@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu, Notification, nativeImage, powerMonitor, shell, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { createAppReadyRunner } = require("./renderer/app-lifecycle");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
 const APP_DATA_DIR_NAME = "deepstudy";
@@ -12,6 +13,7 @@ if (process.platform === "win32") {
 }
 
 const gotTheLock = app.requestSingleInstanceLock();
+const runWhenAppReady = createAppReadyRunner(app);
 
 if (!gotTheLock) {
   app.exit(0);
@@ -110,6 +112,7 @@ function createWindow() {
       mainWindow.webContents.send("window:minimized-changed", false);
     }
   });
+  return mainWindow;
 }
 
 function showWhenReady(window, fallbackMs = 5000) {
@@ -135,15 +138,20 @@ function attachWindowLoadDiagnostics(window, label) {
 }
 
 function showMainWindow() {
-  bringMainWindowToFront();
+  void bringMainWindowToFront().catch((error) => {
+    console.warn("Unable to show the main window:", error);
+  });
 }
 
 function bringMainWindowToFront() {
-  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.moveTop?.();
-  mainWindow.focus();
+  return runWhenAppReady(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.moveTop?.();
+    mainWindow.focus();
+    return mainWindow;
+  });
 }
 
 function trayImage(alerting = false) {
@@ -1047,15 +1055,18 @@ ipcMain.handle("noise:delete", (_event, id) => {
 });
 
 app.on("second-instance", () => {
-  bringMainWindowToFront();
+  showMainWindow();
 });
 
-app.whenReady().then(() => {
-  createWindow();
+runWhenAppReady(() => {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
   createTray();
   checkReminders();
   setInterval(checkReminders, 30000);
   powerMonitor.on("resume", checkReminders);
+}).catch((error) => {
+  console.error("DeepStudy failed to finish starting:", error);
+  app.quit();
 });
 
 app.on("window-all-closed", () => {
@@ -1063,9 +1074,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+  showMainWindow();
 });
 
 app.on("before-quit", () => { quitting = true; });

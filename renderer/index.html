@@ -30,7 +30,12 @@
                 我的白噪音
               </button>
               <button id="noise-mute-button" class="noise-mute-button" type="button" aria-label="静音白噪音" title="静音白噪音">
-                🔊
+                <svg class="noise-volume-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path class="speaker-shape" d="M4 10v4h4l5 4V6L8 10H4Z" />
+                  <path class="volume-wave volume-wave-near" d="M16 9.5a4 4 0 0 1 0 5" />
+                  <path class="volume-wave volume-wave-far" d="M18.5 7a7.5 7.5 0 0 1 0 10" />
+                  <path class="volume-muted-mark" d="m16 9 5 6m0-6-5 6" />
+                </svg>
               </button>
             </div>
             <div id="noise-popover" class="noise-popover" hidden>
@@ -50,6 +55,7 @@
                   <input id="noise-volume" type="range" min="0" max="100" value="70" />
                 </div>
               </div>
+              <div id="noise-status" class="noise-status" role="status" aria-live="polite"></div>
               <button id="noise-custom-toggle" class="secondary-btn compact" type="button">
                 自定义白噪音
               </button>
@@ -63,7 +69,6 @@
                   <button id="noise-pick-file" class="secondary-btn compact" type="button">选择文件</button>
                   <button id="noise-add-file" class="primary-btn compact" type="button" disabled>添加</button>
                 </div>
-                <div id="noise-status" class="subtle" role="status"></div>
               </div>
             </div>
           </div>
@@ -642,8 +647,8 @@
       </section>
     </div>
 
-    <audio id="audio-muyu" src="assets/audio/muyu.mp3" loop></audio>
-    <audio id="audio-rain" src="assets/audio/rain.mp3" loop></audio>
+    <audio id="audio-muyu" src="assets/audio/muyu.mp3" preload="auto" loop></audio>
+    <audio id="audio-rain" src="assets/audio/rain.mp3" preload="auto" loop></audio>
     <audio id="audio-breathing" src="assets/audio/4-4-4-4.MP3"></audio>
     <audio id="audio-wim" src="assets/audio/wim_hof_3groups_v3_faster_22_24_final_320k.mp3"></audio>
     <audio id="audio-focus-rest-prompt" src="assets/audio/brain_cache_rest_charge.mp3"></audio>

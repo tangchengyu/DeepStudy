@@ -423,6 +423,30 @@ select:focus {
   border-bottom-left-radius: 0;
   line-height: 1;
 }
+.noise-volume-icon {
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.noise-volume-icon .speaker-shape {
+  fill: currentColor;
+  stroke: none;
+}
+.noise-volume-icon .volume-muted-mark {
+  display: none;
+}
+.noise-mute-button[data-volume-level="low"] .volume-wave-far,
+.noise-mute-button[data-volume-level="muted"] .volume-wave {
+  display: none;
+}
+.noise-mute-button[data-volume-level="muted"] .volume-muted-mark {
+  display: block;
+}
 .is-minimized .noise-mute-button {
   width: 26px;
 }
@@ -528,6 +552,9 @@ select:focus {
   gap: 8px;
 }
 .noise-track-play {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   height: 32px;
   padding: 0 10px;
@@ -536,10 +563,61 @@ select:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.noise-track-state {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.noise-track-state::before {
+  position: absolute;
+  top: 5px;
+  left: 7px;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid currentColor;
+  content: "";
+}
+.noise-track-play.active .noise-track-state {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+.noise-track-play.active .noise-track-state::before {
+  top: 5px;
+  left: 6px;
+  width: 2px;
+  height: 8px;
+  border: 0;
+  background: currentColor;
+  box-shadow: 4px 0 0 currentColor;
+}
+.noise-track-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .noise-track-play.active {
   color: white;
   border-color: var(--accent);
   background: var(--accent);
+}
+.noise-status {
+  min-height: 18px;
+  margin: -2px 2px 9px;
+  color: var(--accent-hover);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.noise-status:empty {
+  display: none;
+}
+.noise-status.error {
+  color: var(--red-hover);
 }
 .noise-remove {
   width: 28px;

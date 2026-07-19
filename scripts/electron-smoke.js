@@ -154,7 +154,7 @@ async function waitFor(predicate, timeout = 15000) {
     const muted = {
       input: input.value,
       value: document.querySelector('#volume-value').textContent,
-      icon: button.textContent.trim(),
+      level: button.dataset.volumeLevel,
       open: !popover.hidden,
       label: button.getAttribute('aria-label')
     };
@@ -164,14 +164,30 @@ async function waitFor(predicate, timeout = 15000) {
       restored: {
         input: input.value,
         value: document.querySelector('#volume-value').textContent,
-        icon: button.textContent.trim(),
+        level: button.dataset.volumeLevel,
         open: !popover.hidden,
         label: button.getAttribute('aria-label')
       }
     };
   })()`);
-  if (volumeToggle.muted.input !== "0" || volumeToggle.muted.value !== "0%" || volumeToggle.muted.icon !== "🔇" || volumeToggle.muted.open || volumeToggle.muted.label !== "恢复白噪音音量") throw new Error("White-noise mute button did not mute cleanly");
-  if (volumeToggle.restored.input !== "72" || volumeToggle.restored.value !== "72%" || volumeToggle.restored.icon !== "🔊" || volumeToggle.restored.open || volumeToggle.restored.label !== "静音白噪音") throw new Error("White-noise mute button did not restore the previous volume");
+  if (volumeToggle.muted.input !== "0" || volumeToggle.muted.value !== "0%" || volumeToggle.muted.level !== "muted" || volumeToggle.muted.open || volumeToggle.muted.label !== "恢复白噪音音量") throw new Error("White-noise mute button did not mute cleanly");
+  if (volumeToggle.restored.input !== "72" || volumeToggle.restored.value !== "72%" || volumeToggle.restored.level !== "high" || volumeToggle.restored.open || volumeToggle.restored.label !== "静音白噪音") throw new Error("White-noise mute button did not restore the previous volume");
+  const noisePlayback = await evaluate(main, `(async () => {
+    const track = [...document.querySelectorAll('.noise-track-play')].find(node => node.textContent.includes('木鱼'));
+    const audio = document.querySelector('#audio-muyu');
+    track.click();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const state = {
+      paused: audio.paused,
+      currentTime: audio.currentTime,
+      readyState: audio.readyState,
+      active: document.querySelector('.noise-track-play.active')?.textContent.includes('木鱼'),
+      status: document.querySelector('#noise-status').textContent
+    };
+    document.querySelector('.noise-track-play.active')?.click();
+    return state;
+  })()`);
+  if (noisePlayback.paused || noisePlayback.currentTime <= 0 || noisePlayback.readyState < 2 || !noisePlayback.active || !noisePlayback.status.includes('正在播放木鱼白噪音')) throw new Error("Bundled white noise did not actually play");
   const focusDurationFlow = await evaluate(main, `(async () => {
     if (!document.querySelector('#gate-view').hidden) document.querySelector('#enter-gate').click();
     document.querySelector('[data-mode="focus"]').click();

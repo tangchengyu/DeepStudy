@@ -1203,11 +1203,15 @@ const AudioControls = (() => {
   const VOLUME_KEY = "deepstudy.noiseVolume.v1";
   const LAST_VOLUME_KEY = "deepstudy.lastNoiseVolume.v1";
   let rate = 1;
-  let volume = Math.max(0, Math.min(1, Number(readJSON(VOLUME_KEY, 0.7))));
-  let lastNonZeroVolume = Math.max(
-    0.01,
-    Math.min(1, Number(readJSON(LAST_VOLUME_KEY, volume || 0.7))),
-  );
+  function normalizeVolume(value, fallback = 0.7) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : fallback;
+  }
+  let volume = normalizeVolume(readJSON(VOLUME_KEY, 0.7));
+  let lastNonZeroVolume = Math.max(0.01, normalizeVolume(
+    readJSON(LAST_VOLUME_KEY, volume || 0.7),
+    volume || 0.7,
+  ));
   function allTracks() {
     return defaultTracks.concat(customTracks);
   }
@@ -1220,9 +1224,9 @@ const AudioControls = (() => {
     });
     volumeInput.value = String(Math.round(volume * 100));
     volumeValue.textContent = `${Math.round(volume * 100)}%`;
-    const volIcon = volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊";
+    const volumeLevel = volume === 0 ? "muted" : volume < 0.5 ? "low" : "high";
     const muteTitle = volume === 0 ? "恢复白噪音音量" : "静音白噪音";
-    muteButton.textContent = volIcon;
+    muteButton.dataset.volumeLevel = volumeLevel;
     muteButton.title = muteTitle;
     muteButton.setAttribute("aria-label", muteTitle);
     muteButton.classList.toggle("active", volume === 0);
@@ -1238,7 +1242,12 @@ const AudioControls = (() => {
   }
   function setStatus(message, isError = false) {
     status.textContent = message;
-    status.style.color = isError ? "var(--red-hover)" : "";
+    status.classList.toggle("error", isError);
+  }
+  function playbackErrorMessage(track, player, error) {
+    const mediaCode = player?.error?.code;
+    const detail = mediaCode ? `（媒体错误 ${mediaCode}）` : "";
+    return `${track.name}播放失败${detail}。${error?.message ? ` ${error.message}` : ""}`;
   }
   function stopOtherTracks(trackId) {
     allTracks().forEach((track) => {
@@ -1258,6 +1267,7 @@ const AudioControls = (() => {
     const blob = new Blob([item.buffer], { type: item.type || "audio/mpeg" });
     const player = new Audio(URL.createObjectURL(blob));
     player.loop = true;
+    player.preload = "auto";
     player.volume = volume;
     player.playbackRate = rate;
     customPlayers.set(track.id, player);
@@ -1274,9 +1284,17 @@ const AudioControls = (() => {
       const play = document.createElement("button");
       play.type = "button";
       play.className = "noise-track-play secondary-btn";
-      play.textContent = track.name;
+      const state = document.createElement("span");
+      state.className = "noise-track-state";
+      state.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.className = "noise-track-label";
+      label.textContent = track.name;
+      play.append(state, label);
       play.title = track.name;
       play.classList.toggle("active", activeTrackId === track.id);
+      play.setAttribute("aria-pressed", String(activeTrackId === track.id));
+      play.setAttribute("aria-label", `${activeTrackId === track.id ? "暂停" : "播放"}${track.name}`);
       play.addEventListener("click", () => toggleTrack(track));
       row.append(play);
       if (track.kind === "custom") {
@@ -1309,18 +1327,24 @@ const AudioControls = (() => {
       if (activeTrackId === track.id && !player.paused) {
         player.pause();
         activeTrackId = "";
+        setStatus(`已暂停${track.name}。`);
         renderTracks();
         return;
       }
       stopOtherTracks(track.id);
+      if (volume === 0) setVolume(lastNonZeroVolume || 0.7);
       player.volume = volume;
       player.playbackRate = rate;
+      setStatus(`正在加载${track.name}…`);
       await player.play();
       activeTrackId = track.id;
+      setStatus(`正在播放${track.name}。`);
       renderTracks();
     } catch (error) {
       console.warn(error);
-      setStatus(error.message || "白噪音播放失败。", true);
+      activeTrackId = "";
+      setStatus(playbackErrorMessage(track, playerForExistingTrack(track), error), true);
+      renderTracks();
     }
   }
   async function refreshCustomTracks() {
