@@ -29,3 +29,5 @@ __pycache__/
 *.png
 !renderer/assets/focus-gate.png
 !deepstudy-app/assets/*.png
+!build/deepstudy.png
+!build/icons/*.png
