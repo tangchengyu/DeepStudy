@@ -1928,6 +1928,22 @@ const RestMode = (() => {
     Breathing.stop();
     render();
   }
+  function returnToFocus() {
+    if (running) {
+      clearInterval(timer);
+      running = false;
+      timer = null;
+      captureSegment();
+    }
+    if (completedSegments.length) recordCompletedSession();
+    completedSegments = [];
+    total = 15 * 60000;
+    remaining = total;
+    Breathing.stop();
+    FocusTracker.log("rest-return-focus");
+    render();
+    switchMode("focus");
+  }
 
   // Click-to-edit timer: clicking the rest-timer (when idle) shows inline inputs
   function setupTimerEdit() {
@@ -1981,6 +1997,7 @@ const RestMode = (() => {
   $("#rest-start").addEventListener("click", start);
   $("#rest-pause").addEventListener("click", pause);
   $("#rest-reset").addEventListener("click", reset);
+  $("#rest-return-focus").addEventListener("click", returnToFocus);
   setupTimerEdit();
   render();
   return {};

@@ -16,7 +16,7 @@
       </section>
 
       <section v-show="runtime.currentMode === 'rest'" class="mode-panel active">
-        <RestMode />
+        <RestMode @return-focus="switchMode('focus')" />
       </section>
 
       <section v-show="runtime.currentMode === 'habit'" class="mode-panel active">

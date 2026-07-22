@@ -56,6 +56,13 @@
       >
         重置
       </ElButton>
+      <ElButton
+        id="rest-return-focus"
+        class="secondary-btn"
+        @click="returnToFocus"
+      >
+        返回专注
+      </ElButton>
     </div>
 
     <ElCard id="breathing-card" class="breathing-card" v-show="showBreathingCard">
@@ -107,7 +114,7 @@ const props = defineProps({
   // Optional: receive rest duration from parent
 })
 
-const emit = defineEmits([])
+const emit = defineEmits(['return-focus'])
 
 // Timer state
 const totalMs = ref(15 * 60 * 1000) // 15 minutes default
@@ -218,6 +225,17 @@ function resetRest() {
   updateTotalFromInputs()
   showBreathingCard.value = false
   breathingActive.value = false
+}
+
+function returnToFocus() {
+  hasStopped.value = false
+  isRunning.value = false
+  isPaused.value = false
+  stopTicking()
+  stopBreathing()
+  updateTotalFromInputs()
+  showBreathingCard.value = true
+  emit('return-focus')
 }
 
 function toggleRest() {
@@ -473,8 +491,10 @@ onMounted(() => {
 
 .center-actions {
   display: flex;
+  align-items: center;
   justify-content: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .breathing-card {
