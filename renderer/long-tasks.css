@@ -2,14 +2,12 @@
 .long-task-app { height: 100vh; overflow: hidden; display: flex; flex-direction: column; padding: 24px; }
 .long-task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
 .long-task-header h1 { margin: 3px 0 5px; font-size: 28px; }
-.long-task-header p, .quadrant header p, .long-ai-panel p { color: var(--text-muted); font-size: 13px; }
+.long-task-header p, .long-ai-panel p { color: var(--text-muted); font-size: 13px; }
 .long-task-header-actions { display: flex; gap: 8px; }
 .quadrant-board { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .quadrant { min-height: 0; padding: 14px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-top: 4px solid; border-radius: var(--radius); background: var(--surface); }
 .quadrant.q1 { border-top-color: #df7779; }.quadrant.q2 { border-top-color: #daa940; }.quadrant.q3 { border-top-color: #6d9ed0; }.quadrant.q4 { border-top-color: #80a595; }
-.quadrant > header { display: flex; gap: 11px; align-items: center; margin-bottom: 12px; }
-.quadrant > header > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--surface-3); color: var(--text-muted); font-weight: 800; }
-.quadrant h2 { font-size: 16px; }.quadrant-list { flex: 1; min-height: 0; display: grid; align-content: start; gap: 8px; overflow-y: auto; padding-right: 4px; border-radius: var(--radius-sm); scrollbar-gutter: stable; }
+.quadrant-list { flex: 1; min-height: 0; display: grid; align-content: start; gap: 8px; overflow-y: auto; padding-right: 4px; border-radius: var(--radius-sm); scrollbar-gutter: stable; }
 .quadrant-list.drag-over { outline: 2px dashed var(--accent); outline-offset: 3px; }
 .long-task-card { min-height: 64px; padding: 8px 10px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; border: 1px solid var(--border); border-radius: 8px; background: white; box-shadow: 0 2px 8px rgba(44,62,56,.03); cursor: grab; transition: border-color var(--transition), box-shadow var(--transition); }
 .long-task-card.dragging { opacity: 0.5; box-shadow: 0 12px 28px rgba(44,62,56,.14); }
@@ -36,6 +34,36 @@
 .long-task-form { display: grid; gap: 16px; width: min(560px, calc(100vw - 32px)); padding: 26px 28px; border-color: var(--border); background: var(--surface); box-shadow: 0 24px 70px rgba(44,62,56,.2); text-align: left; }.long-task-form label { display: grid; gap: 7px; color: var(--text-muted); font-size: 13px; font-weight: 650; }.long-task-form input, .long-task-form textarea, .long-task-form select { width: 100%; min-height: 42px; padding: 9px 11px; }.long-task-form textarea { min-height: 88px; resize: vertical; }.long-task-form .settings-heading h2 { margin-top: 3px; color: var(--text); }.long-task-form .modal-actions { margin-top: 2px; }
 .long-task-form fieldset { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); }.weekday-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; }.weekday-options label { display: flex; flex-direction: row; }
 .long-ai-settings-card { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 36px); overflow: auto; text-align: left; border-color: var(--border); background: var(--surface); box-shadow: 0 24px 70px rgba(44,62,56,.2); }.long-ai-settings-card .settings-heading p { margin-top: 4px; color: var(--text-muted); font-size: 12px; }
+.long-task-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.long-task-view[hidden] { display: none; }
+.quadrant-open { width: 100%; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 18px; gap: 10px; align-items: center; padding: 0 0 12px; border: 0; background: transparent; color: var(--text); text-align: left; }
+.quadrant-open:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 3px; border-radius: 8px; }
+.quadrant-number { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-3); font-weight: 800; }
+.quadrant-heading { min-width: 0; display: grid; gap: 2px; }
+.quadrant-heading strong { font-size: 16px; }
+.quadrant-heading small { color: var(--text-muted); font-size: 12px; }
+.quadrant-total { min-width: 30px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.quadrant-arrow { color: var(--text-muted); font-size: 26px; line-height: 1; }
+.drilldown-view { overflow: hidden; }
+.drilldown-header, .detail-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.drilldown-title { flex: 1; min-width: 0; }
+.drilldown-title h1 { margin: 2px 0 3px; font-size: 26px; }
+.drilldown-title p { color: var(--text-muted); font-size: 13px; }
+.back-button { width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 12px; background: white; color: var(--text); font-size: 23px; }
+.quadrant-list-full { padding: 16px; border: 1px solid var(--border); background: var(--surface); }
+.quadrant-list-full .long-task-card { min-height: 72px; }
+.quadrant-list-full .long-task-title-button { font-size: 16px; }
+.long-task-title-button { max-width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; font-size: 14px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; cursor: pointer; }
+.task-note-indicator { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.detail-header { justify-content: space-between; }
+.detail-quadrant-chip { margin-right: auto; padding: 5px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-hover); font-size: 12px; font-weight: 700; }
+.task-detail-card { flex: 1; min-height: 0; overflow: auto; padding: 30px clamp(24px, 6vw, 72px); border: 1px solid var(--border); border-radius: var(--radius); background: white; }
+.task-detail-complete { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; }
+.task-detail-card h1 { margin: 24px 0 12px; font-size: clamp(28px, 4vw, 42px); line-height: 1.2; overflow-wrap: anywhere; }
+.task-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--text-muted); font-size: 12px; }
+.task-detail-notes { margin-top: 28px; color: var(--text); font-size: 17px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.task-detail-notes.empty { color: var(--text-muted); }
+.task-detail-actions { display: flex; justify-content: flex-end; margin-top: 32px; }
 @media (max-width: 900px) { .long-task-app { overflow: auto; }.quadrant-board { flex: none; grid-template-columns: 1fr; grid-template-rows: none; height: auto; }.quadrant { min-height: 245px; }.long-task-window { min-width: 0; }.long-task-header { flex-direction: column; } }
 @media (max-width: 720px) { .long-task-card { grid-template-columns: 20px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .long-ai-panel { transition: none; } }

@@ -1,6 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { applyPriorityDecision, dueTasks, fallbackAiOperationsFromText, nextReminderAt, normalizeAiOperations, normalizeTask } = require("../renderer/long-task-utils");
+const {
+  activeTasksForQuadrant,
+  applyPriorityDecision,
+  dueTasks,
+  fallbackAiOperationsFromText,
+  nextReminderAt,
+  normalizeAiOperations,
+  normalizeTask,
+  resolveLongTaskView,
+} = require("../renderer/long-task-utils");
 
 test("normalizes a long task and its reminder", () => {
   const task = normalizeTask({ title: "  写论文  ", quadrant: "important-urgent", reminder: { kind: "weekly", time: "18:30", weekdays: [1, 3, 3] } }, 10);
@@ -58,4 +67,30 @@ test("creates a fallback long-task operation when the model returns empty conten
   assert.equal(operations[0].task.reminder.kind, "once");
   assert.equal(new Date(operations[0].task.reminder.at).getDay(), 2);
   assert.equal(new Date(operations[0].task.reminder.at).getHours(), 20);
+});
+
+test("selects and sorts active tasks for one quadrant", () => {
+  const input = [
+    { id: "later", quadrant: "important-urgent", status: "active", order: 2, createdAt: 1 },
+    { id: "done", quadrant: "important-urgent", status: "completed", order: 0, createdAt: 1 },
+    { id: "other", quadrant: "important-not-urgent", status: "active", order: 0, createdAt: 1 },
+    { id: "first", quadrant: "important-urgent", status: "active", order: 1, createdAt: 2 },
+  ];
+  assert.deepEqual(activeTasksForQuadrant(input, "important-urgent").map((task) => task.id), ["first", "later"]);
+});
+
+test("keeps detail on the latest active task and falls back when it disappears", () => {
+  const active = { id: "a", title: "新标题", quadrant: "urgent-not-important", status: "active" };
+  assert.deepEqual(resolveLongTaskView({ mode: "detail", quadrant: "important-urgent", taskId: "a" }, [active]), {
+    mode: "detail",
+    quadrant: "urgent-not-important",
+    taskId: "a",
+    task: active,
+  });
+  assert.deepEqual(resolveLongTaskView({ mode: "detail", quadrant: "important-urgent", taskId: "missing" }, []), {
+    mode: "quadrant",
+    quadrant: "important-urgent",
+    taskId: null,
+    task: null,
+  });
 });

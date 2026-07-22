@@ -241,12 +241,14 @@ async function waitFor(predicate, timeout = 15000) {
   })()`));
   if (!stopwatchState.ready || stopwatchState.title !== "秒表" || !stopwatchState.panelVisible || stopwatchState.time !== "00:00:00.00") throw new Error("Stopwatch window did not load correctly");
   const stopwatchAlwaysOnTop = await evaluate(stopwatchWindow, `(async () => {
+    const initial = await window.electronAPI.getAlwaysOnTop();
+    const afterFirstToggle = await window.electronAPI.toggleAlwaysOnTop();
     const afterToggle = await window.electronAPI.toggleAlwaysOnTop();
     const current = await window.electronAPI.getAlwaysOnTop();
-    return { afterToggle, current };
+    return { initial, afterFirstToggle, afterToggle, current };
   })()`);
   const mainAlwaysOnTopAfterTimer = await evaluate(main, `window.electronAPI.getAlwaysOnTop()`);
-  if (!stopwatchAlwaysOnTop.afterToggle || !stopwatchAlwaysOnTop.current) throw new Error("Stopwatch always-on-top did not apply to the timer window");
+  if (!stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.afterFirstToggle || !stopwatchAlwaysOnTop.afterToggle || !stopwatchAlwaysOnTop.current) throw new Error("Stopwatch always-on-top did not toggle and restore on the timer window");
   if (mainAlwaysOnTopAfterTimer !== mainAlwaysOnTopBeforeTimer) throw new Error("Timer always-on-top changed the main window state");
   await evaluate(stopwatchWindow, `window.close()`);
   await evaluate(main, `document.querySelector('#open-countdown').click()`);
@@ -277,7 +279,13 @@ async function waitFor(predicate, timeout = 15000) {
     const quadrantStyle = getComputedStyle(document.querySelector('.quadrant'));
     const listStyle = getComputedStyle(document.querySelector('.quadrant-list'));
     if (quadrantStyle.overflow !== 'hidden' || listStyle.overflowY !== 'auto') throw new Error('quadrant scrolling layout missing');
-    const saved = await window.electronAPI.saveLongTask({ title: 'Smoke task', quadrant: 'important-not-urgent', reminder: { kind: 'none' } });
+    const noteText = '第一行\\n<img src=x onerror="window.__noteInjected=true">\\n第三行';
+    const saved = await window.electronAPI.saveLongTask({
+      title: 'Smoke task',
+      notes: noteText,
+      quadrant: 'important-not-urgent',
+      reminder: { kind: 'none' }
+    });
     const moved = await window.electronAPI.saveLongTask({ title: 'Smoke moved long task ' + Date.now(), quadrant: 'important-not-urgent', reminder: { kind: 'none' } });
     const listed = await window.electronAPI.listLongTasks();
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -297,14 +305,76 @@ async function waitFor(predicate, timeout = 15000) {
     const afterMove = await window.electronAPI.listLongTasks();
     const movedTask = afterMove.find(task => task.id === moved.id);
     const movedCardStillVisible = Boolean(document.querySelector(\`.long-task-card[data-id="\${moved.id}"]\`));
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const savedCardForDetail = document.querySelector(\`.long-task-card[data-id="\${saved.id}"]\`);
+    savedCardForDetail.querySelector('.long-task-title-button').click();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const detailState = {
+      visible: !document.querySelector('#task-detail-view').hidden,
+      menuHidden: document.querySelector('.long-task-menu').hidden,
+      title: document.querySelector('#task-detail-title').textContent,
+      notes: document.querySelector('#task-detail-notes').textContent,
+      injectedNode: Boolean(document.querySelector('#task-detail-notes img')),
+      injectedFlag: Boolean(window.__noteInjected),
+    };
+    document.querySelector('#task-detail-edit').click();
+    const taskModalEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(taskModalEscape);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const taskModalKeyboardState = {
+      defaultPrevented: taskModalEscape.defaultPrevented,
+      modalHidden: document.querySelector('#long-task-modal').hidden,
+      detailVisible: !document.querySelector('#task-detail-view').hidden,
+    };
+    document.querySelector('#long-ai-settings').click();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const aiSettingsEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(aiSettingsEscape);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const aiSettingsKeyboardState = {
+      defaultPrevented: aiSettingsEscape.defaultPrevented,
+      modalHidden: document.querySelector('#long-ai-settings-modal').hidden,
+      detailVisible: !document.querySelector('#task-detail-view').hidden,
+    };
+    if (!taskModalKeyboardState.defaultPrevented || !taskModalKeyboardState.modalHidden || !taskModalKeyboardState.detailVisible) throw new Error('Escape did not close the task editor without navigating away from detail');
+    if (!aiSettingsKeyboardState.defaultPrevented || !aiSettingsKeyboardState.modalHidden || !aiSettingsKeyboardState.detailVisible) throw new Error('Escape did not close AI settings without navigating away from detail');
+    document.querySelector('#task-detail-edit').click();
+    document.querySelector('#long-task-notes').value = \`\${noteText}\\n编辑后仍停留在详情页\`;
+    document.querySelector('#long-task-form').requestSubmit();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const editState = {
+      detailVisible: !document.querySelector('#task-detail-view').hidden,
+      notes: document.querySelector('#task-detail-notes').textContent,
+    };
+    document.querySelector('#task-detail-back').click();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const listState = {
+      visible: !document.querySelector('#quadrant-list-view').hidden,
+      title: document.querySelector('#quadrant-view-title').textContent,
+      containsTask: Boolean(document.querySelector(\`#quadrant-view-list .long-task-card[data-id="\${saved.id}"]\`)),
+    };
+    document.querySelector('#quadrant-back').click();
+    document.querySelector('[data-open-quadrant="important-not-urgent"]').click();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const directOpenWorks = !document.querySelector('#quadrant-list-view').hidden;
+    document.querySelector('#quadrant-back').click();
+    document.querySelector(\`.long-task-card[data-id="\${saved.id}"] .long-task-title-button\`).click();
+    await new Promise(resolve => requestAnimationFrame(resolve));
     const completion = await window.electronAPI.completeLongTask(saved.id);
     await new Promise(resolve => setTimeout(resolve, 150));
+    const completionReturnedToList = !document.querySelector('#quadrant-list-view').hidden && document.querySelector('#task-detail-view').hidden;
     await window.electronAPI.deleteLongTask(saved.id);
-    return { quadrants: 4, persisted: listed.some(task => task.id === saved.id), aiMode: config.mode, menuActions, completion: completion.completed, moved: moveResult.moved, movedStatus: movedTask?.status, movedCardStillVisible, movedId: moved.id, movedTitle: moved.title };
+    return { quadrants: 4, persisted: listed.some(task => task.id === saved.id), aiMode: config.mode, menuActions, detailState, taskModalKeyboardState, aiSettingsKeyboardState, editState, listState, directOpenWorks, completion: completion.completed, completionReturnedToList, noteText, moved: moveResult.moved, movedStatus: movedTask?.status, movedCardStillVisible, movedId: moved.id, movedTitle: moved.title };
   })()`);
   if (!result.persisted) throw new Error("Long task persistence failed");
+  if (!result.detailState.menuHidden) throw new Error("Long task menu remained open after entering detail");
+  if (!result.detailState.visible || result.detailState.title !== "Smoke task" || result.detailState.notes !== result.noteText) throw new Error("Long task detail did not preserve its content");
+  if (result.detailState.injectedNode || result.detailState.injectedFlag) throw new Error("Long task notes were rendered as HTML");
+  if (!result.editState.detailVisible || result.editState.notes !== `${result.noteText}\n编辑后仍停留在详情页`) throw new Error("Long task detail did not refresh after editing");
+  if (!result.listState.visible || result.listState.title !== "重要不紧急" || !result.listState.containsTask || !result.directOpenWorks) throw new Error("Quadrant drill-down navigation failed");
   if (!result.completion) throw new Error("Long task completion failed");
-  if (!result.moved || result.movedStatus !== "planned" || result.movedCardStillVisible) throw new Error("Moved long task did not leave the active quadrant without completion");
+  if (!result.completionReturnedToList) throw new Error("Long task completion did not return to the quadrant list");
+  if (!result.moved || result.movedStatus !== "planned" || result.movedCardStillVisible) throw new Error(`Moved long task did not leave the active quadrant without completion: ${JSON.stringify({ moved: result.moved, movedStatus: result.movedStatus, movedCardStillVisible: result.movedCardStillVisible })}`);
   const movedTitleLiteral = JSON.stringify(result.movedTitle || "");
   const movedReflectionFlow = await evaluate(main, `(async () => {
     const title = ${movedTitleLiteral};
@@ -347,9 +417,14 @@ async function waitFor(predicate, timeout = 15000) {
     const message = document.querySelector('.rest-message');
     const spans = [...message.querySelectorAll(':scope > span')];
     const termTips = [...document.querySelectorAll('.term-tip[title], .mode-tab[title], .breathing-btn[title]')].map(node => node.getAttribute('title'));
-    const restCustom = document.querySelector('.rest-custom-time');
-    const restInputs = [...restCustom.querySelectorAll('label input')].map(input => input.id);
-    const restCustomStyle = getComputedStyle(restCustom);
+    const breathingTips = [...document.querySelectorAll('.breathing-btn')].map(button => ({ label: button.textContent.trim(), title: button.getAttribute('title') }));
+    const restTimer = document.querySelector('#rest-timer');
+    const restTimerBeforeEdit = restTimer.textContent.trim();
+    restTimer.click();
+    const restEditor = restTimer.querySelector('.rest-edit-inline');
+    const restInputs = [...restEditor.querySelectorAll('label input')].map(input => input.id);
+    const restEditorDisplay = getComputedStyle(restEditor).display;
+    restEditor.querySelector('input').dispatchEvent(new Event('change', { bubbles: true }));
     const distractionColor = getComputedStyle(document.querySelector('.legend-dot.audit-segment.distraction')).backgroundColor;
     return {
       spanCount: spans.length,
@@ -359,15 +434,17 @@ async function waitFor(predicate, timeout = 15000) {
       second: spans[1]?.textContent.trim(),
       stacked: spans.length === 2 && spans[1].getBoundingClientRect().top > spans[0].getBoundingClientRect().top,
       termTips,
-      restCustomDisplay: restCustomStyle.display,
+      breathingTips,
+      restEditorDisplay,
       restInputIds: restInputs,
+      restTimerRestored: !restTimer.querySelector('.rest-edit-inline') && restTimer.textContent.trim() === restTimerBeforeEdit,
       distractionColor
     };
   })()`);
   if (restMessageLayout.spanCount !== 2 || restMessageLayout.textAlign !== "center" || restMessageLayout.display !== "grid" || !restMessageLayout.stacked) throw new Error("Rest message is not rendered as two centered lines");
-  if (!["4-4-4-4 腹式呼吸法", "冰人呼吸法", "专注模式", "分散模式"].every(keyword => restMessageLayout.termTips.some(title => title?.includes(keyword)))) throw new Error("Mode and breathing glossary tooltips are missing");
-  if (restMessageLayout.restCustomDisplay !== "grid" || !["rest-h", "rest-m", "rest-s"].every(id => restMessageLayout.restInputIds.includes(id))) throw new Error("Custom rest duration control is not grouped correctly");
-  if (!/232,\s*136,\s*138/.test(restMessageLayout.distractionColor)) throw new Error("Time audit distraction color is not red");
+  if (!["专注模式", "分散模式"].every(keyword => restMessageLayout.termTips.some(title => title?.includes(keyword))) || !["4-4-4-4 腹式呼吸", "冰人呼吸法"].every(label => restMessageLayout.breathingTips.some(item => item.label.includes(label) && item.title?.trim()))) throw new Error("Mode and breathing glossary tooltips are missing");
+  if (restMessageLayout.restEditorDisplay !== "inline-flex" || !["rest-edit-h", "rest-edit-m", "rest-edit-s"].every(id => restMessageLayout.restInputIds.includes(id)) || !restMessageLayout.restTimerRestored) throw new Error("Click-to-edit rest duration control is not grouped or restored correctly");
+  if (!/217,\s*143,\s*145/.test(restMessageLayout.distractionColor)) throw new Error("Time audit distraction color does not match the current red token");
   const gateChrome = await evaluate(main, `(() => {
     document.querySelector('#back-to-gate').click();
     const soulBefore = !document.querySelector('#soul-open').hidden;

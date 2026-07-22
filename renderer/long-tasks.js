@@ -4,6 +4,36 @@ const api = window.electronAPI;
 let tasks = [];
 let chatHistory = [];
 let pendingOperations = [];
+const QUADRANT_META = {
+  "important-urgent": { label: "重要且紧急", className: "q1" },
+  "important-not-urgent": { label: "重要不紧急", className: "q2" },
+  "urgent-not-important": { label: "不重要但紧急", className: "q3" },
+  "not-important-not-urgent": { label: "不重要不紧急", className: "q4" },
+};
+let viewState = { mode: "board", quadrant: null, taskId: null };
+let suppressTaskOpenUntil = 0;
+
+function openQuadrant(quadrant) {
+  if (!LongTaskUtils.QUADRANTS.includes(quadrant)) return;
+  viewState = { mode: "quadrant", quadrant, taskId: null };
+  render();
+}
+
+function openTaskDetail(taskId) {
+  if (Date.now() < suppressTaskOpenUntil) return;
+  const task = tasks.find((item) => item.id === taskId && item.status === "active");
+  if (!task) return;
+  hideTaskMenu();
+  viewState = { mode: "detail", quadrant: task.quadrant, taskId };
+  render();
+}
+
+function navigateBack() {
+  if (viewState.mode === "detail") viewState = { mode: "quadrant", quadrant: viewState.quadrant, taskId: null };
+  else if (viewState.mode === "quadrant") viewState = { mode: "board", quadrant: null, taskId: null };
+  else return;
+  render();
+}
 
 function escapeHTML(value) { const div = document.createElement("div"); div.textContent = String(value || ""); return div.innerHTML; }
 function reminderLabel(reminder) {
@@ -15,7 +45,11 @@ function reminderLabel(reminder) {
 function taskCard(task) {
   const card = document.createElement("article");
   card.className = "long-task-card"; card.draggable = true; card.tabIndex = 0; card.dataset.id = task.id;
-  card.innerHTML = `<label class="long-task-check" title="标记完成"><input type="checkbox" aria-label="标记完成"></label><div class="long-card-main"><header><h3>${escapeHTML(task.title)}</h3></header>${task.notes ? `<p>${escapeHTML(task.notes)}</p>` : ""}${reminderLabel(task.reminder) ? `<span class="task-reminder">${escapeHTML(reminderLabel(task.reminder))}</span>` : ""}</div>`;
+  card.innerHTML = `<label class="long-task-check" title="标记完成"><input type="checkbox" aria-label="标记完成"></label><div class="long-card-main"><header><button class="long-task-title-button" type="button">${escapeHTML(task.title)}</button>${task.notes ? '<span class="task-note-indicator" title="包含备注" aria-label="包含备注">▤</span>' : ""}</header>${task.notes ? `<p>${escapeHTML(task.notes)}</p>` : ""}${reminderLabel(task.reminder) ? `<span class="task-reminder">${escapeHTML(reminderLabel(task.reminder))}</span>` : ""}</div>`;
+  card.querySelector(".long-task-title-button").addEventListener("click", (event) => {
+    event.stopPropagation();
+    openTaskDetail(task.id);
+  });
   card.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     showTaskMenu(task, event.clientX, event.clientY);
@@ -42,6 +76,7 @@ function taskCard(task) {
     card.classList.add("dragging");
   });
   card.addEventListener("dragend", () => {
+    suppressTaskOpenUntil = Date.now() + 180;
     card.classList.remove("dragging");
     clearDragPlaceholder();
   });
@@ -99,17 +134,50 @@ function updateDragPlaceholder(list, event) {
   if (index < cards.length) list.insertBefore(dragPlaceholder, cards[index]);
   else list.append(dragPlaceholder);
 }
+function setVisibleView(mode) {
+  $("#quadrant-board-view").hidden = mode !== "board";
+  $("#quadrant-list-view").hidden = mode !== "quadrant";
+  $("#task-detail-view").hidden = mode !== "detail";
+}
+
+function renderBoard() {
+  LongTaskUtils.QUADRANTS.forEach((quadrant) => {
+    const quadrantTasks = LongTaskUtils.activeTasksForQuadrant(tasks, quadrant);
+    const list = $(`[data-list="${quadrant}"]`);
+    list.replaceChildren(...quadrantTasks.map(taskCard));
+    $(`[data-quadrant-count="${quadrant}"]`).textContent = String(quadrantTasks.length);
+  });
+}
+
+function renderQuadrantList() {
+  const quadrantTasks = LongTaskUtils.activeTasksForQuadrant(tasks, viewState.quadrant);
+  $("#quadrant-view-title").textContent = QUADRANT_META[viewState.quadrant].label;
+  $("#quadrant-view-count").textContent = String(quadrantTasks.length);
+  $("#quadrant-view-list").replaceChildren(...quadrantTasks.map(taskCard));
+}
+
+function renderTaskDetail(task) {
+  const noteText = task.notes || "暂无备注";
+  $("#task-detail-quadrant").textContent = QUADRANT_META[task.quadrant].label;
+  $("#task-detail-title").textContent = task.title;
+  $("#task-detail-notes").textContent = noteText;
+  $("#task-detail-notes").classList.toggle("empty", !task.notes);
+  const meta = [];
+  const reminder = reminderLabel(task.reminder);
+  if (reminder) meta.push(`提醒：${reminder}`);
+  if (task.createdAt) meta.push(`创建于 ${new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(new Date(task.createdAt))}`);
+  $("#task-detail-meta").replaceChildren(...meta.map((text) => Object.assign(document.createElement("span"), { textContent: text })));
+  $("#task-detail-check").checked = false;
+  $("#task-detail-check").disabled = false;
+}
+
 function render() {
-  $$(".quadrant-list").forEach((list) => list.replaceChildren());
-  const quadrants = ["important-urgent", "important-not-urgent", "urgent-not-important", "not-important-not-urgent"];
-  const byQuadrant = new Map(quadrants.map((quadrant) => [quadrant, []]));
-  tasks.filter((task) => task.status === "active").forEach((task) => {
-    if (byQuadrant.has(task.quadrant)) byQuadrant.get(task.quadrant).push(task);
-  });
-  byQuadrant.forEach((listTasks, quadrant) => {
-    listTasks.sort((a, b) => (a.order - b.order) || (a.createdAt - b.createdAt));
-    listTasks.forEach((task) => $(`[data-list="${quadrant}"]`).append(taskCard(task)));
-  });
+  const resolved = LongTaskUtils.resolveLongTaskView(viewState, tasks);
+  viewState = { mode: resolved.mode, quadrant: resolved.quadrant, taskId: resolved.taskId };
+  setVisibleView(viewState.mode);
+  if (viewState.mode === "board") renderBoard();
+  else if (viewState.mode === "quadrant") renderQuadrantList();
+  else renderTaskDetail(resolved.task);
 }
 async function reload() {
   try {
@@ -132,8 +200,32 @@ function showForm(task = {}) {
 }
 function hideForm() { $("#long-task-modal").hidden = true; }
 function renderReminderFields() { const kind = $("#long-reminder-kind").value; $("#long-reminder-once").hidden = kind !== "once"; $("#long-reminder-time").hidden = !["daily", "weekly"].includes(kind); $("#long-reminder-weekdays").hidden = kind !== "weekly"; }
-$("#long-add").addEventListener("click", () => showForm()); $("#long-task-close").addEventListener("click", hideForm); $("#long-task-cancel").addEventListener("click", hideForm); $("#long-reminder-kind").addEventListener("change", renderReminderFields);
+$$('[data-open-quadrant]').forEach((button) => button.addEventListener("click", () => openQuadrant(button.dataset.openQuadrant)));
+$("#quadrant-back").addEventListener("click", navigateBack);
+$("#task-detail-back").addEventListener("click", navigateBack);
+function newTaskDefaults() {
+  return viewState.mode === "quadrant" ? { quadrant: viewState.quadrant } : {};
+}
+$("#long-add").addEventListener("click", () => showForm(newTaskDefaults()));
+$("#quadrant-add").addEventListener("click", () => showForm(newTaskDefaults()));
+$("#long-task-close").addEventListener("click", hideForm); $("#long-task-cancel").addEventListener("click", hideForm); $("#long-reminder-kind").addEventListener("change", renderReminderFields);
 $("#long-task-form").addEventListener("submit", async (event) => { event.preventDefault(); const kind = $("#long-reminder-kind").value; const weekdays = $$("#long-reminder-weekdays input:checked").map((input) => Number(input.value)); if (kind === "once" && !$("#long-reminder-at").value) return alert("请选择单次提醒时间。"); if (kind === "once" && Date.parse($("#long-reminder-at").value) <= Date.now()) return alert("提醒时间必须晚于当前时间。"); if (kind === "weekly" && !weekdays.length) return alert("请至少选择一个星期。"); const task = { id: $("#long-task-id").value, title: $("#long-task-title").value, notes: $("#long-task-notes").value, quadrant: $("#long-task-quadrant").value, reminder: { kind, at: $("#long-reminder-at").value ? new Date($("#long-reminder-at").value).toISOString() : null, time: $("#long-reminder-clock").value, weekdays } }; await api.saveLongTask(task); hideForm(); await reload(); });
+$("#task-detail-edit").addEventListener("click", () => {
+  const task = tasks.find((item) => item.id === viewState.taskId);
+  if (task) showForm(task);
+});
+$("#task-detail-menu").addEventListener("click", (event) => {
+  event.stopPropagation();
+  const task = tasks.find((item) => item.id === viewState.taskId);
+  if (!task) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  showTaskMenu(task, rect.right - 160, rect.bottom + 6);
+});
+$("#task-detail-check").addEventListener("change", async (event) => {
+  event.currentTarget.disabled = true;
+  try { await api.completeLongTask(viewState.taskId); }
+  catch (error) { event.currentTarget.checked = false; event.currentTarget.disabled = false; alert(error.message); }
+});
 taskMenu.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
@@ -151,7 +243,6 @@ taskMenu.addEventListener("click", async (event) => {
   if (button.dataset.action === "delete" && confirm(`删除"${task.title}"？`)) await api.deleteLongTask(task.id);
 });
 document.addEventListener("click", hideTaskMenu);
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") hideTaskMenu(); });
 $$(".quadrant-list").forEach((list) => {
   list.addEventListener("dragover", (event) => {
     event.preventDefault();
@@ -173,7 +264,7 @@ $$(".quadrant-list").forEach((list) => {
       dragPlaceholder.remove();
       return;
     }
-    const targetQuadrant = list.dataset.list;
+    const targetQuadrant = list.dataset.list === "active-quadrant" ? viewState.quadrant : list.dataset.list;
     const beforeId = placeholderTargetId(list);
     dragPlaceholder.remove();
     const activeTasks = tasks.filter((t) => t.status === "active");
@@ -198,7 +289,13 @@ $$(".quadrant-list").forEach((list) => {
   });
 });
 function renderMessages() { $("#long-ai-messages").innerHTML = chatHistory.map((message) => `<div class="long-ai-message ${message.role}">${escapeHTML(message.content)}</div>`).join(""); }
-$("#long-ai-toggle").addEventListener("click", () => { $("#long-ai-panel").hidden = false; $("#long-ai-input").focus(); }); $("#long-ai-close").addEventListener("click", () => $("#long-ai-panel").hidden = true);
+function openAiPanel() {
+  $("#long-ai-panel").hidden = false;
+  $("#long-ai-input").focus();
+}
+$("#long-ai-toggle").addEventListener("click", openAiPanel);
+$("#quadrant-ai-toggle").addEventListener("click", openAiPanel);
+$("#long-ai-close").addEventListener("click", () => $("#long-ai-panel").hidden = true);
 $("#long-ai-new").addEventListener("click", () => { chatHistory = []; pendingOperations = []; $("#long-ai-preview").hidden = true; renderMessages(); $("#long-ai-input").focus(); });
 $("#long-ai-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -408,7 +505,16 @@ const LongAiSettings = (() => {
   modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   populatePresets();
   refresh().catch((error) => { $("#long-ai-config-summary").textContent = error.message; });
-  return { refresh };
+  return { refresh, close };
 })();
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" && !(event.altKey && event.key === "ArrowLeft")) return;
+  if (!taskMenu.hidden) { event.preventDefault(); hideTaskMenu(); return; }
+  if (!$("#long-task-modal").hidden) { event.preventDefault(); hideForm(); return; }
+  if (!$("#long-ai-settings-modal").hidden) { event.preventDefault(); LongAiSettings.close(); return; }
+  if (!$("#long-ai-panel").hidden) { event.preventDefault(); $("#long-ai-panel").hidden = true; return; }
+  if (viewState.mode !== "board") { event.preventDefault(); navigateBack(); }
+});
 
 api.onLongTasksChanged((next) => { tasks = next; render(); }); api.acknowledgeReminders(); reload();

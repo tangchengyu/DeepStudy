@@ -10,15 +10,41 @@
 </head>
 <body class="long-task-window">
   <main class="long-task-app">
-    <header class="long-task-header">
-      <div><div class="eyebrow">LONG-TERM BOARD</div><h1>长期任务备忘录</h1><p>按重要性与紧迫性安排未来，而不是只处理眼前。</p></div>
-      <div class="long-task-header-actions"><button id="long-ai-toggle" class="secondary-btn" type="button">AI 对话</button><button id="long-add" class="primary-btn" type="button">新增任务</button></div>
-    </header>
-    <section id="quadrant-board" class="quadrant-board" aria-label="长期任务四象限">
-      <article class="quadrant q1" data-quadrant="important-urgent"><header><span>01</span><div><h2>重要且紧急</h2><p>立即推进，避免失控</p></div></header><div class="quadrant-list" data-list="important-urgent"></div></article>
-      <article class="quadrant q2" data-quadrant="important-not-urgent"><header><span>02</span><div><h2>重要不紧急</h2><p>持续投入，建立长期优势</p></div></header><div class="quadrant-list" data-list="important-not-urgent"></div></article>
-      <article class="quadrant q3" data-quadrant="urgent-not-important"><header><span>03</span><div><h2>不重要但紧急</h2><p>快速处理或减少投入</p></div></header><div class="quadrant-list" data-list="urgent-not-important"></div></article>
-      <article class="quadrant q4" data-quadrant="not-important-not-urgent"><header><span>04</span><div><h2>不重要不紧急</h2><p>谨慎保留，定期清理</p></div></header><div class="quadrant-list" data-list="not-important-not-urgent"></div></article>
+    <section id="quadrant-board-view" class="long-task-view">
+      <header class="long-task-header">
+        <div><div class="eyebrow">LONG-TERM BOARD</div><h1>长期任务备忘录</h1><p>按重要性与紧迫性安排未来，而不是只处理眼前。</p></div>
+        <div class="long-task-header-actions"><button id="long-ai-toggle" class="secondary-btn" type="button">AI 对话</button><button id="long-add" class="primary-btn" type="button">新增任务</button></div>
+      </header>
+      <section id="quadrant-board" class="quadrant-board" aria-label="长期任务四象限">
+        <article class="quadrant q1" data-quadrant="important-urgent"><button class="quadrant-open" type="button" data-open-quadrant="important-urgent" aria-label="打开重要且紧急任务列表"><span class="quadrant-number">I</span><span class="quadrant-heading"><strong>重要且紧急</strong><small>立即推进，避免失控</small></span><span class="quadrant-total" data-quadrant-count="important-urgent">0</span><span class="quadrant-arrow" aria-hidden="true">›</span></button><div class="quadrant-list" data-list="important-urgent"></div></article>
+        <article class="quadrant q2" data-quadrant="important-not-urgent"><button class="quadrant-open" type="button" data-open-quadrant="important-not-urgent" aria-label="打开重要不紧急任务列表"><span class="quadrant-number">II</span><span class="quadrant-heading"><strong>重要不紧急</strong><small>持续投入，建立长期优势</small></span><span class="quadrant-total" data-quadrant-count="important-not-urgent">0</span><span class="quadrant-arrow" aria-hidden="true">›</span></button><div class="quadrant-list" data-list="important-not-urgent"></div></article>
+        <article class="quadrant q3" data-quadrant="urgent-not-important"><button class="quadrant-open" type="button" data-open-quadrant="urgent-not-important" aria-label="打开不重要但紧急任务列表"><span class="quadrant-number">III</span><span class="quadrant-heading"><strong>不重要但紧急</strong><small>快速处理或减少投入</small></span><span class="quadrant-total" data-quadrant-count="urgent-not-important">0</span><span class="quadrant-arrow" aria-hidden="true">›</span></button><div class="quadrant-list" data-list="urgent-not-important"></div></article>
+        <article class="quadrant q4" data-quadrant="not-important-not-urgent"><button class="quadrant-open" type="button" data-open-quadrant="not-important-not-urgent" aria-label="打开不重要不紧急任务列表"><span class="quadrant-number">IV</span><span class="quadrant-heading"><strong>不重要不紧急</strong><small>谨慎保留，定期清理</small></span><span class="quadrant-total" data-quadrant-count="not-important-not-urgent">0</span><span class="quadrant-arrow" aria-hidden="true">›</span></button><div class="quadrant-list" data-list="not-important-not-urgent"></div></article>
+      </section>
+    </section>
+
+    <section id="quadrant-list-view" class="long-task-view drilldown-view" hidden>
+      <header class="drilldown-header">
+        <button id="quadrant-back" class="back-button" type="button" aria-label="返回四象限">←</button>
+        <div class="drilldown-title"><div class="eyebrow">QUADRANT</div><h1 id="quadrant-view-title"></h1><p><span id="quadrant-view-count">0</span> 项未完成任务</p></div>
+        <div class="long-task-header-actions"><button id="quadrant-ai-toggle" class="secondary-btn" type="button">AI 对话</button><button id="quadrant-add" class="primary-btn" type="button">新增任务</button></div>
+      </header>
+      <div id="quadrant-view-list" class="quadrant-list quadrant-list-full" data-list="active-quadrant" aria-live="polite"></div>
+    </section>
+
+    <section id="task-detail-view" class="long-task-view drilldown-view" hidden>
+      <header class="detail-header">
+        <button id="task-detail-back" class="back-button" type="button" aria-label="返回象限列表">←</button>
+        <span id="task-detail-quadrant" class="detail-quadrant-chip"></span>
+        <button id="task-detail-menu" class="icon-btn compact" type="button" aria-label="更多任务操作">⋯</button>
+      </header>
+      <article class="task-detail-card">
+        <label class="task-detail-complete"><input id="task-detail-check" type="checkbox"><span>标记为完成</span></label>
+        <h1 id="task-detail-title"></h1>
+        <div id="task-detail-meta" class="task-detail-meta"></div>
+        <div id="task-detail-notes" class="task-detail-notes"></div>
+        <div class="task-detail-actions"><button id="task-detail-edit" class="primary-btn" type="button">编辑任务</button></div>
+      </article>
     </section>
   </main>
 

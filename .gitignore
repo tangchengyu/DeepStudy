@@ -17,12 +17,6 @@ release/
 .env
 .env.*
 
-.claude/
-.codex/
-.agents/
-CLAUDE.md
-AGENTS.md
-skills-lock.json
 __pycache__/
 *.py[cod]
 
