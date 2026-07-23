@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "deepstudy-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "FIREBASE_WEB_API_KEY": "local-test-firebase-key",
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://localhost,capacitor://localhost",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+    "TURNSTILE_ALLOWED_HOSTNAMES": "localhost"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "deepstudy-sync",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "preview_database_id": "deepstudy-sync-local",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "env": {
+    "production": {
+      "name": "deepstudy-gateway",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "FIREBASE_WEB_API_KEY": "REPLACE_WITH_FIREBASE_WEB_API_KEY",
+        "FIREBASE_PROJECT_ID": "REPLACE_WITH_FIREBASE_PROJECT_ID",
+        "ALLOWED_ORIGINS": "https://localhost,capacitor://localhost",
+        "TURNSTILE_SITE_KEY": "REPLACE_WITH_TURNSTILE_SITE_KEY",
+        "TURNSTILE_ALLOWED_HOSTNAMES": "REPLACE_WITH_TURNSTILE_HOSTNAME"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "deepstudy-sync",
+          "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}

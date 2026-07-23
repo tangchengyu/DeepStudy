@@ -1,0 +1,88 @@
+name: Release Android pilot APK
+
+on:
+  push:
+    tags:
+      - "android-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing Android release tag, for example android-v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: deepstudy-app/package-lock.json
+
+      - name: Use Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Install web dependencies
+        working-directory: deepstudy-app
+        run: npm ci
+
+      - name: Test mobile application
+        working-directory: deepstudy-app
+        run: npm test
+
+      - name: Build and synchronize Android project
+        working-directory: deepstudy-app
+        run: |
+          npm run build
+          npm run cap:sync
+
+      - name: Build installable pilot APK
+        working-directory: deepstudy-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK
+        shell: bash
+        env:
+          TAG_NAME: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p deepstudy-app/dist-apk
+          cp deepstudy-app/android/app/build/outputs/apk/debug/app-debug.apk \
+            "deepstudy-app/dist-apk/DeepStudy-Android-${TAG_NAME}.apk"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepstudy-android-pilot
+          path: deepstudy-app/dist-apk/*.apk
+          if-no-files-found: error
+
+      - name: Upload APK to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.release_tag || github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG_NAME" --repo "$REPO" >/dev/null 2>&1 || \
+            gh release create "$TAG_NAME" --repo "$REPO" \
+              --title "DeepStudy Android ${TAG_NAME}" \
+              --notes "Pilot Android APK. This build uses Android debug signing and is intended for small-scale testing."
+          gh release upload "$TAG_NAME" deepstudy-app/dist-apk/*.apk --repo "$REPO" --clobber

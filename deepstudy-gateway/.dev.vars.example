@@ -1,0 +1,6 @@
+# Copy this file to .dev.vars for local development only.
+GATEWAY_SECRET=replace-with-at-least-32-random-characters
+FIREBASE_WEB_API_KEY=local-test-firebase-key
+RECOVERY_CODE_PEPPER=replace-with-an-independent-random-secret
+# Cloudflare's documented always-pass test secret. Never use it in production.
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
