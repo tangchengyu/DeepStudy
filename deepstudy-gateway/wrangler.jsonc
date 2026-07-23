@@ -12,7 +12,6 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
-    "FIREBASE_WEB_API_KEY": "local-test-firebase-key",
     "ALLOWED_ORIGINS": "http://localhost:5173,https://localhost,capacitor://localhost",
     "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
     "TURNSTILE_ALLOWED_HOSTNAMES": "localhost"
@@ -31,8 +30,6 @@
       "name": "deepstudy-gateway",
       "vars": {
         "ENVIRONMENT": "production",
-        "FIREBASE_WEB_API_KEY": "REPLACE_WITH_FIREBASE_WEB_API_KEY",
-        "FIREBASE_PROJECT_ID": "REPLACE_WITH_FIREBASE_PROJECT_ID",
         "ALLOWED_ORIGINS": "https://localhost,capacitor://localhost",
         "TURNSTILE_SITE_KEY": "REPLACE_WITH_TURNSTILE_SITE_KEY",
         "TURNSTILE_ALLOWED_HOSTNAMES": "REPLACE_WITH_TURNSTILE_HOSTNAME"
