@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "deepstudy-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://localhost,capacitor://localhost",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+    "TURNSTILE_ALLOWED_HOSTNAMES": "localhost"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "deepstudy-sync",
+      "database_id": "ead48a7f-9ddb-4b79-8937-f62174230441",
+      "preview_database_id": "deepstudy-sync-local",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "env": {
+    "production": {
+      "name": "deepstudy-gateway",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5177,https://localhost,capacitor://localhost",
+        "TURNSTILE_SITE_KEY": "0x4AAAAAAD7sfyZXxwNWdy77",
+        "TURNSTILE_ALLOWED_HOSTNAMES": "localhost"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "deepstudy-sync",
+          "database_id": "ead48a7f-9ddb-4b79-8937-f62174230441",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}

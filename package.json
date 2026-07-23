@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test",
+    "test": "node --test \"test/*.test.js\" \"packages/sync-contract/test/*.test.js\"",
     "pack": "npm run pack:win",
     "pack:win": "node scripts/pack.js --win nsis --publish never",
     "pack:linux": "node scripts/pack.js --linux tar.gz --x64",
@@ -20,8 +20,8 @@
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "7zip-bin": "^5.2.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.deepstudy.focus",
@@ -59,6 +59,7 @@
       "preload.js",
       "build/**",
       "renderer/**",
+      "packages/sync-contract/**",
       "node_modules/**"
     ],
     "asar": false,

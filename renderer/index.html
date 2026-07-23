@@ -82,6 +82,7 @@
             <span class="long-task-launch-mark" aria-hidden="true"></span>
             长期任务
           </button>
+          <button id="sync-account-open" class="tool-btn" type="button">账号同步</button>
           <label class="aot-label"
             ><input id="always-on-top" type="checkbox" /> 窗口置顶</label
           >
@@ -650,6 +651,66 @@
       </section>
     </div>
 
+    <div id="sync-modal" class="modal" hidden>
+      <section class="modal-card sync-card" role="dialog" aria-modal="true" aria-labelledby="sync-title">
+        <div class="settings-heading">
+          <div>
+            <div class="eyebrow">ACCOUNT &amp; SYNC</div>
+            <h2 id="sync-title">DeepStudy 账号同步</h2>
+          </div>
+          <button id="sync-close" class="icon-btn compact" type="button" aria-label="关闭账号同步">×</button>
+        </div>
+        <div class="sync-grid">
+          <label>同步服务地址<input id="sync-gateway-url" type="url" spellcheck="false" placeholder="https://deepstudy-gateway.jackbreese585.workers.dev" /></label>
+          <label>用户名<input id="sync-username" autocomplete="username" maxlength="30" /></label>
+          <label>密码<input id="sync-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" /></label>
+          <label>人机验证令牌<input id="sync-turnstile-token" autocomplete="off" spellcheck="false" /></label>
+        </div>
+        <p class="sync-hint">试点阶段由部署环境提供一次性验证令牌；不会保存密码或验证令牌。</p>
+            <div class="sync-actions">
+              <button id="sync-register" class="primary-btn" type="button">注册</button>
+              <button id="sync-sign-in" class="primary-btn" type="button">登录</button>
+              <button id="sync-sign-out" class="secondary-btn" type="button">退出账号</button>
+              <button id="sync-device-retry" class="secondary-btn" type="button" hidden>重试设备登记</button>
+            </div>
+        <details class="sync-recovery">
+          <summary>使用恢复码重设密码</summary>
+          <div class="sync-grid">
+            <label>恢复码<input id="sync-recovery-input" autocomplete="off" spellcheck="false" /></label>
+            <label>新密码<input id="sync-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" /></label>
+          </div>
+          <button id="sync-recover" class="secondary-btn" type="button">重设密码并轮换恢复码</button>
+        </details>
+        <div id="sync-recovery-code-wrap" class="sync-recovery-code" hidden>
+          <strong>新的恢复码（只显示这一次，请立即离线保存）</strong>
+          <code id="sync-recovery-code"></code>
+          <label><input id="sync-recovery-saved" type="checkbox" /> 我已离线保存恢复码</label>
+        </div>
+        <section class="sync-data-section">
+          <h3>旧数据与同步</h3>
+          <p>先预览，不会修改本地或云端；确认时会重新检查数据，并在真正写回前创建可恢复备份。</p>
+          <div class="sync-actions">
+            <button id="sync-import-preview" class="secondary-btn" type="button">预览首次导入</button>
+            <button id="sync-import-confirm" class="primary-btn" type="button" disabled>确认并导入</button>
+            <button id="sync-pull" class="secondary-btn" type="button">拉取并应用</button>
+            <button id="sync-conflicts" class="secondary-btn" type="button">查看冲突</button>
+          </div>
+          <div class="sync-backup-restore">
+            <label>备份编号<input id="sync-backup-id" autocomplete="off" spellcheck="false" placeholder="粘贴同步完成时显示的备份编号" /></label>
+            <button id="sync-backup-restore" class="secondary-btn" type="button">恢复该备份</button>
+          </div>
+          <div id="sync-preview-result" class="sync-preview-result"></div>
+          <div id="sync-conflict-list" class="sync-conflict-list"></div>
+        </section>
+        <section id="sync-timer-section" class="sync-data-section" hidden>
+          <h3>另一台设备正在计时</h3>
+          <p id="sync-timer-summary"></p>
+          <button id="sync-takeover" class="danger-btn" type="button">接管并继续</button>
+        </section>
+        <div id="sync-status" class="settings-status" role="status" aria-live="polite"></div>
+      </section>
+    </div>
+
     <audio id="audio-muyu" src="assets/audio/muyu.mp3" preload="auto" loop></audio>
     <audio id="audio-rain" src="assets/audio/rain.mp3" preload="auto" loop></audio>
     <audio id="audio-breathing" src="assets/audio/4-4-4-4.MP3"></audio>
@@ -658,7 +719,12 @@
     <script src="planner-utils.js"></script>
     <script src="electron-bridge.js"></script>
     <script src="default-quotes.js"></script>
+    <script src="legacy-sync.js"></script>
+    <script src="sync-enrollment.js"></script>
+    <script src="timer-sync-runtime.js"></script>
     <script src="app.js"></script>
+    <script src="continuous-sync.js"></script>
+    <script src="sync-enrollment-ui.js"></script>
     <script src="tutorial.js"></script>
   </body>
 </html>

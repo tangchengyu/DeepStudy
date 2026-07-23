@@ -1,12 +1,67 @@
 const { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu, Notification, nativeImage, powerMonitor, shell, net } = require("electron");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { createAppReadyRunner } = require("./renderer/app-lifecycle");
+const {
+  createCredentialStore,
+  createDesktopSyncService,
+  createLegacyBackupStore,
+  createStateStore,
+} = require("./renderer/desktop-sync-service");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
 const APP_DATA_DIR_NAME = "deepstudy";
 
-app.setPath("userData", path.join(app.getPath("appData"), APP_DATA_DIR_NAME));
+const productionUserDataPath = path.join(app.getPath("appData"), APP_DATA_DIR_NAME);
+const requestedTestUserData = cleanTestUserDataPath(
+  process.env.DEEPSTUDY_TEST_USER_DATA,
+  process.env.DEEPSTUDY_TEST_MODE,
+  productionUserDataPath,
+);
+app.setPath("userData", requestedTestUserData || productionUserDataPath);
+
+function cleanTestUserDataPath(value, testMode, productionPath) {
+  if (!value) return "";
+  if (testMode !== "1") throw new Error("DEEPSTUDY_TEST_USER_DATA requires DEEPSTUDY_TEST_MODE=1.");
+  const resolved = path.resolve(value);
+  if (resolved === path.parse(resolved).root) throw new Error("Refusing to use a filesystem root as test userData.");
+  const temporaryRoot = path.resolve(os.tmpdir());
+  const relativeToTemp = path.relative(temporaryRoot, resolved);
+  if (!relativeToTemp || relativeToTemp.startsWith("..") || path.isAbsolute(relativeToTemp)) {
+    throw new Error("Test userData must be a descendant of the OS temporary directory.");
+  }
+  if (resolved.toLowerCase() === path.resolve(productionPath).toLowerCase()) {
+    throw new Error("Refusing to use the production DeepStudy profile for a test.");
+  }
+  return resolved;
+}
+
+const syncUserDataPath = app.getPath("userData");
+const syncCredentialStore = createCredentialStore({
+  fs,
+  filePath: path.join(syncUserDataPath, "sync-credentials.json"),
+  safeStorage,
+});
+const syncStateStore = createStateStore({
+  fs,
+  filePath: path.join(syncUserDataPath, "sync-device.json"),
+});
+const legacyBackupStore = createLegacyBackupStore({
+  fs,
+  userDataPath: syncUserDataPath,
+  longTasksFilePath: path.join(syncUserDataPath, "long-tasks.json"),
+});
+let syncContractPromise;
+const desktopSyncService = createDesktopSyncService({
+  fetch: (...args) => net.fetch(...args),
+  credentialStore: syncCredentialStore,
+  stateStore: syncStateStore,
+  hashSnapshot: async (records) => {
+    syncContractPromise ||= import("./packages/sync-contract/index.js");
+    return (await syncContractPromise).snapshotHash(records);
+  },
+});
 
 if (process.platform === "win32") {
   app.setAppUserModelId(APP_USER_MODEL_ID);
@@ -884,6 +939,46 @@ ipcMain.handle("long-tasks:move-to-daily-plan", (_event, payload = {}) => {
 });
 ipcMain.handle("reminders:acknowledge", acknowledgeReminders);
 
+ipcMain.handle("sync:auth-register", (_event, input) => desktopSyncService.register(input));
+ipcMain.handle("sync:auth-sign-in", (_event, input) => desktopSyncService.signIn(input));
+ipcMain.handle("sync:auth-recover", (_event, input) => desktopSyncService.recover(input));
+ipcMain.handle("sync:auth-sign-out", () => desktopSyncService.signOut());
+ipcMain.handle("sync:session", () => desktopSyncService.session());
+ipcMain.handle("sync:status", () => desktopSyncService.status());
+ipcMain.handle("sync:device-register", (_event, input, expected) => desktopSyncService.registerDevice(input, expected));
+ipcMain.handle("sync:snapshot-capture-long-tasks", () => legacyBackupStore.captureLongTasks());
+ipcMain.handle("sync:snapshot-verify-long-tasks", (_event, fingerprint) => legacyBackupStore.verifyLongTasks(fingerprint));
+ipcMain.handle("sync:import-preview", (_event, records) => desktopSyncService.previewImport(records));
+ipcMain.handle("sync:import-commit", (_event, input, expected) => desktopSyncService.commitImport(input, expected));
+ipcMain.handle("sync:import-progress", () => desktopSyncService.importProgress());
+ipcMain.handle("sync:import-progress-save", (_event, progress) => desktopSyncService.saveImportProgress(progress));
+ipcMain.handle("sync:push", (_event, mutations, expected) => desktopSyncService.push(mutations, expected));
+ipcMain.handle("sync:pull", (_event, input) => desktopSyncService.pull(input));
+ipcMain.handle("sync:pull-commit", (_event, input) => desktopSyncService.commitPull(input));
+ipcMain.handle("sync:outbox-state", (_event, expected) => desktopSyncService.outboxState(expected));
+ipcMain.handle("sync:outbox-queue", (_event, mutations, expected) => desktopSyncService.queueOutbox(mutations, expected));
+ipcMain.handle("sync:outbox-settle", (_event, results, expected) => desktopSyncService.settleOutbox(results, expected));
+ipcMain.handle("sync:records-remember", (_event, records, expected) => desktopSyncService.recordPulled(records, expected));
+ipcMain.handle("sync:enrollment-finish", (_event, records) => desktopSyncService.finishEnrollment(records));
+ipcMain.handle("sync:conflicts", (_event, expected) => desktopSyncService.conflicts(expected));
+ipcMain.handle("sync:conflict-resolve", (_event, conflictId, input, expected) => desktopSyncService.resolveConflict(conflictId, input, expected));
+ipcMain.handle("sync:timer-current", (_event, expected) => desktopSyncService.currentTimer(expected));
+ipcMain.handle("sync:timer-claim", (_event, input, expected) => desktopSyncService.claimTimer(input, expected));
+ipcMain.handle("sync:timer-release", (_event, input, expected) => desktopSyncService.releaseTimer(input, expected));
+ipcMain.handle("sync:backup-create", (_event, snapshot) => legacyBackupStore.createBackup(snapshot));
+ipcMain.handle("sync:backup-write-long-tasks", (_event, tasks, backupId) => {
+  const result = legacyBackupStore.writeLongTasks(tasks, backupId);
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send("long-tasks:changed", result);
+  return result;
+});
+ipcMain.handle("sync:backup-read-long-tasks", () => legacyBackupStore.readLongTasks());
+ipcMain.handle("sync:backup-restore", (_event, backupId) => {
+  const result = legacyBackupStore.restoreBackup(backupId);
+  const tasks = legacyBackupStore.readLongTasks();
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send("long-tasks:changed", tasks);
+  return result;
+});
+
 ipcMain.handle("window:toggle-always-on-top", (event) => {
   const targetWindow = BrowserWindow.fromWebContents(event.sender);
   if (targetWindow && !targetWindow.isDestroyed()) {
@@ -1064,6 +1159,13 @@ runWhenAppReady(() => {
   checkReminders();
   setInterval(checkReminders, 30000);
   powerMonitor.on("resume", checkReminders);
+  const testExitMs = Number(process.env.DEEPSTUDY_TEST_EXIT_AFTER_MS);
+  if (requestedTestUserData && Number.isFinite(testExitMs) && testExitMs > 0) {
+    setTimeout(() => {
+      quitting = true;
+      app.quit();
+    }, testExitMs);
+  }
 }).catch((error) => {
   console.error("DeepStudy failed to finish starting:", error);
   app.quit();

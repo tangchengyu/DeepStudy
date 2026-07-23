@@ -16,6 +16,20 @@ release/
 *.tmp
 .env
 .env.*
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+deepstudy-app/android/.gradle/
+deepstudy-app/android/local.properties
+deepstudy-app/android/app/build/
+deepstudy-app/android/build/
+deepstudy-app/.vite/
+deepstudy-gateway/.wrangler/
 
 __pycache__/
 *.py[cod]
@@ -23,5 +37,6 @@ __pycache__/
 *.png
 !renderer/assets/focus-gate.png
 !deepstudy-app/assets/*.png
+!deepstudy-app/android/app/src/main/res/**/*.png
 !build/deepstudy.png
 !build/icons/*.png

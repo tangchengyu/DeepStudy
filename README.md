@@ -96,7 +96,7 @@ if (Test-Path $shortcut) {
 
 Requirements:
 
-- Node.js 18 or newer
+- Node.js 22.12 or newer
 - Java 21 and Maven 3.9 or newer if you want to inspect the Spring Boot backend
 
 Production Electron app:
@@ -247,7 +247,7 @@ if (Test-Path $shortcut) {
 
 环境要求：
 
-- Node.js 18 或更高版本
+- Node.js 22.12 或更高版本
 - 如果要查看 Spring Boot 后端，需要 Java 21 和 Maven 3.9 或更高版本
 
 运行生产 Electron 应用：

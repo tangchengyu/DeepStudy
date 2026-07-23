@@ -1,0 +1,32 @@
+{
+  "name": "deepstudy-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run test/crypto.test.ts",
+    "test:integration": "vitest run test/worker.test.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy --env production",
+    "db:migrate:local": "wrangler d1 migrations apply deepstudy-sync --local",
+    "db:migrate:remote": "wrangler d1 migrations apply deepstudy-sync --env production --remote",
+    "cpu:smoke": "node scripts/cpu-smoke.mjs"
+  },
+  "dependencies": {
+    "@deepstudy/sync-contract": "file:../packages/sync-contract",
+    "hono": "4.12.31"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.18.7",
+    "@cloudflare/workers-types": "5.20260722.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.113.0"
+  },
+  "overrides": {
+    "sharp": "0.35.0"
+  }
+}
