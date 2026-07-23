@@ -31,8 +31,8 @@
       "vars": {
         "ENVIRONMENT": "production",
         "ALLOWED_ORIGINS": "https://localhost,capacitor://localhost",
-        "TURNSTILE_SITE_KEY": "REPLACE_WITH_TURNSTILE_SITE_KEY",
-        "TURNSTILE_ALLOWED_HOSTNAMES": "REPLACE_WITH_TURNSTILE_HOSTNAME"
+        "TURNSTILE_SITE_KEY": "0x4AAAAAAD7sfyZXxwNWdy77",
+        "TURNSTILE_ALLOWED_HOSTNAMES": "localhost"
       },
       "d1_databases": [
         {
