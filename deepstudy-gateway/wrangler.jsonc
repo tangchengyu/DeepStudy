@@ -20,7 +20,7 @@
     {
       "binding": "DB",
       "database_name": "deepstudy-sync",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "ead48a7f-9ddb-4b79-8937-f62174230441",
       "preview_database_id": "deepstudy-sync-local",
       "migrations_dir": "migrations"
     }
@@ -38,7 +38,7 @@
         {
           "binding": "DB",
           "database_name": "deepstudy-sync",
-          "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+          "database_id": "ead48a7f-9ddb-4b79-8937-f62174230441",
           "migrations_dir": "migrations"
         }
       ]
