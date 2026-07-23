@@ -396,7 +396,7 @@ watch(() => syncState.conflicts, () => {
       <label for="gateway-url">同步网关</label>
       <p>这里只是公开服务地址，不是密钥。账号密码和令牌不会写入此设置。</p>
       <div class="gateway-row">
-        <input id="gateway-url" v-model="gatewayUrl" type="url" inputmode="url" placeholder="https://sync.example.com">
+        <input id="gateway-url" v-model="gatewayUrl" type="url" inputmode="url" placeholder="https://deepstudy-gateway.jackbreese585.workers.dev">
         <button type="button" @click="saveGateway">保存</button>
       </div>
       <small v-if="gatewayMessage">{{ gatewayMessage }}</small>

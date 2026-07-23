@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createGatewaySettings } from './gatewaySettings'
+import { createGatewaySettings, gatewaySettings, productionGatewayBaseUrl } from './gatewaySettings'
 
 describe('gateway settings', () => {
   beforeEach(() => localStorage.clear())
@@ -12,6 +12,10 @@ describe('gateway settings', () => {
     expect(settings.getBaseUrl()).toBe('https://pilot.example.com')
     expect(localStorage.getItem('deepstudy.gatewayBaseUrl')).toBe('https://pilot.example.com')
     expect(JSON.stringify(localStorage)).not.toContain('token')
+  })
+
+  it('uses the production gateway as the shipped default', () => {
+    expect(gatewaySettings.getBaseUrl()).toBe(productionGatewayBaseUrl)
   })
 
   it('rejects insecure non-local gateway URLs', () => {

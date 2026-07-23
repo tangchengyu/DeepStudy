@@ -1,4 +1,5 @@
 const gatewayUrlKey = 'deepstudy.gatewayBaseUrl'
+export const productionGatewayBaseUrl = 'https://deepstudy-gateway.jackbreese585.workers.dev'
 
 export function normalizeGatewayBaseUrl(value: string) {
   const trimmed = value.trim()
@@ -19,7 +20,7 @@ export function normalizeGatewayBaseUrl(value: string) {
 
 export function createGatewaySettings(
   storage: Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>,
-  buildDefault = import.meta.env.VITE_GATEWAY_BASE_URL ?? '',
+  buildDefault = import.meta.env.VITE_GATEWAY_BASE_URL ?? productionGatewayBaseUrl,
 ) {
   const defaultUrl = normalizeGatewayBaseUrl(buildDefault)
   return {

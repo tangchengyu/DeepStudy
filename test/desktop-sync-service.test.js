@@ -78,6 +78,19 @@ test("credential encryption availability is checked lazily after Electron become
   });
 });
 
+test("desktop sync uses the production gateway by default and migrates blank local state", async () => {
+  const { DEFAULT_GATEWAY_URL, createStateStore } = require(MODULE_PATH);
+  await withTempDir((directory) => {
+    const filePath = path.join(directory, "sync-device.json");
+    const first = createStateStore({ fs, filePath, createDeviceId: () => "desktop-default-device" });
+    assert.equal(first.read().gatewayUrl, DEFAULT_GATEWAY_URL);
+
+    fs.writeFileSync(filePath, JSON.stringify({ version: 2, gatewayUrl: "", deviceId: "desktop-blank-device", scopes: {} }));
+    const restored = createStateStore({ fs, filePath, createDeviceId: () => "unexpected-device" });
+    assert.equal(restored.read().gatewayUrl, DEFAULT_GATEWAY_URL);
+  });
+});
+
 test("durable scoped outbox merges entity edits, retains tombstones, and survives a restart", async () => {
   const { createStateStore } = require(MODULE_PATH);
   await withTempDir((directory) => {

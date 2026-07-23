@@ -2,6 +2,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const MEMORY_ONLY_WARNING = "当前系统没有可用的安全凭据存储，登录令牌仅保留在本次运行的内存中，退出软件后需要重新登录。";
+const DEFAULT_GATEWAY_URL = "https://deepstudy-gateway.jackbreese585.workers.dev";
 
 function canPersistSecurely(safeStorage, platform) {
   if (!safeStorage?.isEncryptionAvailable?.()) return false;
@@ -92,7 +93,7 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
   function defaults() {
     return {
       version: 2,
-      gatewayUrl: "",
+      gatewayUrl: DEFAULT_GATEWAY_URL,
       deviceId: createDeviceId(),
       username: "",
       cursor: 0,
@@ -128,7 +129,7 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
       || (stored.scopes != null && (typeof stored.scopes !== "object" || Array.isArray(stored.scopes)))) {
       throw new TypeError("Invalid sync state.");
     }
-    return {
+    const state = {
       ...defaults(),
       ...stored,
       scopes: stored.scopes || {},
@@ -137,6 +138,8 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
         ? stored.deviceId
         : createDeviceId(),
     };
+    if (!state.gatewayUrl) state.gatewayUrl = DEFAULT_GATEWAY_URL;
+    return state;
   }
   function read() {
     if (cached) return { ...cached };
@@ -843,6 +846,7 @@ function createDesktopSyncService({
 
 module.exports = {
   GatewayRequestError,
+  DEFAULT_GATEWAY_URL,
   MEMORY_ONLY_WARNING,
   atomicWriteJson,
   canPersistSecurely,
