@@ -12,6 +12,7 @@ release/
 
 *.db
 *.jar
+!deepstudy-app/android/gradle/wrapper/gradle-wrapper.jar
 *.log
 *.tmp
 .env
