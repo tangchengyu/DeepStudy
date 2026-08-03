@@ -17,6 +17,12 @@ test("forwards planner calls when Electron preload is available", async () => {
     getPlannerConfig: async () => ({ mode: "api" }),
     savePlannerConfig: async (value) => (calls.push(value), value),
     deletePlannerApiProfile: async (id) => ({ deleted: id }),
+    getLongTaskAiConfig: async () => ({ scope: "long" }),
+    saveLongTaskAiConfig: async (value) => ({ savedLong: value }),
+    getAppPreferences: async () => ({ language: "zh-CN" }),
+    saveAppPreferences: async (value) => value,
+    testApiConfig: async (value) => ({ ok: true, value }),
+    openAppSettings: async (section) => ({ section }),
     openFreeApiTutorial: async () => true,
     chatWithPlanner: async () => ({ content: "ok" }),
   };
@@ -25,6 +31,12 @@ test("forwards planner calls when Electron preload is available", async () => {
   assert.deepEqual(await bridge.getPlannerConfig(), { mode: "api" });
   await bridge.savePlannerConfig({ mode: "api" });
   assert.deepEqual(await bridge.deletePlannerApiProfile("profile-1"), { deleted: "profile-1" });
+  assert.deepEqual(await bridge.getLongTaskAiConfig(), { scope: "long" });
+  assert.deepEqual(await bridge.saveLongTaskAiConfig({ mode: "api" }), { savedLong: { mode: "api" } });
+  assert.deepEqual(await bridge.getAppPreferences(), { language: "zh-CN" });
+  assert.deepEqual(await bridge.saveAppPreferences({ language: "en-US" }), { language: "en-US" });
+  assert.deepEqual(await bridge.testApiConfig({ model: "test" }), { ok: true, value: { model: "test" } });
+  assert.deepEqual(await bridge.openAppSettings("long-ai"), { section: "long-ai" });
   assert.equal(await bridge.openFreeApiTutorial(), true);
   assert.deepEqual(calls, [{ mode: "api" }]);
 });

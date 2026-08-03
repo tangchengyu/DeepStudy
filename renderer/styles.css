@@ -1948,15 +1948,112 @@ button:disabled {
 .focus-duration-custom small {
   color: var(--text-dim);
 }
-.settings-card {
-  width: min(640px, 100%);
-  max-height: min(700px, calc(100vh - 40px));
-  overflow: auto;
-  padding: 24px;
+.settings-card,
+.app-settings-card {
+  width: min(940px, calc(100vw - 36px));
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: hidden;
+  padding: 0;
   border-color: var(--border);
   background: var(--surface);
   box-shadow: 0 24px 80px rgba(44, 62, 56, 0.24);
   text-align: left;
+}
+.app-settings-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.app-settings-top h2 {
+  margin-top: 3px;
+}
+.app-settings-top p {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.app-settings-layout {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  min-height: 520px;
+  max-height: calc(100vh - 190px);
+}
+.settings-nav {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow: auto;
+}
+.settings-nav-item {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 800;
+}
+.settings-nav-item:hover,
+.settings-nav-item.active {
+  border-color: rgba(72, 168, 142, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.settings-content {
+  min-width: 0;
+  padding: 22px 26px;
+  overflow: auto;
+}
+.settings-section {
+  display: none;
+  max-width: 680px;
+}
+.settings-section.active {
+  display: grid;
+  gap: 14px;
+}
+.settings-section h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+}
+.settings-section > label,
+.settings-inline-actions {
+  display: grid;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.settings-section > label input:not([type="checkbox"]),
+.settings-section > label select,
+.settings-section > label textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-weight: 400;
+}
+.settings-section > label textarea {
+  min-height: 168px;
+  line-height: 1.45;
+  resize: vertical;
+  font-family: Consolas, "Microsoft YaHei", monospace;
+  font-size: 12px;
+}
+.settings-inline-actions {
+  grid-template-columns: auto auto;
+  justify-content: end;
+  align-items: center;
+  margin-top: 4px;
 }
 .soul-card {
   width: min(680px, 100%);
@@ -2074,7 +2171,7 @@ button:disabled {
 .settings-panel {
   display: grid;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 0;
 }
 .tutorial-button {
   width: 100%;
@@ -2198,9 +2295,53 @@ button:disabled {
   .settings-card {
     padding: 18px;
   }
+  .app-settings-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-nav {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-content {
+    padding: 18px;
+  }
   .saved-profile-row {
     grid-template-columns: 1fr;
   }
+}
+.language-choice-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(21, 37, 33, 0.28);
+  backdrop-filter: blur(6px);
+}
+.language-choice-card {
+  width: min(420px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(44, 62, 56, 0.22);
+}
+.language-choice-card h2 {
+  margin: 4px 0 8px;
+}
+.language-choice-card p {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.language-choice-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
 }
 .timer-panel {
   max-width: 520px;

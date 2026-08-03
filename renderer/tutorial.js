@@ -4,7 +4,7 @@
   const timerMode = new URLSearchParams(location.search).get("mode");
   if (!launchButton || timerMode) return;
 
-  const steps = [
+  const zhSteps = [
     {
       target: "#top-bar",
       title: "欢迎来到DeepStudy",
@@ -48,9 +48,15 @@
       view: "gate",
     },
     {
-      target: "#soul-open",
-      title: "维护你的灵魂按摩间",
-      description: "这里保存能让你恢复方向感的句子。入口页会随机展示你的收藏，也可以启用内置好句库。",
+      target: "#app-settings-open",
+      title: "统一设置入口",
+      description: "设置窗口里可以切换语言、新建 API 配置、测试模型连接、调整每日任务和长期任务 AI 的偏好提示词，也能维护灵魂按摩间的好句库。",
+      view: "gate",
+    },
+    {
+      target: "#app-settings-open",
+      title: "先设置模型 API",
+      description: "进入设置后，在“新建 API 配置”栏目填写配置名称、常用模型、API Base URL、模型名称和 API Key，并点击“一键测试”。验证成功后，每日任务 AI 和长期任务 AI 都可以选择这个 API。",
       view: "gate",
     },
     {
@@ -102,6 +108,28 @@
       view: "focus",
     },
   ];
+  const enSteps = [
+    { target: "#top-bar", title: "Welcome to DeepStudy", description: "DeepStudy is a desktop focus workflow that combines daily planning, AI planning, long-term tasks, focus timers, distraction capture, breathing, white noise, time auditing, and reflection.", view: "gate" },
+    { target: "#daily-plan-sidebar", title: "Clarify Today First", description: "Add tasks to Daily Plan with Enter, then tick the checkbox when done. Completed tasks are added to Daily Reflection automatically. Right-click a daily task to mark or unmark priority; use Clear Done to clean up the list.", view: "gate" },
+    { target: "#chat-toggle", title: "Let AI Draft the Plan", description: "Open AI Chat and describe today's goals. The AI tool turns them into checklist tasks. Its settings now live in the global Settings window.", view: "gate" },
+    { target: "#noise-control", title: "Protect Attention With Sound", description: "My White Noise supports built-in tracks, volume, playback speed, and local audio files.", view: "gate" },
+    { target: "#open-stopwatch", title: "Stopwatch and Countdown", description: "Use Stopwatch for open-ended work and Countdown for bounded work. Both open in small independent windows.", view: "gate" },
+    { target: "#long-tasks-open", title: "Manage Long Tasks", description: "Long Tasks use the important/urgent quadrant board. Ticking a long task completes it and syncs it to Daily Reflection; an undo button stays available for 10 seconds.", view: "gate" },
+    { target: "#long-tasks-open", title: "Long Task Operations", description: "The colored left strip is the drag handle. Drag tasks across quadrants or reorder within one quadrant. Click the rest of the card to edit details. The right-click menu includes Copy to Today and Delete.", view: "gate" },
+    { target: "#app-settings-open", title: "One Settings Window", description: "Settings contains language, API configuration, API test, Daily AI preferences, Long Task AI preferences, the quote room, and the guide.", view: "gate" },
+    { target: "#app-settings-open", title: "Configure Model API First", description: "In New API Configuration, fill in profile name, model preset, API Base URL, model name, and API Key. Use Test Once before saving. Then select that API for Daily AI and Long Task AI.", view: "gate" },
+    { target: "#focus-quote-screen", title: "Clear Attention Residue", description: "Click the quote card to refresh a saved sentence. Before working, pause briefly so the last task can leave working memory.", view: "gate" },
+    { target: "#enter-gate", title: "Enter Focus Space", description: "When ready, enter the workspace. The guide will preview internal features and then return you to this gate.", view: "gate" },
+    { target: ".mode-tabs", title: "Three Clear Modes", description: "Focus Mode is for single-task work, Rest Mode is for recovery, and Habit Building is for audit and reflection.", view: "focus" },
+    { target: "#focus-mode .section-header", title: "Set Boundaries", description: "Choose duration, mark work as core or maintenance, then start, pause, or reset. The record goes into your review data.", view: "focus" },
+    { target: "#quick-distraction", title: "Capture Distraction", description: "When distracted, click Quick Add Distraction or press <kbd>Ctrl</kbd> + <kbd>D</kbd>. Capture it first, then return attention to the task.", view: "focus" },
+    { target: "#breathing-card", title: "Rest Is Not More Input", description: "Rest Mode includes a timer, breathing practice, and local audio prompts. Movement or breathing helps recovery more than scrolling.", view: "rest" },
+    { target: "#habit-mode", title: "Build Long Feedback", description: "Use Habit Building to review time audit, focus records, and Daily Reflection, then adjust tomorrow's plan.", view: "habit" },
+    { target: "#back-to-gate", title: "Guide Complete", description: "Back returns to the gate. You can open this guide again from the top bar.", view: "focus" },
+  ];
+  function steps() {
+    return window.DeepStudyI18n?.language?.() === "en-US" ? enSteps : zhSteps;
+  }
 
   const layer = document.createElement("div");
   layer.className = "tutorial-layer";
@@ -231,11 +259,12 @@
 
   function renderStep() {
     const token = ++renderToken;
-    const step = steps[index];
+    const activeSteps = steps();
+    const step = activeSteps[index];
     applyView(step.view);
     target = document.querySelector(step.target);
     if (!target) {
-      if (index < steps.length - 1) {
+      if (index < activeSteps.length - 1) {
         index += 1;
         renderStep();
       } else {
@@ -248,11 +277,16 @@
     target.scrollIntoView({ block: "center", inline: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
     title.textContent = step.title;
     description.innerHTML = step.description;
-    count.textContent = `${index + 1} / ${steps.length}`;
-    progress.style.width = `${((index + 1) / steps.length) * 100}%`;
+    count.textContent = `${index + 1} / ${activeSteps.length}`;
+    progress.style.width = `${((index + 1) / activeSteps.length) * 100}%`;
     previousButton.disabled = index === 0;
-    nextButton.textContent = index === steps.length - 1 ? "完成" : "下一步";
-    skipButton.hidden = index === steps.length - 1;
+    const isEnglish = window.DeepStudyI18n?.language?.() === "en-US";
+    nextButton.textContent = index === activeSteps.length - 1 ? (isEnglish ? "Finish" : "完成") : (isEnglish ? "Next" : "下一步");
+    previousButton.textContent = isEnglish ? "Previous" : "上一步";
+    skipButton.textContent = isEnglish ? "Skip" : "跳过教程";
+    layer.querySelector(".tutorial-kicker").textContent = isEnglish ? "Guide" : "使用教程";
+    closeButton.setAttribute("aria-label", isEnglish ? "Close guide" : "退出使用教程");
+    skipButton.hidden = index === activeSteps.length - 1;
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -287,7 +321,7 @@
   }
 
   function next() {
-    if (index >= steps.length - 1) {
+    if (index >= steps().length - 1) {
       finish();
       return;
     }
@@ -341,7 +375,11 @@
   window.addEventListener("scroll", positionOverlay, true);
   document.addEventListener("keydown", onKeydown, true);
 
-  if (localStorage.getItem(SEEN_KEY) !== "true") {
-    window.setTimeout(start, 550);
-  }
+  window.DeepStudyTutorial = { start };
+
+  Promise.resolve(window.DeepStudyI18n?.ready).then(() => {
+    if (localStorage.getItem(SEEN_KEY) !== "true") {
+      window.setTimeout(start, 550);
+    }
+  });
 })();

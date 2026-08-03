@@ -80,8 +80,8 @@
         <label>API Base URL<input id="long-api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
         <label>模型名称<input id="long-api-model" spellcheck="false" placeholder="例如 deepseek-chat" /></label>
         <label id="long-api-key-row">API Key<input id="long-api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
-        <label class="system-prompt-field">长期任务前置提示词<textarea id="long-system-prompt" rows="9" spellcheck="false"></textarea></label>
-        <p class="settings-help">提示词会直接作为长期任务 AI 的 system message。建议保留 JSON 输出、象限枚举和“不要臆测时间”的约束。</p>
+        <label class="system-prompt-field">长期任务偏好提示词<textarea id="long-system-prompt" rows="9" spellcheck="false"></textarea></label>
+        <p class="settings-help">这里只填写你的工作风格和偏好。四象限、输出格式和提醒规则由 DeepStudy 内部固定维护，避免误改后任务创建失败。</p>
         <p id="long-api-saved-hint" class="settings-help" hidden>已保存安全凭据，可直接使用。</p>
       </div>
       <div id="long-ai-settings-status" class="settings-status" role="status"></div>
@@ -105,6 +105,7 @@
   </div>
   <script src="planner-utils.js"></script>
   <script src="long-task-utils.js"></script>
+  <script src="i18n.js"></script>
   <script src="long-tasks.js"></script>
 </body>
 </html>

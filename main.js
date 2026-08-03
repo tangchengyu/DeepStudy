@@ -45,6 +45,8 @@ const DEFAULT_DAILY_SYSTEM_PROMPT = [
   "Do not invent filler tasks just to reach a target number of priorities.",
   "Do not guess exact times, durations, locations, tools, or process details unless the user provided them.",
 ].join("\n");
+const DEFAULT_DAILY_USER_PROMPT = "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。";
+const DEFAULT_DAILY_USER_PROMPT_EN = "Turn my goals into clear, short, actionable tasks for today, while matching my working style.";
 const DEFAULT_LONG_TASK_SYSTEM_PROMPT = [
   "You manage a four-quadrant long-term task board.",
   "Reply by returning JSON only: {\"operations\":[{\"action\":\"create|update|delete|restore\",\"id\":\"existing id when needed\",\"task\":{\"title\":\"\",\"notes\":\"\",\"quadrant\":\"important-urgent|important-not-urgent|urgent-not-important|not-important-not-urgent\",\"reminder\":{\"kind\":\"none|once|daily|weekly\",\"at\":\"ISO date\",\"time\":\"HH:mm\",\"weekdays\":[0]}}}]}",
@@ -54,6 +56,9 @@ const DEFAULT_LONG_TASK_SYSTEM_PROMPT = [
   "Never invent a reminder time, duration, schedule, workflow, or intermediate steps. Leave reminder.kind as none when time is unclear.",
   "Use the user's local timezone. Keep titles concise.",
 ].join("\n");
+const DEFAULT_LONG_TASK_USER_PROMPT = "请帮我维护长期任务，任务名称和备注保持简洁，优先尊重我明确给出的信息。";
+const DEFAULT_LONG_TASK_USER_PROMPT_EN = "Help me maintain long-term tasks with concise titles and notes, and prioritize information I explicitly provide.";
+const APP_PREFERENCES_DEFAULT = { language: "zh-CN" };
 const FREE_API_TUTORIAL_URL = "https://my.feishu.cn/docx/Sr9RdRzFaop9BSxBgcAcdxDonOc";
 const PLANNER_TIMEOUT_MS = 120000;
 const PORTABLE_ICON_PATH = process.env.PORTABLE_EXECUTABLE_FILE
@@ -447,6 +452,31 @@ function plannerSettingsPath(scope = "planner") {
   return path.join(app.getPath("userData"), scope === "long-tasks" ? "long-task-ai-settings.json" : "planner-settings.json");
 }
 
+function appPreferencesPath() {
+  return path.join(app.getPath("userData"), "app-preferences.json");
+}
+
+function readAppPreferences() {
+  try {
+    const stored = JSON.parse(fs.readFileSync(appPreferencesPath(), "utf8"));
+    return {
+      language: ["zh-CN", "en-US"].includes(stored.language) ? stored.language : APP_PREFERENCES_DEFAULT.language,
+    };
+  } catch {
+    return { ...APP_PREFERENCES_DEFAULT };
+  }
+}
+
+function saveAppPreferences(input = {}) {
+  const preferences = {
+    language: ["zh-CN", "en-US"].includes(input.language) ? input.language : APP_PREFERENCES_DEFAULT.language,
+  };
+  fs.writeFileSync(appPreferencesPath(), JSON.stringify(preferences, null, 2), "utf8");
+  mainWindow?.webContents.send("app:preferences-changed", preferences);
+  longTasksWindow?.webContents.send("app:preferences-changed", preferences);
+  return preferences;
+}
+
 function decryptApiKey(value) {
   if (!value || !safeStorage.isEncryptionAvailable()) return "";
   try {
@@ -458,6 +488,38 @@ function decryptApiKey(value) {
 
 function createConfigId() {
   return `api-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function stripHiddenPromptRules(value, scope = "planner") {
+  const raw = cleanString(value);
+  const fallback = defaultUserPrompt(scope);
+  if (!raw) return fallback;
+  const blocked = scope === "long-tasks"
+    ? [/json/i, /operations/i, /quadrant/i, /important-urgent/i, /important-not-urgent/i, /urgent-not-important/i, /not-important-not-urgent/i, /reminder\.kind/i, /same language/i]
+    : [/PLAN_ITEMS/i, /\[PRIORITY\]/i, /plain-text bullet/i, /Do not use JSON/i, /section named/i, /Priority means/i];
+  const kept = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !blocked.some((pattern) => pattern.test(line)))
+    .join("\n")
+    .trim();
+  if (!kept || kept.length < 8) return fallback;
+  return kept;
+}
+
+function defaultUserPrompt(scope = "planner") {
+  const english = readAppPreferences().language === "en-US";
+  if (scope === "long-tasks") return english ? DEFAULT_LONG_TASK_USER_PROMPT_EN : DEFAULT_LONG_TASK_USER_PROMPT;
+  return english ? DEFAULT_DAILY_USER_PROMPT_EN : DEFAULT_DAILY_USER_PROMPT;
+}
+
+function composeSystemPrompt(scope, userPrompt) {
+  return [
+    scope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT,
+    "",
+    "User-customized style and workflow preference:",
+    stripHiddenPromptRules(userPrompt, scope),
+  ].join("\n");
 }
 
 function readRawStoredSettings(scope = "planner") {
@@ -524,10 +586,10 @@ function readPlannerSettings(scope = "planner") {
   );
   return {
     mode: "api",
-    systemPrompt: cleanString(
+    systemPrompt: stripHiddenPromptRules(cleanString(
       stored.systemPrompt,
-      scope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT,
-    ),
+      defaultUserPrompt(scope),
+    ), scope),
     api: {
       baseUrl: activeProfile?.baseUrl || cleanString(
           stored.api?.baseUrl,
@@ -572,7 +634,7 @@ function savePlannerSettings(input = {}, scope = "planner") {
   }
   const settings = {
     mode,
-    systemPrompt: cleanString(input.systemPrompt, current.systemPrompt),
+    systemPrompt: stripHiddenPromptRules(cleanString(input.systemPrompt, current.systemPrompt), scope),
     api: {
       baseUrl: normalizeBaseUrl(input.api?.baseUrl, current.api.baseUrl),
       model: cleanString(input.api?.model, current.api.model),
@@ -635,7 +697,7 @@ function syncApiProfilesToOtherScope(sourceScope, sourceProfilesEncrypted) {
   if (updatedActive) otherApi = { baseUrl: updatedActive.baseUrl, model: updatedActive.model };
   const otherStoredUpdated = {
     mode: otherStored.mode || "api",
-    systemPrompt: otherStored.systemPrompt || (otherScope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT),
+    systemPrompt: stripHiddenPromptRules(otherStored.systemPrompt || defaultUserPrompt(otherScope), otherScope),
     api: otherApi,
     activeApiProfileId: typeof otherStored.activeApiProfileId === "string" ? otherStored.activeApiProfileId : (mergedOtherProfiles[0]?.id || ""),
     apiProfiles: mergedOtherProfiles,
@@ -695,7 +757,7 @@ function deleteApiProfileFromOtherScope(deletedProfileId, sourceScope) {
   const otherActive = nextOtherProfiles.find((profile) => profile.id === otherActiveId) || nextOtherProfiles[0];
   const otherStoredUpdated = {
     mode: otherStored.mode || "api",
-    systemPrompt: otherStored.systemPrompt || (otherScope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT),
+    systemPrompt: stripHiddenPromptRules(otherStored.systemPrompt || defaultUserPrompt(otherScope), otherScope),
     api: otherActive
       ? { baseUrl: otherActive.baseUrl, model: otherActive.model }
       : (otherStored.api || DEFAULT_PLANNER_SETTINGS.api),
@@ -713,7 +775,7 @@ function buildPlannerMessages(payload = {}, settings = readPlannerSettings()) {
   return [
     {
       role: "system",
-      content: cleanString(settings.systemPrompt, DEFAULT_DAILY_SYSTEM_PROMPT),
+      content: composeSystemPrompt("planner", settings.systemPrompt),
     },
     ...history,
     {
@@ -807,6 +869,49 @@ async function requestStructuredModel(messages, signal, settingsOverride) {
   }
 }
 
+async function testApiConfiguration(input = {}) {
+  const current = readPlannerSettings();
+  const selectedProfile = current.apiProfiles.find((profile) => profile.id === cleanString(input.profileId));
+  const api = {
+    baseUrl: normalizeBaseUrl(input.baseUrl, selectedProfile?.baseUrl || current.api.baseUrl),
+    model: cleanString(input.model, selectedProfile?.model || current.api.model),
+    apiKey: cleanString(input.apiKey) || selectedProfile?.apiKey || current.api.apiKey,
+  };
+  if (!api.model || !api.apiKey) throw new Error("请填写模型名称和 API Key 后再测试。");
+  const settings = { mode: "api", api };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await net.fetch(`${api.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: modelHeaders(settings),
+      body: JSON.stringify({
+        model: api.model,
+        stream: false,
+        max_tokens: 16,
+        temperature: 0,
+        messages: [
+          { role: "system", content: "Reply with OK only." },
+          { role: "user", content: "ping" },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`API 返回 HTTP ${response.status}: ${body.slice(0, 300)}`);
+    }
+    const data = await response.json();
+    const content = cleanString(extractModelContent(data, true));
+    if (!content) throw new Error("API 已连接，但模型返回了空内容。");
+    return { ok: true, message: "API 验证成功。" };
+  } catch (error) {
+    throw new Error(modelNetworkError(error, api.baseUrl));
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function proposeLongTaskOperations(payload = {}) {
   const tasks = readLongTasks();
   const history = sanitizeChatHistory(payload.history, 6);
@@ -814,7 +919,7 @@ async function proposeLongTaskOperations(payload = {}) {
   const settings = readPlannerSettings("long-tasks");
   const messages = [{
     role: "system",
-    content: cleanString(settings.systemPrompt, DEFAULT_LONG_TASK_SYSTEM_PROMPT),
+    content: composeSystemPrompt("long-tasks", settings.systemPrompt),
   }, ...history, {
     role: "user",
     content: `Current local time: ${new Date().toString()}\nExisting tasks: ${JSON.stringify(tasks.map(({ id, title, quadrant, status, reminder }) => ({ id, title, quadrant, status, reminder })))}\nRequest: ${requestText}`,
@@ -969,6 +1074,16 @@ ipcMain.handle("window:get-always-on-top", (event) => {
 	});
 
 ipcMain.handle("planner:get-config", () => publicPlannerSettings());
+ipcMain.handle("app:get-preferences", () => readAppPreferences());
+ipcMain.handle("app:save-preferences", (_event, preferences) => saveAppPreferences(preferences));
+ipcMain.handle("app:test-api-config", (_event, input) => testApiConfiguration(input));
+ipcMain.handle("app:open-settings", (_event, section = "general") => {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send("app:open-settings", cleanString(section, "general"));
+  return true;
+});
 
 ipcMain.handle("planner:save-config", (_event, settings) =>
   savePlannerSettings(settings),

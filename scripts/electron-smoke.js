@@ -41,7 +41,7 @@ async function waitFor(predicate, timeout = 15000) {
 
 (async () => {
   const main = await waitFor(async () => (await targets()).find((target) => target.url.endsWith("renderer/index.html")));
-  await waitFor(async () => evaluate(main, `document.readyState !== 'loading' && Boolean(document.querySelector('#long-tasks-open')) && Boolean(document.querySelector('#planner-settings-open'))`));
+  await waitFor(async () => evaluate(main, `document.readyState !== 'loading' && Boolean(document.querySelector('#long-tasks-open')) && Boolean(document.querySelector('#app-settings-open'))`));
   const tutorialFlow = await evaluate(main, `(async () => {
     const key = 'deepstudy.tutorial.seen.v1';
     const originalSeen = localStorage.getItem(key);
@@ -86,7 +86,7 @@ async function waitFor(predicate, timeout = 15000) {
     const completedByDate = reflections.filter(item => String(item.kind || '').startsWith('completed-task')).reduce((counts, item) => ({ ...counts, [item.date]: (counts[item.date] || 0) + 1 }), {});
     return {
       button: Boolean(document.querySelector('#long-tasks-open')),
-      settings: Boolean(document.querySelector('#planner-settings-open')),
+      settings: Boolean(document.querySelector('#app-settings-open')),
       noiseMenu: Boolean(document.querySelector('#noise-menu-button')),
       addPlaceholder: document.querySelector('#plan-input')?.getAttribute('placeholder'),
       plusRemoved: !document.querySelector('#plan-add-button'),
@@ -328,16 +328,12 @@ async function waitFor(predicate, timeout = 15000) {
     };
     document.querySelector('#long-ai-settings').click();
     await new Promise(resolve => requestAnimationFrame(resolve));
-    const aiSettingsEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    document.dispatchEvent(aiSettingsEscape);
-    await new Promise(resolve => requestAnimationFrame(resolve));
     const aiSettingsKeyboardState = {
-      defaultPrevented: aiSettingsEscape.defaultPrevented,
       modalHidden: document.querySelector('#long-ai-settings-modal').hidden,
       detailVisible: !document.querySelector('#task-detail-view').hidden,
     };
     if (!taskModalKeyboardState.defaultPrevented || !taskModalKeyboardState.modalHidden || !taskModalKeyboardState.detailVisible) throw new Error('Escape did not close the task editor without navigating away from detail');
-    if (!aiSettingsKeyboardState.defaultPrevented || !aiSettingsKeyboardState.modalHidden || !aiSettingsKeyboardState.detailVisible) throw new Error('Escape did not close AI settings without navigating away from detail');
+    if (!aiSettingsKeyboardState.modalHidden || !aiSettingsKeyboardState.detailVisible) throw new Error('Long-task AI settings should delegate to the global settings window');
     document.querySelector('#task-detail-edit').click();
     document.querySelector('#long-task-notes').value = \`\${noteText}\\n编辑后仍停留在详情页\`;
     document.querySelector('#long-task-form').requestSubmit();
@@ -447,14 +443,14 @@ async function waitFor(predicate, timeout = 15000) {
   if (!/217,\s*143,\s*145/.test(restMessageLayout.distractionColor)) throw new Error("Time audit distraction color does not match the current red token");
   const gateChrome = await evaluate(main, `(() => {
     document.querySelector('#back-to-gate').click();
-    const soulBefore = !document.querySelector('#soul-open').hidden;
+    const soulBefore = !document.querySelector('#app-settings-open').hidden;
     document.querySelector('#enter-gate').click();
     return {
       soulBefore,
-      soulAfter: !document.querySelector('#soul-open').hidden
+      soulAfter: !document.querySelector('#app-settings-open').hidden
     };
   })()`);
-  if (!gateChrome.soulBefore || gateChrome.soulAfter) throw new Error("Soul massage button visibility does not match the gate state");
+  if (!gateChrome.soulBefore || gateChrome.soulAfter) throw new Error("Settings button visibility does not match the gate state");
   const stickyHeaderLayout = await evaluate(main, `(() => {
     const mainArea = document.querySelector('#main-area');
     mainArea.scrollTop = 120;
@@ -491,14 +487,16 @@ async function waitFor(predicate, timeout = 15000) {
   })()`);
   if (gateLayout.textAlign !== "center" || !gateLayout.insideWidth || !gateLayout.insideHeight || gateLayout.width < gateLayout.screenWidth * 0.55) throw new Error("Focus gate quote layout can still collapse or overflow after returning");
   const apiSettings = await evaluate(main, `(() => {
-    document.querySelector('#planner-settings-open').click();
+    document.querySelector('#app-settings-open').click();
     return {
       tutorial: Boolean(document.querySelector('#free-api-tutorial')),
       apiOnly: Boolean(document.querySelector('#api-settings')) && !document.querySelector('.provider-switch'),
+      navItems: document.querySelectorAll('.settings-nav-item').length,
+      apiTest: Boolean(document.querySelector('#api-test')),
       contextMenu: Boolean(document.querySelector('.task-context-menu')),
       dropTarget: Boolean(document.querySelector('.plan-list-wrap'))
     };
   })()`);
-  if (!apiSettings.tutorial || !apiSettings.apiOnly || !apiSettings.contextMenu || !apiSettings.dropTarget) throw new Error("API settings or daily plan interactions are incomplete");
+  if (!apiSettings.tutorial || !apiSettings.apiOnly || apiSettings.navItems < 6 || !apiSettings.apiTest || !apiSettings.contextMenu || !apiSettings.dropTarget) throw new Error("API settings or daily plan interactions are incomplete");
   process.stdout.write(JSON.stringify({ main: mainState, longTasks: result, apiSettings }, null, 2));
 })().catch((error) => { console.error(error); process.exitCode = 1; });

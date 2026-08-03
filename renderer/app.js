@@ -595,11 +595,23 @@ const DailyPlan = (() => {
   return { addTasks, getTasks };
 })();
 
-const PlannerSettings = (() => {
+const AppSettings = (() => {
   const modal = $("#planner-settings-modal");
   const status = $("#planner-settings-status");
   let apiProfiles = [];
-  let applyingProfile = false;
+  let dailyConfig = null;
+  let longConfig = null;
+  let preferences = { language: "zh-CN" };
+  const defaultPrompts = {
+    "zh-CN": {
+      daily: "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。",
+      long: "请帮我维护长期任务，任务名称和备注保持简洁，优先尊重我明确给出的信息。",
+    },
+    "en-US": {
+      daily: "Turn my goals into clear, short, actionable tasks for today, while matching my working style.",
+      long: "Help me maintain long-term tasks with concise titles and notes, and prioritize information I explicitly provide.",
+    },
+  };
 
   function populateApiPresets() {
     const select = $("#api-model-preset");
@@ -620,6 +632,23 @@ const PlannerSettings = (() => {
       select.append(group);
     });
   }
+  function sectionTitle(section) {
+    return ({
+      general: "常规与语言",
+      api: "新建 API 配置",
+      "daily-ai": "每日任务 AI",
+      "long-ai": "长期任务 AI",
+      soul: "灵魂按摩间",
+      help: "使用教程",
+    })[section] || "常规与语言";
+  }
+  function selectSection(section = "general") {
+    const target = $(".settings-section[data-section=\"" + section + "\"]") ? section : "general";
+    $$(".settings-nav-item").forEach((button) => button.classList.toggle("active", button.dataset.settingsSection === target));
+    $$(".settings-section").forEach((panel) => panel.classList.toggle("active", panel.dataset.section === target));
+    status.textContent = "";
+    $("#planner-settings-title").textContent = sectionTitle(target);
+  }
   function selectMatchingApiPreset() {
     const preset = PlannerUtils.matchApiModelPreset(
       $("#api-model").value.trim(),
@@ -633,15 +662,24 @@ const PlannerSettings = (() => {
     $("#api-key-entry").hidden = hasSavedProfile && !showKeyInput;
     if (!showKeyInput) $("#api-key").value = "";
   }
-  function populateSavedProfiles(config) {
-    apiProfiles = config.apiProfiles || [];
-    const select = $("#api-profile-select");
-    select.replaceChildren(new Option("新建 API 配置", ""));
+  function populateProfileSelect(select, activeId = "", firstLabel = "选择已保存 API") {
+    select.replaceChildren(new Option(firstLabel, ""));
     apiProfiles.forEach((profile) =>
       select.append(new Option(profile.label, profile.id)),
     );
-    select.value = config.activeApiProfileId || "";
-    $("#api-profile-delete").disabled = !select.value;
+    select.value = activeId || "";
+  }
+  function populateSavedProfiles() {
+    const merged = new Map();
+    [...(dailyConfig?.apiProfiles || []), ...(longConfig?.apiProfiles || [])].forEach((profile) => merged.set(profile.id, profile));
+    apiProfiles = [...merged.values()];
+    populateProfileSelect($("#api-profile-select"), dailyConfig?.activeApiProfileId || "", "新建 API 配置");
+    populateProfileSelect($("#daily-ai-profile-select"), dailyConfig?.activeApiProfileId || "");
+    populateProfileSelect($("#long-ai-profile-select-main"), longConfig?.activeApiProfileId || "");
+    $("#api-profile-delete").disabled = !$("#api-profile-select").value;
+  }
+  function profileById(id) {
+    return apiProfiles.find((item) => item.id === id);
   }
   function startNewApiProfile() {
     const select = $("#api-profile-select");
@@ -658,9 +696,7 @@ const PlannerSettings = (() => {
     $("#api-profile-name").focus();
   }
   function applySavedProfile() {
-    const profile = apiProfiles.find(
-      (item) => item.id === $("#api-profile-select").value,
-    );
+    const profile = profileById($("#api-profile-select").value);
     if (!profile) {
       $("#api-profile-name").value = "";
       renderCredentialState(true);
@@ -676,10 +712,8 @@ const PlannerSettings = (() => {
     setStatus(`已选择"${profile.label}"，可直接保存并使用。`, "success");
   }
   function detachSavedProfileIfChanged() {
-    if (applyingProfile || !$("#api-profile-select").value) return;
-    const profile = apiProfiles.find(
-      (item) => item.id === $("#api-profile-select").value,
-    );
+    if (!$("#api-profile-select").value) return;
+    const profile = profileById($("#api-profile-select").value);
     if (
       profile &&
       (profile.baseUrl !== $("#api-base-url").value.trim().replace(/\/+$/, "") ||
@@ -705,15 +739,9 @@ const PlannerSettings = (() => {
     setStatus(`已选择 ${preset.provider} · ${preset.label}`, "success");
   }
 
-  function selectedMode() {
-    return "api";
-  }
   function setStatus(message = "", kind = "") {
     status.textContent = message;
     status.className = `settings-status${kind ? ` ${kind}` : ""}`;
-  }
-  function renderMode() {
-    $("#api-settings").hidden = false;
   }
   function renderSummary(config) {
     $("#planner-config").textContent = `${config.api.model || "未配置"} · API 运行`;
@@ -723,23 +751,34 @@ const PlannerSettings = (() => {
     renderSummary(config);
     return config;
   }
-  async function open() {
+  async function refreshAll() {
+    preferences = await PlannerBridge.getAppPreferences();
+    dailyConfig = await PlannerBridge.getPlannerConfig();
+    longConfig = await PlannerBridge.getLongTaskAiConfig();
+    renderSummary(dailyConfig);
+    populateSavedProfiles();
+    $("#app-language-select").value = preferences.language || "zh-CN";
+    $("#planner-system-prompt").value = dailyConfig.systemPrompt || "";
+    $("#long-system-prompt-main").value = longConfig.systemPrompt || "";
+    if (dailyConfig.activeApiProfileId) {
+      $("#api-profile-select").value = dailyConfig.activeApiProfileId;
+      applySavedProfile();
+    } else {
+      $("#api-base-url").value = dailyConfig.api.baseUrl;
+      $("#api-model").value = dailyConfig.api.model;
+      selectMatchingApiPreset();
+      renderCredentialState(true);
+    }
+    return dailyConfig;
+  }
+  async function open(section = "general") {
     modal.hidden = false;
     setStatus("正在读取配置…");
     try {
-      const config = await refreshSummary();
-      populateSavedProfiles(config);
-      if (config.activeApiProfileId) applySavedProfile();
-      else {
-        $("#api-base-url").value = config.api.baseUrl;
-        $("#api-model").value = config.api.model;
-        selectMatchingApiPreset();
-        renderCredentialState(true);
-      }
-      $("#planner-system-prompt").value = config.systemPrompt || "";
-      renderMode();
-      if (!config.activeApiProfileId) setStatus("");
-      $("#api-model-preset").focus();
+      await refreshAll();
+      setStatus("");
+      selectSection(section);
+      $(".settings-nav-item.active")?.focus();
     } catch (error) {
       setStatus(error.message, "error");
     }
@@ -748,16 +787,27 @@ const PlannerSettings = (() => {
     modal.hidden = true;
     requestAnimationFrame(() => {
       const plannerInput = $("#planner-chat").hidden ? null : $("#planner-input");
-      (plannerInput || $("#planner-settings-open")).focus();
+      (plannerInput || $("#app-settings-open")).focus();
     });
   }
-  async function save() {
+  function configForSelectedProfile(profileId, fallbackConfig) {
+    const profile = profileById(profileId) || profileById(fallbackConfig?.activeApiProfileId);
+    return {
+      profileId: profile?.id || "",
+      label: profile?.label || fallbackConfig?.api?.model || "",
+      baseUrl: profile?.baseUrl || fallbackConfig?.api?.baseUrl || "",
+      model: profile?.model || fallbackConfig?.api?.model || "",
+      apiKey: "",
+      forceNewProfile: false,
+    };
+  }
+  async function saveApiConfig() {
     const button = $("#planner-settings-save");
     button.disabled = true;
     setStatus("正在保存…");
     try {
       const config = await PlannerBridge.savePlannerConfig({
-        mode: selectedMode(),
+        mode: "api",
         api: {
           profileId: $("#api-profile-select").value,
           label: $("#api-profile-name").value,
@@ -766,29 +816,93 @@ const PlannerSettings = (() => {
           apiKey: $("#api-key").value,
           forceNewProfile: !$("#api-profile-select").value,
         },
-        systemPrompt: $("#planner-system-prompt").value,
+        systemPrompt: dailyConfig?.systemPrompt || "",
       });
+      dailyConfig = config;
+      longConfig = await PlannerBridge.getLongTaskAiConfig();
       renderSummary(config);
-      setStatus("配置已保存，下一次对话将使用新模型。", "success");
-      setTimeout(close, 450);
+      populateSavedProfiles();
+      setStatus("API 配置已保存。", "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
       button.disabled = false;
     }
   }
+  async function saveDailyAiConfig() {
+    $("#daily-ai-save").disabled = true;
+    setStatus("正在保存每日任务 AI 设置…");
+    try {
+      dailyConfig = await PlannerBridge.savePlannerConfig({
+        mode: "api",
+        api: configForSelectedProfile($("#daily-ai-profile-select").value, dailyConfig),
+        systemPrompt: $("#planner-system-prompt").value,
+      });
+      renderSummary(dailyConfig);
+      populateSavedProfiles();
+      setStatus("每日任务 AI 设置已保存。", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      $("#daily-ai-save").disabled = false;
+    }
+  }
+  async function saveLongAiConfig() {
+    $("#long-ai-save-main").disabled = true;
+    setStatus("正在保存长期任务 AI 设置…");
+    try {
+      longConfig = await PlannerBridge.saveLongTaskAiConfig({
+        mode: "api",
+        api: configForSelectedProfile($("#long-ai-profile-select-main").value, longConfig),
+        systemPrompt: $("#long-system-prompt-main").value,
+      });
+      populateSavedProfiles();
+      setStatus("长期任务 AI 设置已保存。", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      $("#long-ai-save-main").disabled = false;
+    }
+  }
+  function showAppAlert(title, message) {
+    $("#app-alert-title").textContent = title;
+    $("#app-alert-message").textContent = message;
+    $("#app-alert-modal").hidden = false;
+    $("#app-alert-ok").focus();
+  }
+  async function testApi() {
+    $("#api-test").disabled = true;
+    setStatus("正在测试 API…");
+    try {
+      const result = await PlannerBridge.testApiConfig({
+        profileId: $("#api-profile-select").value,
+        baseUrl: $("#api-base-url").value,
+        model: $("#api-model").value,
+        apiKey: $("#api-key").value,
+      });
+      setStatus(result.message, "success");
+      showAppAlert("验证成功", result.message);
+    } catch (error) {
+      setStatus(error.message, "error");
+      showAppAlert("验证失败", error.message);
+    } finally {
+      $("#api-test").disabled = false;
+    }
+  }
   async function deleteSelectedProfile() {
     const select = $("#api-profile-select");
     const profileId = select.value;
-    const profile = apiProfiles.find((item) => item.id === profileId);
+    const profile = profileById(profileId);
     if (!profile) return;
     if (!confirm(`删除已保存的 API 配置"${profile.label}"？`)) return;
     $("#api-profile-delete").disabled = true;
     setStatus("正在删除 API 配置…");
     try {
       const config = await PlannerBridge.deletePlannerApiProfile(profileId);
-      populateSavedProfiles(config);
-      if (config.activeApiProfileId) applySavedProfile();
+      dailyConfig = config;
+      longConfig = await PlannerBridge.getLongTaskAiConfig();
+      populateSavedProfiles();
+      if (dailyConfig.activeApiProfileId) applySavedProfile();
       else {
         $("#api-profile-name").value = "";
         $("#api-base-url").value = config.api.baseUrl;
@@ -796,7 +910,7 @@ const PlannerSettings = (() => {
         selectMatchingApiPreset();
         renderCredentialState(true);
       }
-      renderSummary(config);
+      renderSummary(dailyConfig);
       setStatus("API 配置已删除。", "success");
     } catch (error) {
       setStatus(error.message, "error");
@@ -805,10 +919,14 @@ const PlannerSettings = (() => {
     }
   }
 
-  $("#planner-settings-open").addEventListener("click", open);
+  $("#app-settings-open").addEventListener("click", () => open("general"));
+  $("#planner-settings-open").addEventListener("click", () => open("daily-ai"));
   $("#planner-settings-close").addEventListener("click", close);
   $("#planner-settings-cancel").addEventListener("click", close);
-  $("#planner-settings-save").addEventListener("click", save);
+  $("#planner-settings-save").addEventListener("click", saveApiConfig);
+  $("#daily-ai-save").addEventListener("click", saveDailyAiConfig);
+  $("#long-ai-save-main").addEventListener("click", saveLongAiConfig);
+  $("#api-test").addEventListener("click", testApi);
   $("#api-profile-select").addEventListener("change", applySavedProfile);
   $("#api-profile-new").addEventListener("click", () => startNewApiProfile());
   $("#api-profile-delete").addEventListener("click", deleteSelectedProfile);
@@ -826,6 +944,33 @@ const PlannerSettings = (() => {
     selectMatchingApiPreset();
     detachSavedProfileIfChanged();
   });
+  $("#app-language-select").addEventListener("change", async () => {
+    try {
+      const previousLanguage = preferences.language || "zh-CN";
+      const previousDefaults = defaultPrompts[previousLanguage] || defaultPrompts["zh-CN"];
+      preferences = await PlannerBridge.saveAppPreferences({ language: $("#app-language-select").value });
+      window.DeepStudyI18n?.setLanguage(preferences.language);
+      const nextDefaults = defaultPrompts[preferences.language] || defaultPrompts["zh-CN"];
+      if (!$("#planner-system-prompt").value.trim() || $("#planner-system-prompt").value.trim() === previousDefaults.daily) {
+        $("#planner-system-prompt").value = nextDefaults.daily;
+      }
+      if (!$("#long-system-prompt-main").value.trim() || $("#long-system-prompt-main").value.trim() === previousDefaults.long) {
+        $("#long-system-prompt-main").value = nextDefaults.long;
+      }
+      setStatus("语言设置已保存。", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
+  });
+  $("#settings-open-tutorial").addEventListener("click", () => {
+    close();
+    window.DeepStudyTutorial?.start();
+  });
+  $("#app-alert-ok").addEventListener("click", () => $("#app-alert-modal").hidden = true);
+  $("#app-alert-modal").addEventListener("click", (event) => {
+    if (event.target.id === "app-alert-modal") $("#app-alert-modal").hidden = true;
+  });
+  $$(".settings-nav-item").forEach((button) => button.addEventListener("click", () => selectSection(button.dataset.settingsSection)));
   modal.addEventListener("click", (event) => {
     if (event.target === modal) close();
   });
@@ -833,13 +978,18 @@ const PlannerSettings = (() => {
     if (event.key === "Escape" && !modal.hidden) close();
   });
   populateApiPresets();
-  refreshSummary().catch((error) => {
+  window.electronAPI?.onOpenAppSettings((section) => open(section));
+  window.electronAPI?.onAppPreferencesChanged((next) => {
+    preferences = next || preferences;
+    window.DeepStudyI18n?.setLanguage(preferences.language);
+  });
+  refreshAll().catch((error) => {
     $("#planner-config").textContent = error.message;
     $("#planner-config").classList.add("bridge-warning");
     $("#planner-send").disabled = true;
     $("#planner-settings-save").disabled = true;
   });
-  return { refreshSummary };
+  return { open, close, refreshSummary };
 })();
 
 const PlannerChat = (() => {
@@ -945,9 +1095,6 @@ const PlannerChat = (() => {
 
 const SoulQuotes = (() => {
   const DEFAULT_QUOTE = "Attention Is All You Need";
-  const modal = $("#soul-modal");
-  const openButton = $("#soul-open");
-  const closeButton = $("#soul-close");
   const form = $("#soul-form");
   const editIdInput = $("#soul-edit-id");
   const textInput = $("#soul-input");
@@ -1019,16 +1166,6 @@ const SoulQuotes = (() => {
     textInput.value = "";
     saveButton.textContent = "添加句子";
     cancelEditButton.hidden = true;
-  }
-  function setModalOpen(open) {
-    modal.hidden = !open;
-    if (open) {
-      renderDefaultLibraryButton();
-      renderList();
-      textInput.focus();
-    } else {
-      clearForm();
-    }
   }
   function pickRandomQuote(currentText = "") {
     const pool = quotePool();
@@ -1146,8 +1283,6 @@ const SoulQuotes = (() => {
     clearForm();
     renderList();
   });
-  openButton.addEventListener("click", () => setModalOpen(true));
-  closeButton.addEventListener("click", () => setModalOpen(false));
   cancelEditButton.addEventListener("click", clearForm);
   defaultLibraryButton?.addEventListener("click", () => {
     defaultLibraryEnabled = !defaultLibraryEnabled;
@@ -1162,12 +1297,6 @@ const SoulQuotes = (() => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     renderGateQuote();
-  });
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) setModalOpen(false);
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) setModalOpen(false);
   });
   window.addEventListener("resize", scheduleGateQuoteFit);
   if (window.ResizeObserver) {
@@ -1464,7 +1593,7 @@ function switchMode(mode) {
 function setGateVisible(visible) {
   $("#gate-view").hidden = !visible;
   $("#mode-shell").hidden = visible;
-  $("#soul-open").hidden = !visible;
+  $("#app-settings-open").hidden = !visible;
   $("#tutorial-open").hidden = !visible;
 }
 

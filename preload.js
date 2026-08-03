@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("planner:save-config", settings),
   deletePlannerApiProfile: (profileId) =>
     ipcRenderer.invoke("planner:delete-api-profile", profileId),
+  getAppPreferences: () => ipcRenderer.invoke("app:get-preferences"),
+  saveAppPreferences: (preferences) => ipcRenderer.invoke("app:save-preferences", preferences),
+  testApiConfig: (payload) => ipcRenderer.invoke("app:test-api-config", payload),
+  openAppSettings: (section) => ipcRenderer.invoke("app:open-settings", section),
   openFreeApiTutorial: () => ipcRenderer.invoke("app:open-free-api-tutorial"),
   chatWithPlanner: (payload) => ipcRenderer.invoke("planner:chat", payload),
   openLongTasks: () => ipcRenderer.invoke("long-tasks:open"),
@@ -40,6 +44,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
     const listener = () => callback();
     ipcRenderer.on("focus:open-distraction", listener);
     return () => ipcRenderer.removeListener("focus:open-distraction", listener);
+  },
+  onOpenAppSettings: (callback) => {
+    const listener = (_event, section) => callback(section);
+    ipcRenderer.on("app:open-settings", listener);
+    return () => ipcRenderer.removeListener("app:open-settings", listener);
+  },
+  onAppPreferencesChanged: (callback) => {
+    const listener = (_event, preferences) => callback(preferences);
+    ipcRenderer.on("app:preferences-changed", listener);
+    return () => ipcRenderer.removeListener("app:preferences-changed", listener);
   },
   onMinimizedChanged: (callback) => {
     const listener = (_event, minimized) => callback(minimized);

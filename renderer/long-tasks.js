@@ -790,7 +790,10 @@ const LongAiSettings = (() => {
     } catch (error) { setStatus(error.message, "error"); }
     finally { $("#long-api-delete").disabled = !$("#long-api-profile").value; }
   }
-  $("#long-ai-settings").addEventListener("click", open);
+  $("#long-ai-settings").addEventListener("click", () => {
+    if (typeof api.openAppSettings === "function") api.openAppSettings("long-ai");
+    else open();
+  });
   $("#long-ai-settings-close").addEventListener("click", close);
   $("#long-ai-settings-cancel").addEventListener("click", close);
   $("#long-ai-settings-save").addEventListener("click", save);

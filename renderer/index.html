@@ -21,8 +21,8 @@
           <button id="tutorial-open" class="tool-btn tutorial-launch" type="button">
             使用教程
           </button>
-          <button id="soul-open" class="tool-btn soul-btn" type="button">
-            灵魂按摩间
+          <button id="app-settings-open" class="tool-btn soul-btn" type="button" data-i18n="settings">
+            设置
           </button>
           <div id="noise-control" class="noise-control">
             <div class="noise-button-group">
@@ -557,82 +557,103 @@
     </div>
 
     <div id="planner-settings-modal" class="modal" hidden>
-      <section
-        class="modal-card settings-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="planner-settings-title"
-      >
-        <div class="settings-heading">
+      <section class="modal-card app-settings-card" role="dialog" aria-modal="true" aria-labelledby="planner-settings-title">
+        <div class="app-settings-top">
           <div>
-            <div class="eyebrow">AI MODEL</div>
-            <h2 id="planner-settings-title">AI 计划助手设置</h2>
-            <p>仅使用 API 模型，支持 OpenAI 兼容接口。</p>
+            <div class="eyebrow">SETTINGS</div>
+            <h2 id="planner-settings-title">DeepStudy 设置</h2>
+            <p>统一管理语言、API、AI 助手、好句库与使用教程。</p>
           </div>
           <button id="planner-settings-close" class="icon-btn compact" type="button" aria-label="关闭设置">×</button>
         </div>
-
-        <button id="free-api-tutorial" class="tutorial-button" type="button">
-          免费 API 配置教程
-        </button>
-
-        <div id="api-settings" class="settings-panel">
-          <p class="settings-help">支持 OpenAI 兼容接口，例如 OpenRouter、OpenAI、DeepSeek、通义千问及自建服务。</p>
-          <div class="saved-profile-row">
-            <label>已保存的 API<select id="api-profile-select"><option value="">选择已保存 API</option></select></label>
-            <button id="api-profile-new" class="secondary-btn" type="button">新建 API 配置</button>
-            <button id="api-profile-delete" class="secondary-btn danger-lite" type="button" disabled>删除此 API</button>
+        <div class="app-settings-layout">
+          <nav class="settings-nav" aria-label="设置栏目">
+            <button class="settings-nav-item active" data-settings-section="general" type="button">常规与语言</button>
+            <button class="settings-nav-item" data-settings-section="api" type="button">新建 API 配置</button>
+            <button class="settings-nav-item" data-settings-section="daily-ai" type="button">每日任务 AI</button>
+            <button class="settings-nav-item" data-settings-section="long-ai" type="button">长期任务 AI</button>
+            <button class="settings-nav-item" data-settings-section="soul" type="button">灵魂按摩间</button>
+            <button class="settings-nav-item" data-settings-section="help" type="button">使用教程</button>
+          </nav>
+          <div class="settings-content">
+            <section class="settings-section active" data-section="general">
+              <h3>常规与语言</h3>
+              <p class="settings-help">首次安装后会先选择语言，再进入使用教程。切换语言后，主界面、教程和默认 AI 偏好提示词会随之更新。</p>
+              <label>界面语言<select id="app-language-select"><option value="zh-CN">中文（简体）</option><option value="en-US">English</option></select></label>
+            </section>
+            <section class="settings-section" data-section="api">
+              <h3>新建 API 配置</h3>
+              <button id="free-api-tutorial" class="tutorial-button" type="button">免费 API 配置教程</button>
+              <div id="api-settings" class="settings-panel">
+                <p class="settings-help">支持 OpenAI 兼容接口，例如 OpenRouter、OpenAI、DeepSeek、通义千问及自建服务。这里保存的 API 可供每日任务和长期任务 AI 共同选择。</p>
+                <div class="saved-profile-row">
+                  <label>已保存的 API<select id="api-profile-select"><option value="">新建 API 配置</option></select></label>
+                  <button id="api-profile-new" class="secondary-btn" type="button">清空新建</button>
+                  <button id="api-profile-delete" class="secondary-btn danger-lite" type="button" disabled>删除此 API</button>
+                </div>
+                <div id="api-saved-credential" class="saved-credential" hidden>
+                  <span>此配置的凭据已安全保存，可直接使用</span>
+                  <button id="api-key-change" class="reflection-action edit" type="button">更换 API Key</button>
+                </div>
+                <label>配置名称<input id="api-profile-name" maxlength="60" placeholder="例如：工作用 DeepSeek" /></label>
+                <label>常用模型<select id="api-model-preset"><option value="custom">自定义模型</option></select></label>
+                <label>API Base URL<input id="api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
+                <label>模型名称<input id="api-model" spellcheck="false" placeholder="例如 gpt-4.1-mini" /></label>
+                <label id="api-key-entry">API Key<input id="api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
+                <div class="settings-inline-actions">
+                  <button id="api-test" class="secondary-btn" type="button">一键测试</button>
+                  <button id="planner-settings-save" class="primary-btn" type="button">保存 API 配置</button>
+                </div>
+              </div>
+            </section>
+            <section class="settings-section" data-section="daily-ai">
+              <h3>每日任务 AI</h3>
+              <p class="settings-help">这里只选择已保存 API，并编辑你的偏好提示词。任务输出格式、安全解析规则由 DeepStudy 内部固定维护，避免误改后任务创建失败。</p>
+              <label>使用的 API<select id="daily-ai-profile-select"><option value="">选择已保存 API</option></select></label>
+              <label class="system-prompt-field">短期任务偏好提示词<textarea id="planner-system-prompt" rows="8" spellcheck="false"></textarea></label>
+              <button id="daily-ai-save" class="primary-btn settings-save-button" type="button">保存每日任务 AI 设置</button>
+            </section>
+            <section class="settings-section" data-section="long-ai">
+              <h3>长期任务 AI</h3>
+              <p class="settings-help">这里只选择已保存 API，并编辑长期任务助手的偏好提示词。任务创建格式、四象限规则和提醒规则由 DeepStudy 内部固定维护。</p>
+              <label>使用的 API<select id="long-ai-profile-select-main"><option value="">选择已保存 API</option></select></label>
+              <label class="system-prompt-field">长期任务偏好提示词<textarea id="long-system-prompt-main" rows="8" spellcheck="false"></textarea></label>
+              <button id="long-ai-save-main" class="primary-btn settings-save-button" type="button">保存长期任务 AI 设置</button>
+            </section>
+            <section class="settings-section" data-section="soul">
+              <h3 id="soul-title">灵魂按摩间</h3>
+              <form id="soul-form" class="soul-form">
+                <input id="soul-edit-id" type="hidden" />
+                <label><span>好句子</span><textarea id="soul-input" rows="3" maxlength="240" placeholder="写下一句你想保存的话"></textarea></label>
+                <div class="soul-form-actions">
+                  <button id="soul-cancel-edit" class="secondary-btn" type="button" hidden>取消修改</button>
+                  <button id="soul-save" class="primary-btn" type="submit">添加句子</button>
+                  <button id="soul-default-library-toggle" class="secondary-btn soul-library-toggle" type="button" aria-pressed="false">使用默认的“好句库”</button>
+                </div>
+              </form>
+              <div id="soul-list" class="soul-list" aria-live="polite"></div>
+            </section>
+            <section class="settings-section" data-section="help">
+              <h3>使用教程</h3>
+              <p class="settings-help">教程会介绍每日任务、长期任务、右键菜单、复选框完成逻辑、AI 设置和 API 配置流程。建议第一次配置模型 API 后重新查看一遍。</p>
+              <button id="settings-open-tutorial" class="tutorial-button" type="button">打开使用教程</button>
+            </section>
           </div>
-          <div id="api-saved-credential" class="saved-credential" hidden>
-            <span>此配置的凭据已安全保存，可直接使用</span>
-            <button id="api-key-change" class="reflection-action edit" type="button">更换 API Key</button>
-          </div>
-          <label>配置名称<input id="api-profile-name" maxlength="60" placeholder="例如：工作用 DeepSeek" /></label>
-          <label>常用模型<select id="api-model-preset"><option value="custom">自定义模型</option></select></label>
-          <label>API Base URL<input id="api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
-          <label>模型名称<input id="api-model" spellcheck="false" placeholder="例如 gpt-4.1-mini" /></label>
-          <label id="api-key-entry">API Key<input id="api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
-          <label class="system-prompt-field">短期任务前置提示词<textarea id="planner-system-prompt" rows="8" spellcheck="false"></textarea></label>
-          <p class="settings-help">提示词会直接作为每日计划 AI 的 system message。建议保留“PLAN_ITEMS”输出约束，避免任务创建失败。</p>
         </div>
-
         <div id="planner-settings-status" class="settings-status" role="status"></div>
         <div class="modal-actions">
-          <button id="planner-settings-cancel" class="secondary-btn" type="button">取消</button>
-          <button id="planner-settings-save" class="primary-btn" type="button">保存并使用</button>
+          <button id="planner-settings-cancel" class="secondary-btn" type="button">关闭</button>
         </div>
       </section>
     </div>
 
-    <div id="soul-modal" class="modal" hidden>
-      <section
-        class="modal-card soul-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="soul-title"
-      >
-        <div class="settings-heading">
-          <div>
-            <div class="eyebrow">SOUL ROOM</div>
-            <h2 id="soul-title">灵魂按摩间</h2>
-          </div>
-          <button id="soul-close" class="icon-btn compact" type="button" aria-label="关闭灵魂按摩间">×</button>
+    <div id="app-alert-modal" class="modal" hidden>
+      <section class="modal-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="app-alert-title">
+        <h2 id="app-alert-title">提示</h2>
+        <p id="app-alert-message"></p>
+        <div class="modal-actions">
+          <button id="app-alert-ok" class="primary-btn" type="button">知道了</button>
         </div>
-
-        <form id="soul-form" class="soul-form">
-          <input id="soul-edit-id" type="hidden" />
-          <label>
-            <span>好句子</span>
-            <textarea id="soul-input" rows="3" maxlength="240" placeholder="写下一句你想保存的话"></textarea>
-          </label>
-          <div class="soul-form-actions">
-            <button id="soul-cancel-edit" class="secondary-btn" type="button" hidden>取消修改</button>
-            <button id="soul-save" class="primary-btn" type="submit">添加句子</button>
-            <button id="soul-default-library-toggle" class="secondary-btn soul-library-toggle" type="button" aria-pressed="false">使用默认的“好句库”</button>
-          </div>
-        </form>
-
-        <div id="soul-list" class="soul-list" aria-live="polite"></div>
       </section>
     </div>
 
@@ -660,6 +681,7 @@
     <script src="planner-utils.js"></script>
     <script src="electron-bridge.js"></script>
     <script src="default-quotes.js"></script>
+    <script src="i18n.js"></script>
     <script src="app.js"></script>
     <script src="tutorial.js"></script>
   </body>
