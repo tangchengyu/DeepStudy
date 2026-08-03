@@ -42,8 +42,10 @@
         <label class="task-detail-complete"><input id="task-detail-check" type="checkbox"><span>标记为完成</span></label>
         <label class="task-detail-title-field"><span>任务名称</span><input id="task-detail-title" maxlength="120" /></label>
         <div id="task-detail-meta" class="task-detail-meta"></div>
-        <div id="task-detail-markdown" class="task-detail-markdown" hidden></div>
-        <label class="task-detail-notes-field"><span>支持 Markdown 格式渲染</span><textarea id="task-detail-notes" rows="14" maxlength="10000" spellcheck="false" placeholder="在这里像记事本一样记录长期任务的背景、想法、清单或 Markdown 内容"></textarea></label>
+        <div class="task-detail-notes-field">
+          <span>支持 Markdown 格式渲染</span>
+          <div id="task-detail-notes" class="task-detail-notes-editor" role="textbox" aria-multiline="true" aria-label="长期任务备注，支持 Markdown 格式渲染"></div>
+        </div>
         <div id="task-detail-save-status" class="task-detail-save-status" role="status"></div>
       </article>
     </section>

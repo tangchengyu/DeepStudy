@@ -27,6 +27,11 @@ function findLatestExe() {
     throw new Error(`Build output directory not found: ${distDir}`);
   }
 
+  const explicitTarget = process.env.DEEPSTUDY_APP_EXE;
+  if (explicitTarget && fs.existsSync(explicitTarget)) {
+    return explicitTarget;
+  }
+
   const unpackedDir = path.join(distDir, "win-unpacked");
   const unpackedExeNames = ["DeepStudy.exe", "deepstudy.exe"];
   for (const exeName of unpackedExeNames) {
@@ -36,30 +41,18 @@ function findLatestExe() {
     }
   }
 
-  const candidates = fs
-    .readdirSync(distDir)
-    .filter((file) => file.toLowerCase().endsWith(".exe"))
-    .map((file) => {
-      const fullPath = path.join(distDir, file);
-      return {
-        fullPath,
-        mtimeMs: fs.statSync(fullPath).mtimeMs,
-      };
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
-
-  if (candidates.length === 0) {
-    throw new Error(
-      `No .exe file found in ${distDir}. Run npm run pack first.`,
-    );
-  }
-
-  return candidates[0].fullPath;
+  throw new Error(
+    `Runnable app executable not found. Run npm run pack:win and use ${path.join(unpackedDir, "DeepStudy.exe")} as the desktop shortcut target. The installer .exe is intentionally not used as a shortcut target.`,
+  );
 }
 
 function createShortcut(targetPath) {
+  if (/setup|install/i.test(path.basename(targetPath))) {
+    throw new Error("Desktop shortcut target must be the installed or unpacked app executable, not the installer.");
+  }
   const desktopPath = getDesktopPath();
-  const shortcutPath = path.join(desktopPath, "DeepStudy.lnk");
+  const shortcutName = process.env.DEEPSTUDY_SHORTCUT_NAME || "DeepStudy";
+  const shortcutPath = path.join(desktopPath, `${shortcutName}.lnk`);
   const command = [
     "$shell = New-Object -ComObject WScript.Shell",
     `$shortcut = $shell.CreateShortcut(${psString(shortcutPath)})`,

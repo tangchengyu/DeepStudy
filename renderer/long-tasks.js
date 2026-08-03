@@ -98,11 +98,148 @@ function markdownToHTML(value) {
   closeList();
   return html.join("");
 }
+function markdownLineToHTML(value) {
+  const raw = String(value || "");
+  const trimmed = raw.trim();
+  if (!trimmed) return "<br>";
+  const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+  if (heading) return `<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
+  const listItem = trimmed.match(/^[-*]\s+(.+)$/);
+  if (listItem) return `<ul><li>${renderInlineMarkdown(listItem[1])}</li></ul>`;
+  const orderedItem = trimmed.match(/^(\d+)[.)]\s+(.+)$/);
+  if (orderedItem) return `<ol start="${Number(orderedItem[1])}"><li>${renderInlineMarkdown(orderedItem[2])}</li></ol>`;
+  return `<p>${renderInlineMarkdown(trimmed)}</p>`;
+}
+function renderMarkdownLine(line) {
+  line.contentEditable = "false";
+  line.classList.remove("editing");
+  line.innerHTML = markdownLineToHTML(line.dataset.raw || "");
+}
+function createMarkdownLine(raw = "") {
+  const line = document.createElement("div");
+  line.className = "markdown-line";
+  line.dataset.raw = raw;
+  line.tabIndex = 0;
+  line.setAttribute("role", "textbox");
+  line.setAttribute("aria-multiline", "false");
+  line.addEventListener("focus", () => startMarkdownLineEdit(line));
+  line.addEventListener("blur", () => {
+    finishMarkdownLineEdit(line);
+    saveDetailEdits();
+  });
+  renderMarkdownLine(line);
+  return line;
+}
+function placeCaretAt(element, offset) {
+  const selection = window.getSelection();
+  const range = document.createRange();
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let remaining = Math.max(0, offset);
+  let node = walker.nextNode();
+  while (node) {
+    if (remaining <= node.textContent.length) {
+      range.setStart(node, remaining);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+    remaining -= node.textContent.length;
+    node = walker.nextNode();
+  }
+  range.selectNodeContents(element);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+function caretOffset(element) {
+  const selection = window.getSelection();
+  if (!selection.rangeCount) return element.textContent.length;
+  const range = selection.getRangeAt(0).cloneRange();
+  range.selectNodeContents(element);
+  range.setEnd(selection.anchorNode, selection.anchorOffset);
+  return range.toString().length;
+}
+function startMarkdownLineEdit(line) {
+  if (line.classList.contains("editing")) return;
+  $$(".markdown-line.editing").forEach((item) => {
+    if (item !== line) finishMarkdownLineEdit(item);
+  });
+  line.classList.add("editing");
+  line.contentEditable = "true";
+  line.spellcheck = false;
+  line.textContent = line.dataset.raw || "";
+  requestAnimationFrame(() => placeCaretAt(line, line.textContent.length));
+}
+function finishMarkdownLineEdit(line) {
+  if (!line?.classList.contains("editing")) return;
+  line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
+  renderMarkdownLine(line);
+}
+function renderNotesEditor(notes) {
+  const editor = $("#task-detail-notes");
+  const lines = String(notes || "").split(/\r?\n/);
+  editor.replaceChildren(...(lines.length ? lines : [""]).map(createMarkdownLine));
+}
+function notesEditorValue() {
+  return $$("#task-detail-notes .markdown-line").map((line) => (
+    line.classList.contains("editing") ? line.textContent : line.dataset.raw || ""
+  )).join("\n").slice(0, 10000);
+}
+function splitMarkdownLine(line) {
+  const text = line.textContent;
+  const offset = caretOffset(line);
+  const before = text.slice(0, offset);
+  const after = text.slice(offset);
+  line.dataset.raw = before;
+  finishMarkdownLineEdit(line);
+  const next = createMarkdownLine(after);
+  line.after(next);
+  next.focus();
+  requestAnimationFrame(() => placeCaretAt(next, 0));
+  saveDetailEdits();
+}
+function insertPlainTextAtCaret(text) {
+  const selection = window.getSelection();
+  if (!selection.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(document.createTextNode(text));
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+function pasteIntoMarkdownLine(line, text) {
+  const normalized = String(text || "").replace(/\r\n/g, "\n");
+  if (!normalized.includes("\n")) {
+    insertPlainTextAtCaret(normalized);
+    line.dataset.raw = line.textContent;
+    saveDetailEdits();
+    return;
+  }
+  const parts = normalized.split("\n");
+  const current = line.textContent;
+  const offset = caretOffset(line);
+  line.dataset.raw = `${current.slice(0, offset)}${parts.shift()}`;
+  const tail = `${parts.pop() || ""}${current.slice(offset)}`;
+  finishMarkdownLineEdit(line);
+  let anchor = line;
+  parts.forEach((part) => {
+    const next = createMarkdownLine(part);
+    anchor.after(next);
+    anchor = next;
+  });
+  const tailLine = createMarkdownLine(tail);
+  anchor.after(tailLine);
+  tailLine.focus();
+  requestAnimationFrame(() => placeCaretAt(tailLine, 0));
+  saveDetailEdits();
+}
 function currentDetailTask() {
   return tasks.find((item) => item.id === viewState.taskId && item.status === "active");
 }
 function isDetailEditorFocused() {
-  return [$("#task-detail-title"), $("#task-detail-notes")].includes(document.activeElement);
+  return [$("#task-detail-title"), $("#task-detail-notes")].includes(document.activeElement) || Boolean(document.activeElement.closest?.("#task-detail-notes"));
 }
 function showLongUndo(task) {
   pendingUndoTask = { ...task, status: "active", completedAt: null };
@@ -262,8 +399,7 @@ function renderQuadrantList() {
 function renderTaskDetail(task) {
   $("#task-detail-quadrant").textContent = QUADRANT_META[task.quadrant].label;
   $("#task-detail-title").value = task.title;
-  $("#task-detail-notes").value = task.notes || "";
-  updateMarkdownPreview(task.notes || "");
+  renderNotesEditor(task.notes || "");
   const meta = [];
   const reminder = reminderLabel(task.reminder);
   if (reminder) meta.push(`提醒：${reminder}`);
@@ -274,23 +410,16 @@ function renderTaskDetail(task) {
   $("#task-detail-save-status").textContent = "";
 }
 
-function updateMarkdownPreview(notes) {
-  const preview = $("#task-detail-markdown");
-  preview.hidden = !String(notes || "").trim();
-  preview.innerHTML = markdownToHTML(notes);
-}
-
 function saveDetailEdits() {
   const task = currentDetailTask();
   if (!task) return;
   const title = $("#task-detail-title").value.trim();
-  const notes = $("#task-detail-notes").value;
+  const notes = notesEditorValue();
   if (!title) {
     $("#task-detail-save-status").textContent = "任务名称不能为空";
     return;
   }
   Object.assign(task, { title, notes, updatedAt: Date.now() });
-  updateMarkdownPreview(notes);
   $("#task-detail-save-status").textContent = "正在保存...";
   clearTimeout(detailSaveTimer);
   detailSaveTimer = setTimeout(async () => {
@@ -343,7 +472,42 @@ $("#quadrant-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#long-task-close").addEventListener("click", hideForm); $("#long-task-cancel").addEventListener("click", hideForm); $("#long-reminder-kind").addEventListener("change", renderReminderFields);
 $("#long-task-form").addEventListener("submit", async (event) => { event.preventDefault(); const kind = $("#long-reminder-kind").value; const weekdays = $$("#long-reminder-weekdays input:checked").map((input) => Number(input.value)); if (kind === "once" && !$("#long-reminder-at").value) return alert("请选择单次提醒时间。"); if (kind === "once" && Date.parse($("#long-reminder-at").value) <= Date.now()) return alert("提醒时间必须晚于当前时间。"); if (kind === "weekly" && !weekdays.length) return alert("请至少选择一个星期。"); const task = { id: $("#long-task-id").value, title: $("#long-task-title").value, notes: $("#long-task-notes").value, quadrant: $("#long-task-quadrant").value, reminder: { kind, at: $("#long-reminder-at").value ? new Date($("#long-reminder-at").value).toISOString() : null, time: $("#long-reminder-clock").value, weekdays } }; await api.saveLongTask(task); hideForm(); await reload(); });
 $("#task-detail-title").addEventListener("input", saveDetailEdits);
-$("#task-detail-notes").addEventListener("input", saveDetailEdits);
+$("#task-detail-notes").addEventListener("click", (event) => {
+  const line = event.target.closest(".markdown-line");
+  if (line) line.focus();
+  else if (!$("#task-detail-notes .markdown-line")) {
+    const next = createMarkdownLine("");
+    $("#task-detail-notes").append(next);
+    next.focus();
+  }
+});
+$("#task-detail-notes").addEventListener("input", (event) => {
+  const line = event.target.closest(".markdown-line.editing");
+  if (line) line.dataset.raw = line.textContent;
+  saveDetailEdits();
+});
+$("#task-detail-notes").addEventListener("keydown", (event) => {
+  const line = event.target.closest(".markdown-line.editing");
+  if (!line) return;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    splitMarkdownLine(line);
+  }
+  if (event.key === "Backspace" && !line.textContent && $$("#task-detail-notes .markdown-line").length > 1) {
+    event.preventDefault();
+    const previous = line.previousElementSibling || line.nextElementSibling;
+    line.remove();
+    previous.focus();
+    requestAnimationFrame(() => placeCaretAt(previous, previous.textContent.length));
+    saveDetailEdits();
+  }
+});
+$("#task-detail-notes").addEventListener("paste", (event) => {
+  const line = event.target.closest(".markdown-line.editing");
+  if (!line) return;
+  event.preventDefault();
+  pasteIntoMarkdownLine(line, event.clipboardData.getData("text/plain"));
+});
 $("#task-detail-menu").addEventListener("click", (event) => {
   event.stopPropagation();
   const task = tasks.find((item) => item.id === viewState.taskId);
@@ -655,7 +819,6 @@ document.addEventListener("keydown", (event) => {
 api.onLongTasksChanged((next) => {
   tasks = next;
   if (viewState.mode === "detail" && isDetailEditorFocused() && currentDetailTask()) {
-    updateMarkdownPreview($("#task-detail-notes").value);
     return;
   }
   render();

@@ -17,12 +17,14 @@ test("declares board, quadrant list, and task detail views", () => {
 });
 
 test("keeps task notes safe and readable in the detail view", () => {
-  assert.match(html, /<textarea id="task-detail-notes"/);
-  assert.match(html, /id="task-detail-markdown"/);
+  assert.match(html, /id="task-detail-notes" class="task-detail-notes-editor"/);
+  assert.doesNotMatch(html, /<textarea id="task-detail-notes"/);
+  assert.doesNotMatch(html, /id="task-detail-markdown"/);
   assert.match(html, /支持 Markdown 格式渲染/);
-  assert.match(css, /\.task-detail-notes-field textarea\s*\{[^}]*line-height:\s*1\.75/s);
-  assert.match(css, /\.task-detail-markdown\s*\{/);
-  assert.match(longTasksJs, /orderedItem/);
+  assert.match(css, /\.task-detail-notes-editor\s*\{[^}]*line-height:\s*1\.72/s);
+  assert.match(css, /\.markdown-line\.editing\s*\{/);
+  assert.match(longTasksJs, /markdownLineToHTML/);
+  assert.match(longTasksJs, /startMarkdownLineEdit/);
 });
 
 test("limits long-task drag affordance to the colored control area", () => {
@@ -30,6 +32,7 @@ test("limits long-task drag affordance to the colored control area", () => {
   assert.match(longTasksJs, /card\.addEventListener\("click"/);
   assert.doesNotMatch(longTasksJs, /card\.draggable\s*=\s*true/);
   assert.match(css, /\.long-task-drag-zone:hover\s*\{[^}]*cursor:\s*grab/s);
+  assert.match(css, /10px 18px 0 currentColor/);
 });
 
 test("does not show an undo button for daily task completion", () => {
