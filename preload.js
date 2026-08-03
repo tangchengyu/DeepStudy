@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveLongTask: (task) => ipcRenderer.invoke("long-tasks:save", task),
   deleteLongTask: (id) => ipcRenderer.invoke("long-tasks:delete", id),
   completeLongTask: (id) => ipcRenderer.invoke("long-tasks:complete", id),
+  undoLongTaskCompletion: (task) => ipcRenderer.invoke("long-tasks:undo-complete", task),
   setLongTaskDragPayload: (payload) => ipcRenderer.invoke("long-tasks:set-drag-payload", payload),
   getLongTaskDragPayload: () => ipcRenderer.invoke("long-tasks:get-drag-payload"),
   chatWithLongTasks: (payload) => ipcRenderer.invoke("long-tasks:chat", payload),
@@ -64,6 +65,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     const listener = (_event, task) => callback(task);
     ipcRenderer.on("long-tasks:completed", listener);
     return () => ipcRenderer.removeListener("long-tasks:completed", listener);
+  },
+  onLongTaskCompletionUndone: (callback) => {
+    const listener = (_event, task) => callback(task);
+    ipcRenderer.on("long-tasks:completion-undone", listener);
+    return () => ipcRenderer.removeListener("long-tasks:completion-undone", listener);
   },
   onRemindersDue: (callback) => {
     const listener = (_event, tasks) => callback(tasks);

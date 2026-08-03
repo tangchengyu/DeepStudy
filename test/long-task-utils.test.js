@@ -43,6 +43,13 @@ test("parses confirmed AI operations and rejects unknown ids", () => {
   assert.throws(() => normalizeAiOperations('{"operations":[{"action":"delete","id":"missing"}]}', existing));
 });
 
+test("parses long-task JSON even when the model adds trailing prose", () => {
+  const operations = normalizeAiOperations('{"operations":[{"action":"create","task":{"title":"经营自己的自媒体","notes":"中文备注","quadrant":"important-not-urgent","reminder":{"kind":"none"}}}]}\\n请确认。', []);
+  assert.equal(operations[0].action, "create");
+  assert.equal(operations[0].task.title, "经营自己的自媒体");
+  assert.equal(operations[0].task.notes, "中文备注");
+});
+
 test("demotes the selected priority when adding a worthy task", () => {
   const tasks = [1, 2, 3].map((id) => ({ id: String(id), text: `任务 ${id}`, priority: true }));
   const result = applyPriorityDecision(tasks, { id: "4", text: "长期任务" }, { worthy: true, demoteId: "3" });

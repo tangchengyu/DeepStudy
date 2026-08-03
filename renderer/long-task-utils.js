@@ -23,7 +23,7 @@
     return {
       id: cleanText(value.id, 80) || `lt-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      notes: String(value.notes || "").trim().slice(0, 1000),
+      notes: String(value.notes || "").trim().slice(0, 10000),
       quadrant: QUADRANTS.includes(value.quadrant) ? value.quadrant : "important-not-urgent",
       status: ["completed", "planned"].includes(value.status) ? value.status : "active",
       reminder: normalizeReminder(value.reminder),
@@ -66,9 +66,33 @@
 
   function extractJson(content) {
     const source = String(content || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
-    const start = Math.min(...[source.indexOf("{"), source.indexOf("[")].filter((index) => index >= 0));
+    const starts = [source.indexOf("{"), source.indexOf("[")].filter((index) => index >= 0);
+    const start = Math.min(...starts);
     if (!Number.isFinite(start)) throw new Error("模型没有返回结构化结果。");
-    return JSON.parse(source.slice(start));
+    const closing = source[start] === "{" ? "}" : "]";
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < source.length; index += 1) {
+      const char = source[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = inString;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (char === source[start]) depth += 1;
+      if (char === closing) depth -= 1;
+      if (depth === 0) return JSON.parse(source.slice(start, index + 1));
+    }
+    throw new Error("模型返回的 JSON 不完整。");
   }
 
   function normalizeAiOperations(content, existingTasks = []) {

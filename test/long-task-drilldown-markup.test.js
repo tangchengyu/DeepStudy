@@ -15,6 +15,8 @@ test("declares board, quadrant list, and task detail views", () => {
 });
 
 test("keeps task notes safe and readable in the detail view", () => {
-  assert.match(html, /id="task-detail-notes"/);
-  assert.match(css, /\.task-detail-notes\s*\{[^}]*white-space:\s*pre-wrap/s);
+  assert.match(html, /<textarea id="task-detail-notes"/);
+  assert.match(html, /id="task-detail-markdown"/);
+  assert.match(css, /\.task-detail-notes-field textarea\s*\{[^}]*line-height:\s*1\.75/s);
+  assert.match(css, /\.task-detail-markdown\s*\{/);
 });

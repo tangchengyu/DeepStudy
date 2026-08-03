@@ -241,6 +241,38 @@ const DailyPlan = (() => {
       window.electronAPI?.syncDailyPlan({ date: state.date, tasks: state.tasks }).catch(() => {});
     }, 0);
   };
+  let undoTimer = null;
+  let lastCheckboxAction = null;
+  const undoButton = document.createElement("button");
+  undoButton.type = "button";
+  undoButton.className = "undo-complete-button";
+  undoButton.hidden = true;
+  undoButton.textContent = "撤回完成状态";
+  $("#daily-plan-sidebar").append(undoButton);
+  function showCheckboxUndo(action) {
+    lastCheckboxAction = action;
+    undoButton.hidden = false;
+    undoButton.textContent = `撤回：${action.text}`;
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => {
+      undoButton.hidden = true;
+      lastCheckboxAction = null;
+    }, 10000);
+  }
+  undoButton.addEventListener("click", () => {
+    if (!lastCheckboxAction) return;
+    const task = state.tasks.find((item) => item.id === lastCheckboxAction.id);
+    if (task) {
+      task.done = lastCheckboxAction.previousDone;
+      task.completedAt = lastCheckboxAction.previousCompletedAt;
+      save();
+      render();
+      Reflections.syncCompletedTasks(state.tasks);
+    }
+    undoButton.hidden = true;
+    lastCheckboxAction = null;
+    clearTimeout(undoTimer);
+  });
   save();
   function parse(value) {
     const raw = String(value || "")
@@ -380,8 +412,16 @@ const DailyPlan = (() => {
         check.type = "checkbox";
         check.checked = task.done;
         check.addEventListener("change", () => {
+          const previousDone = task.done;
+          const previousCompletedAt = task.completedAt || null;
           task.done = check.checked;
           task.completedAt = check.checked ? Date.now() : null;
+          showCheckboxUndo({
+            id: task.id,
+            text: task.text,
+            previousDone,
+            previousCompletedAt,
+          });
           save();
           render();
           Reflections.syncCompletedTasks(state.tasks);
@@ -736,6 +776,7 @@ const PlannerSettings = (() => {
         selectMatchingApiPreset();
         renderCredentialState(true);
       }
+      $("#planner-system-prompt").value = config.systemPrompt || "";
       renderMode();
       if (!config.activeApiProfileId) setStatus("");
       $("#api-model-preset").focus();
@@ -765,6 +806,7 @@ const PlannerSettings = (() => {
           apiKey: $("#api-key").value,
           forceNewProfile: !$("#api-profile-select").value,
         },
+        systemPrompt: $("#planner-system-prompt").value,
       });
       renderSummary(config);
       setStatus("配置已保存，下一次对话将使用新模型。", "success");
@@ -2255,6 +2297,33 @@ const Reflections = (() => {
     ]);
   }
 
+  function removeCompletedLongTask(task) {
+    if (!task?.id || !task.title) return;
+    const sourceId = `long-${task.id}`;
+    const completedLine = `已完成：${task.title}`;
+    items = items
+      .map((item) => {
+        if (item.date !== todayKey() || !item.kind?.startsWith("completed-task")) return item;
+        if (item.sourceTaskId === sourceId) return null;
+        if (Array.isArray(item.sourceTaskIds) && item.sourceTaskIds.includes(sourceId)) {
+          const lines = String(item.content || "")
+            .split("\n")
+            .filter((line) => line.trim() && line.trim() !== completedLine);
+          if (!lines.length) return null;
+          return {
+            ...item,
+            content: lines.join("\n"),
+            sourceTaskIds: item.sourceTaskIds.filter((id) => id !== sourceId),
+            updatedAt: Date.now(),
+          };
+        }
+        return item;
+      })
+      .filter(Boolean);
+    writeJSON(KEYS.reflections, items);
+    render();
+  }
+
   const selectedIds = new Set();
 
   function groupItemsByDate() {
@@ -2418,12 +2487,13 @@ const Reflections = (() => {
   writeJSON(KEYS.reflections, items);
   syncCompletedTasks(DailyPlan.getTasks());
   window.electronAPI?.onLongTaskCompleted(syncCompletedLongTask);
+  window.electronAPI?.onLongTaskCompletionUndone?.(removeCompletedLongTask);
   const today = items.find(
     (item) => item.date === todayKey() && !item.kind?.startsWith("completed-task"),
   );
   if (today) input.value = today.content;
   render();
-  return { syncCompletedTasks, syncCompletedLongTask };
+  return { syncCompletedTasks, syncCompletedLongTask, removeCompletedLongTask };
 })();
 
 function setupStopwatch() {

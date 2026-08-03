@@ -592,6 +592,8 @@
           <label>API Base URL<input id="api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
           <label>模型名称<input id="api-model" spellcheck="false" placeholder="例如 gpt-4.1-mini" /></label>
           <label id="api-key-entry">API Key<input id="api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
+          <label class="system-prompt-field">短期任务前置提示词<textarea id="planner-system-prompt" rows="8" spellcheck="false"></textarea></label>
+          <p class="settings-help">提示词会直接作为每日计划 AI 的 system message。建议保留“PLAN_ITEMS”输出约束，避免任务创建失败。</p>
         </div>
 
         <div id="planner-settings-status" class="settings-status" role="status"></div>

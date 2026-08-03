@@ -311,15 +311,17 @@
 
   function parsePlanItems(content) {
     const source = String(content || "");
+    const jsonItems = parsePlanItemsFromJson(source);
+    if (jsonItems.length) return jsonItems;
     const marker = source.match(
       /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?PLAN_ITEMS\s*[:：]?(?:\*\*)?\s*\n([\s\S]*)$/i,
     );
+    const lines = source.split("\n");
     const candidate = marker
       ? marker[1]
-      : source
-          .split("\n")
-          .filter((line) => /\[PRIORITY\]/i.test(line))
-          .join("\n");
+      : lines.some((line) => /\[PRIORITY\]/i.test(line))
+        ? lines.filter((line) => /\[PRIORITY\]/i.test(line)).join("\n")
+        : lines.filter((line) => /^\s*(?:[-*•]|\d+[.)])\s+/.test(line)).join("\n");
     const items = candidate
       .split("\n")
       .map((line) => line.trim())
@@ -332,6 +334,37 @@
       .filter(isMeaningfulPlanItem);
 
     return items;
+  }
+
+  function parsePlanItemsFromJson(content) {
+    const source = String(content || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+    const candidates = [];
+    const firstObject = source.indexOf("{");
+    const firstArray = source.indexOf("[");
+    [firstObject, firstArray]
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)
+      .forEach((start) => {
+        const endChar = source[start] === "{" ? "}" : "]";
+        const end = source.lastIndexOf(endChar);
+        if (end > start) candidates.push(source.slice(start, end + 1));
+      });
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(candidate);
+        const rawItems = Array.isArray(parsed)
+          ? parsed
+          : parsed.plan_items || parsed.planItems || parsed.tasks || parsed.items;
+        if (!Array.isArray(rawItems)) continue;
+        return rawItems
+          .map((item) => typeof item === "string" ? item : item?.text || item?.title || item?.task)
+          .map((item) => String(item || "").trim())
+          .filter(isMeaningfulPlanItem);
+      } catch {
+        // Try the next candidate.
+      }
+    }
+    return [];
   }
 
   function isMeaningfulPlanItem(item) {

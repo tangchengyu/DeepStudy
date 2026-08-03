@@ -12,6 +12,16 @@ const QUADRANT_META = {
 };
 let viewState = { mode: "board", quadrant: null, taskId: null };
 let suppressTaskOpenUntil = 0;
+let undoTimer = null;
+let pendingUndoTask = null;
+let detailSaveTimer = null;
+
+const undoButton = document.createElement("button");
+undoButton.type = "button";
+undoButton.className = "long-undo-button";
+undoButton.hidden = true;
+undoButton.textContent = "撤回完成";
+document.body.append(undoButton);
 
 function openQuadrant(quadrant) {
   if (!LongTaskUtils.QUADRANTS.includes(quadrant)) return;
@@ -36,6 +46,78 @@ function navigateBack() {
 }
 
 function escapeHTML(value) { const div = document.createElement("div"); div.textContent = String(value || ""); return div.innerHTML; }
+function renderInlineMarkdown(value) {
+  return escapeHTML(value)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+function markdownToHTML(value) {
+  const lines = String(value || "").split(/\r?\n/);
+  const html = [];
+  let inList = false;
+  const closeList = () => {
+    if (inList) {
+      html.push("</ul>");
+      inList = false;
+    }
+  };
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      closeList();
+      return;
+    }
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      closeList();
+      html.push(`<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`);
+      return;
+    }
+    const listItem = trimmed.match(/^[-*]\s+(.+)$/);
+    if (listItem) {
+      if (!inList) {
+        html.push("<ul>");
+        inList = true;
+      }
+      html.push(`<li>${renderInlineMarkdown(listItem[1])}</li>`);
+      return;
+    }
+    closeList();
+    html.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
+  });
+  closeList();
+  return html.join("");
+}
+function currentDetailTask() {
+  return tasks.find((item) => item.id === viewState.taskId && item.status === "active");
+}
+function isDetailEditorFocused() {
+  return [$("#task-detail-title"), $("#task-detail-notes")].includes(document.activeElement);
+}
+function showLongUndo(task) {
+  pendingUndoTask = { ...task, status: "active", completedAt: null };
+  undoButton.hidden = false;
+  undoButton.textContent = `撤回完成：${task.title}`;
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    undoButton.hidden = true;
+    pendingUndoTask = null;
+  }, 10000);
+}
+undoButton.addEventListener("click", async () => {
+  if (!pendingUndoTask) return;
+  const task = pendingUndoTask;
+  undoButton.hidden = true;
+  pendingUndoTask = null;
+  clearTimeout(undoTimer);
+  try {
+    if (typeof api.undoLongTaskCompletion === "function") await api.undoLongTaskCompletion(task);
+    else await api.saveLongTask(task);
+  } catch (error) {
+    alert(error.message);
+  }
+});
 function reminderLabel(reminder) {
   if (!reminder?.enabled || reminder.kind === "none") return "";
   if (reminder.kind === "once") return `单次 · ${new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(reminder.at))}`;
@@ -61,6 +143,7 @@ function taskCard(task) {
     check.disabled = true;
     try {
       await api.completeLongTask(task.id);
+      showLongUndo(task);
     } catch (error) {
       check.checked = false;
       check.disabled = false;
@@ -102,7 +185,6 @@ function hideTaskMenu() {
 function showTaskMenu(task, x, y) {
   taskMenu.replaceChildren();
   [
-    ["edit", "编辑"],
     ["copy-today", "复制到今日任务"],
     ["delete", "删除"],
   ].forEach(([action, label]) => {
@@ -138,6 +220,11 @@ function setVisibleView(mode) {
   $("#quadrant-board-view").hidden = mode !== "board";
   $("#quadrant-list-view").hidden = mode !== "quadrant";
   $("#task-detail-view").hidden = mode !== "detail";
+  document.body.classList.toggle("detail-q1", mode === "detail" && viewState.quadrant === "important-urgent");
+  document.body.classList.toggle("detail-q2", mode === "detail" && viewState.quadrant === "important-not-urgent");
+  document.body.classList.toggle("detail-q3", mode === "detail" && viewState.quadrant === "urgent-not-important");
+  document.body.classList.toggle("detail-q4", mode === "detail" && viewState.quadrant === "not-important-not-urgent");
+  $("#quadrant-list-view").className = `long-task-view drilldown-view ${QUADRANT_META[viewState.quadrant]?.className || ""}`;
 }
 
 function renderBoard() {
@@ -157,11 +244,10 @@ function renderQuadrantList() {
 }
 
 function renderTaskDetail(task) {
-  const noteText = task.notes || "暂无备注";
   $("#task-detail-quadrant").textContent = QUADRANT_META[task.quadrant].label;
-  $("#task-detail-title").textContent = task.title;
-  $("#task-detail-notes").textContent = noteText;
-  $("#task-detail-notes").classList.toggle("empty", !task.notes);
+  $("#task-detail-title").value = task.title;
+  $("#task-detail-notes").value = task.notes || "";
+  updateMarkdownPreview(task.notes || "");
   const meta = [];
   const reminder = reminderLabel(task.reminder);
   if (reminder) meta.push(`提醒：${reminder}`);
@@ -169,6 +255,36 @@ function renderTaskDetail(task) {
   $("#task-detail-meta").replaceChildren(...meta.map((text) => Object.assign(document.createElement("span"), { textContent: text })));
   $("#task-detail-check").checked = false;
   $("#task-detail-check").disabled = false;
+  $("#task-detail-save-status").textContent = "";
+}
+
+function updateMarkdownPreview(notes) {
+  const preview = $("#task-detail-markdown");
+  preview.hidden = !String(notes || "").trim();
+  preview.innerHTML = markdownToHTML(notes);
+}
+
+function saveDetailEdits() {
+  const task = currentDetailTask();
+  if (!task) return;
+  const title = $("#task-detail-title").value.trim();
+  const notes = $("#task-detail-notes").value;
+  if (!title) {
+    $("#task-detail-save-status").textContent = "任务名称不能为空";
+    return;
+  }
+  Object.assign(task, { title, notes, updatedAt: Date.now() });
+  updateMarkdownPreview(notes);
+  $("#task-detail-save-status").textContent = "正在保存...";
+  clearTimeout(detailSaveTimer);
+  detailSaveTimer = setTimeout(async () => {
+    try {
+      await api.saveLongTask(task);
+      $("#task-detail-save-status").textContent = "已自动保存";
+    } catch (error) {
+      $("#task-detail-save-status").textContent = error.message;
+    }
+  }, 500);
 }
 
 function render() {
@@ -210,10 +326,8 @@ $("#long-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#quadrant-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#long-task-close").addEventListener("click", hideForm); $("#long-task-cancel").addEventListener("click", hideForm); $("#long-reminder-kind").addEventListener("change", renderReminderFields);
 $("#long-task-form").addEventListener("submit", async (event) => { event.preventDefault(); const kind = $("#long-reminder-kind").value; const weekdays = $$("#long-reminder-weekdays input:checked").map((input) => Number(input.value)); if (kind === "once" && !$("#long-reminder-at").value) return alert("请选择单次提醒时间。"); if (kind === "once" && Date.parse($("#long-reminder-at").value) <= Date.now()) return alert("提醒时间必须晚于当前时间。"); if (kind === "weekly" && !weekdays.length) return alert("请至少选择一个星期。"); const task = { id: $("#long-task-id").value, title: $("#long-task-title").value, notes: $("#long-task-notes").value, quadrant: $("#long-task-quadrant").value, reminder: { kind, at: $("#long-reminder-at").value ? new Date($("#long-reminder-at").value).toISOString() : null, time: $("#long-reminder-clock").value, weekdays } }; await api.saveLongTask(task); hideForm(); await reload(); });
-$("#task-detail-edit").addEventListener("click", () => {
-  const task = tasks.find((item) => item.id === viewState.taskId);
-  if (task) showForm(task);
-});
+$("#task-detail-title").addEventListener("input", saveDetailEdits);
+$("#task-detail-notes").addEventListener("input", saveDetailEdits);
 $("#task-detail-menu").addEventListener("click", (event) => {
   event.stopPropagation();
   const task = tasks.find((item) => item.id === viewState.taskId);
@@ -223,7 +337,11 @@ $("#task-detail-menu").addEventListener("click", (event) => {
 });
 $("#task-detail-check").addEventListener("change", async (event) => {
   event.currentTarget.disabled = true;
-  try { await api.completeLongTask(viewState.taskId); }
+  const task = currentDetailTask();
+  try {
+    await api.completeLongTask(viewState.taskId);
+    if (task) showLongUndo(task);
+  }
   catch (error) { event.currentTarget.checked = false; event.currentTarget.disabled = false; alert(error.message); }
 });
 taskMenu.addEventListener("click", async (event) => {
@@ -232,7 +350,6 @@ taskMenu.addEventListener("click", async (event) => {
   const task = tasks.find((item) => item.id === taskMenu.dataset.id);
   hideTaskMenu();
   if (!task) return;
-  if (button.dataset.action === "edit") showForm(task);
   if (button.dataset.action === "copy-today") {
     try {
       await copyTaskToToday(task);
@@ -435,6 +552,7 @@ const LongAiSettings = (() => {
         $("#long-api-saved-hint").hidden = true;
         $("#long-api-delete").disabled = true;
       }
+      $("#long-system-prompt").value = config.systemPrompt || "";
       setStatus("");
     } catch (error) { setStatus(error.message, "error"); }
   }
@@ -460,6 +578,7 @@ const LongAiSettings = (() => {
           apiKey: $("#long-api-key").value,
           forceNewProfile: !$("#long-api-profile").value,
         },
+        systemPrompt: $("#long-system-prompt").value,
       });
       renderSummary(config);
       setStatus("配置已保存，下一次对话生效。", "success");
@@ -517,4 +636,11 @@ document.addEventListener("keydown", (event) => {
   if (viewState.mode !== "board") { event.preventDefault(); navigateBack(); }
 });
 
-api.onLongTasksChanged((next) => { tasks = next; render(); }); api.acknowledgeReminders(); reload();
+api.onLongTasksChanged((next) => {
+  tasks = next;
+  if (viewState.mode === "detail" && isDetailEditorFocused() && currentDetailTask()) {
+    updateMarkdownPreview($("#task-detail-notes").value);
+    return;
+  }
+  render();
+}); api.acknowledgeReminders(); reload();

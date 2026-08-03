@@ -56,6 +56,13 @@ test("extracts all tasks when the model uses a markdown PLAN_ITEMS heading", () 
   ]);
 });
 
+test("extracts daily tasks from common JSON-shaped model output", () => {
+  assert.deepEqual(
+    parsePlanItems('{"plan_items":["[PRIORITY] 写论文 45 分钟","整理资料 20 分钟"]}'),
+    ["[PRIORITY] 写论文 45 分钟", "整理资料 20 分钟"],
+  );
+});
+
 test("falls back to splitting sequential Chinese plan text", () => {
   assert.deepEqual(
     fallbackPlanItemsFromText("我今天先去健身，然后把微信这么长时间的聊天记录过完，然后再去看个阿公阿婆，再打个乒乓球"),

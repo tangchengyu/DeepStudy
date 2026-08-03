@@ -30,6 +30,30 @@ const DEFAULT_PLANNER_SETTINGS = {
   mode: "api",
   api: { baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-oss-120b:free" },
 };
+const DEFAULT_DAILY_SYSTEM_PROMPT = [
+  "You help turn a short chat into a practical daily plan for a desktop timer app.",
+  "Reply in the same language as the user, defaulting to Simplified Chinese.",
+  "Keep the response concise and action-oriented.",
+  "When you suggest tasks to add, end with a section named exactly PLAN_ITEMS:",
+  "Use one plain-text bullet per task under PLAN_ITEMS. Do not use JSON, arrays, brackets, or code blocks in PLAN_ITEMS.",
+  "Each task should be specific, short, and suitable for a checklist.",
+  "Split sequential user plans into separate checklist tasks instead of collapsing them into one task.",
+  "Prefix the most important tasks with [PRIORITY]. Mark at most three.",
+  "Priority means purposeful work that produces short-term progress or meaningful personal growth.",
+  "Do not mark entertainment, passive video watching, or routine administration as priority.",
+  "Only suggest tasks that follow from the current conversation.",
+  "Do not invent filler tasks just to reach a target number of priorities.",
+  "Do not guess exact times, durations, locations, tools, or process details unless the user provided them.",
+].join("\n");
+const DEFAULT_LONG_TASK_SYSTEM_PROMPT = [
+  "You manage a four-quadrant long-term task board.",
+  "Reply by returning JSON only: {\"operations\":[{\"action\":\"create|update|delete|restore\",\"id\":\"existing id when needed\",\"task\":{\"title\":\"\",\"notes\":\"\",\"quadrant\":\"important-urgent|important-not-urgent|urgent-not-important|not-important-not-urgent\",\"reminder\":{\"kind\":\"none|once|daily|weekly\",\"at\":\"ISO date\",\"time\":\"HH:mm\",\"weekdays\":[0]}}}]}",
+  "Use the same language as the user for titles and notes. If the user writes Chinese, task titles and notes must be Chinese.",
+  "If the user asks to add a future task, create exactly one operation unless they clearly ask for multiple tasks.",
+  "If the user asks for a reminder relative to the task time, calculate the reminder time and set reminder.kind to once.",
+  "Never invent a reminder time, duration, schedule, workflow, or intermediate steps. Leave reminder.kind as none when time is unclear.",
+  "Use the user's local timezone. Keep titles concise.",
+].join("\n");
 const FREE_API_TUTORIAL_URL = "https://my.feishu.cn/docx/Sr9RdRzFaop9BSxBgcAcdxDonOc";
 const PLANNER_TIMEOUT_MS = 120000;
 const PORTABLE_ICON_PATH = process.env.PORTABLE_EXECUTABLE_FILE
@@ -328,6 +352,25 @@ function completeLongTask(id) {
   return { completed: true, task };
 }
 
+function undoLongTaskCompletion(input = {}) {
+  const id = cleanString(input.id);
+  const tasks = readLongTasks();
+  const index = tasks.findIndex((item) => item.id === id);
+  if (index < 0) throw new Error("长期任务不存在。");
+  const restored = normalizeTask({
+    ...tasks[index],
+    ...input,
+    id,
+    status: "active",
+    completedAt: null,
+  });
+  restored.createdAt = tasks[index].createdAt;
+  tasks[index] = restored;
+  writeLongTasks(tasks);
+  mainWindow?.webContents.send("long-tasks:completion-undone", restored);
+  return restored;
+}
+
 function moveLongTaskToDailyPlan(id) {
   const tasks = readLongTasks();
   const task = tasks.find((item) => item.id === cleanString(id) && item.status === "active");
@@ -481,6 +524,10 @@ function readPlannerSettings(scope = "planner") {
   );
   return {
     mode: "api",
+    systemPrompt: cleanString(
+      stored.systemPrompt,
+      scope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT,
+    ),
     api: {
       baseUrl: activeProfile?.baseUrl || cleanString(
           stored.api?.baseUrl,
@@ -497,6 +544,7 @@ function readPlannerSettings(scope = "planner") {
 function publicPlannerSettings(settings = readPlannerSettings()) {
   return {
     mode: settings.mode,
+    systemPrompt: settings.systemPrompt,
     api: {
       baseUrl: settings.api.baseUrl,
       model: settings.api.model,
@@ -524,6 +572,7 @@ function savePlannerSettings(input = {}, scope = "planner") {
   }
   const settings = {
     mode,
+    systemPrompt: cleanString(input.systemPrompt, current.systemPrompt),
     api: {
       baseUrl: normalizeBaseUrl(input.api?.baseUrl, current.api.baseUrl),
       model: cleanString(input.api?.model, current.api.model),
@@ -553,6 +602,7 @@ function savePlannerSettings(input = {}, scope = "planner") {
   }
   const stored = {
     mode: settings.mode,
+    systemPrompt: settings.systemPrompt,
     api: { baseUrl: settings.api.baseUrl, model: settings.api.model },
     activeApiProfileId: settings.activeApiProfileId,
     apiProfiles: settings.apiProfiles.map((profile) => ({
@@ -585,6 +635,7 @@ function syncApiProfilesToOtherScope(sourceScope, sourceProfilesEncrypted) {
   if (updatedActive) otherApi = { baseUrl: updatedActive.baseUrl, model: updatedActive.model };
   const otherStoredUpdated = {
     mode: otherStored.mode || "api",
+    systemPrompt: otherStored.systemPrompt || (otherScope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT),
     api: otherApi,
     activeApiProfileId: typeof otherStored.activeApiProfileId === "string" ? otherStored.activeApiProfileId : (mergedOtherProfiles[0]?.id || ""),
     apiProfiles: mergedOtherProfiles,
@@ -603,6 +654,7 @@ function deleteApiProfile(profileId, scope = "planner") {
   const activeProfile = nextProfiles.find((profile) => profile.id === current.activeApiProfileId) || nextProfiles[0];
   const settings = {
     mode: "api",
+    systemPrompt: current.systemPrompt,
     api: {
       baseUrl: activeProfile?.baseUrl || DEFAULT_PLANNER_SETTINGS.api.baseUrl,
       model: activeProfile?.model || DEFAULT_PLANNER_SETTINGS.api.model,
@@ -613,6 +665,7 @@ function deleteApiProfile(profileId, scope = "planner") {
   };
   const stored = {
     mode: settings.mode,
+    systemPrompt: settings.systemPrompt,
     api: { baseUrl: settings.api.baseUrl, model: settings.api.model },
     activeApiProfileId: settings.activeApiProfileId,
     apiProfiles: settings.apiProfiles.map((profile) => ({
@@ -642,6 +695,7 @@ function deleteApiProfileFromOtherScope(deletedProfileId, sourceScope) {
   const otherActive = nextOtherProfiles.find((profile) => profile.id === otherActiveId) || nextOtherProfiles[0];
   const otherStoredUpdated = {
     mode: otherStored.mode || "api",
+    systemPrompt: otherStored.systemPrompt || (otherScope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT),
     api: otherActive
       ? { baseUrl: otherActive.baseUrl, model: otherActive.model }
       : (otherStored.api || DEFAULT_PLANNER_SETTINGS.api),
@@ -651,7 +705,7 @@ function deleteApiProfileFromOtherScope(deletedProfileId, sourceScope) {
   fs.writeFileSync(plannerSettingsPath(otherScope), JSON.stringify(otherStoredUpdated, null, 2), "utf8");
 }
 
-function buildPlannerMessages(payload = {}) {
+function buildPlannerMessages(payload = {}, settings = readPlannerSettings()) {
   const userMessage = cleanString(payload.message);
   const date = cleanString(payload.date, new Date().toISOString().slice(0, 10));
 
@@ -659,20 +713,7 @@ function buildPlannerMessages(payload = {}) {
   return [
     {
       role: "system",
-      content: [
-        "You help turn a short chat into a practical daily plan for a desktop timer app.",
-        "Reply in the same language as the user, defaulting to Simplified Chinese.",
-        "Keep the response concise and action-oriented.",
-        "When you suggest tasks to add, end with a section named exactly PLAN_ITEMS:",
-        "Use one plain-text bullet per task under PLAN_ITEMS. Do not use JSON, arrays, brackets, or code blocks in PLAN_ITEMS.",
-        "Each task should be specific, short, and suitable for a checklist.",
-        "Split sequential user plans into separate checklist tasks instead of collapsing them into one task.",
-        "Prefix the most important tasks with [PRIORITY]. Mark at most three.",
-        "Priority means purposeful work that produces short-term progress or meaningful personal growth.",
-        "Do not mark entertainment, passive video watching, or routine administration as priority.",
-        "Only suggest tasks that follow from the current conversation.",
-        "Do not invent filler tasks just to reach a target number of priorities.",
-      ].join("\n"),
+      content: cleanString(settings.systemPrompt, DEFAULT_DAILY_SYSTEM_PROMPT),
     },
     ...history,
     {
@@ -705,7 +746,7 @@ async function requestPlannerReply(payload) {
         stream: false,
         max_tokens: 800,
         temperature: 0.2,
-        messages: buildPlannerMessages(payload),
+        messages: buildPlannerMessages(payload, settings),
       }),
       signal: controller.signal,
     });
@@ -770,21 +811,16 @@ async function proposeLongTaskOperations(payload = {}) {
   const tasks = readLongTasks();
   const history = sanitizeChatHistory(payload.history, 6);
   const requestText = cleanString(payload.message);
+  const settings = readPlannerSettings("long-tasks");
   const messages = [{
     role: "system",
-    content: [
-      "You manage a four-quadrant long-term task board.",
-      "Return JSON only: {\"operations\":[{\"action\":\"create|update|delete|restore\",\"id\":\"existing id when needed\",\"task\":{\"title\":\"\",\"notes\":\"\",\"quadrant\":\"important-urgent|important-not-urgent|urgent-not-important|not-important-not-urgent\",\"reminder\":{\"kind\":\"none|once|daily|weekly\",\"at\":\"ISO date\",\"time\":\"HH:mm\",\"weekdays\":[0]}}}]}",
-      "If the user asks to add a future task, create exactly one operation unless they clearly ask for multiple tasks.",
-      "If the user asks for a reminder relative to the task time, calculate the reminder time and set reminder.kind to once.",
-      "Never invent a reminder time. Use the user's local timezone. Keep titles concise.",
-    ].join("\n"),
+    content: cleanString(settings.systemPrompt, DEFAULT_LONG_TASK_SYSTEM_PROMPT),
   }, ...history, {
     role: "user",
     content: `Current local time: ${new Date().toString()}\nExisting tasks: ${JSON.stringify(tasks.map(({ id, title, quadrant, status, reminder }) => ({ id, title, quadrant, status, reminder })))}\nRequest: ${requestText}`,
   }];
   try {
-    const reply = await requestStructuredModel(messages, null, readPlannerSettings("long-tasks"));
+    const reply = await requestStructuredModel(messages, null, settings);
     return { content: reply.content, operations: normalizeAiOperations(reply.content, tasks) };
   } catch (error) {
     const recoverable = /空内容|结构化结果|JSON|Unexpected token|变更列表无效/.test(error.message);
@@ -821,6 +857,7 @@ ipcMain.handle("long-tasks:delete", (_event, id) => {
   return true;
 });
 ipcMain.handle("long-tasks:complete", (_event, id) => completeLongTask(id));
+ipcMain.handle("long-tasks:undo-complete", (_event, task) => undoLongTaskCompletion(task));
 ipcMain.handle("long-tasks:reorder", (_event, updates) => {
   const tasks = readLongTasks();
   for (const update of Array.isArray(updates) ? updates : []) {
