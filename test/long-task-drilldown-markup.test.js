@@ -43,8 +43,19 @@ test("stores pasted note images as local app files and hydrates them for display
   assert.match(longTasksJs, /hydrateMarkdownImages/);
   assert.match(longTasksJs, /parseObsidianImagePath/);
   assert.match(longTasksJs, /importObsidianImageLine/);
-  assert.match(longTasksJs, /obsidianImageImports\.delete\(sourcePath\)/);
   assert.doesNotMatch(longTasksJs, /readAsDataURL/);
+});
+
+test("abandons stale absolute-path image imports and discards their files", () => {
+  const start = longTasksJs.indexOf("async function importObsidianImageLine");
+  const end = longTasksJs.indexOf("\nasync function localImageUrl", start);
+  const handler = longTasksJs.slice(start, end);
+  assert.match(handler, /const taskId = viewState\.taskId/);
+  assert.match(handler, /viewState\.mode !== "detail"/);
+  assert.match(handler, /viewState\.taskId !== taskId/);
+  assert.match(handler, /!line\.isConnected/);
+  assert.match(handler, /line\.classList\.contains\("editing"\)/);
+  assert.match(handler, /cleanupSavedImages\(\[saved\]\)/);
 });
 
 test("captures image insertion state before persistence awaits", () => {
@@ -154,9 +165,11 @@ test("shows and clears a quadrant-colored image drop state", () => {
 });
 
 test("uses an active note caret for drops and reports unsupported files", () => {
+  assert.match(longTasksJs, /function filesFromTransfer\(transfer\)/);
   assert.match(longTasksJs, /const activeLine = \$\("#task-detail-notes \.markdown-line\.editing"\)/);
   assert.match(longTasksJs, /const line = activeLine \|\| noteLineAtPoint/);
-  assert.match(longTasksJs, /if \(!imageFiles\.length\) \{\s*alert\(tr\("imageImportFailed"\)\)/s);
+  assert.match(longTasksJs, /imageFiles\.length !== transferFiles\.length/);
+  assert.match(longTasksJs, /if \(!imageFiles\.length \|\| imageFiles\.length !== transferFiles\.length\) \{\s*alert\(tr\("imageImportFailed"\)\)/s);
 });
 
 test("documents all supported image intake workflows in both tutorial languages", () => {

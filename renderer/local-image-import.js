@@ -28,14 +28,14 @@ function writeBufferAtomically(targetPath, buffer, createTempName, fileSystem = 
   }
 }
 
-function importLocalImage(sourcePath, destinationDir, createId) {
+function importLocalImage(sourcePath, destinationDir, createId, fileSystem = fs) {
   const source = String(sourcePath || "").trim();
   if (!source || (!path.isAbsolute(source) && !path.win32.isAbsolute(source))) {
     throw new Error("图片必须使用绝对路径。");
   }
-  if (!fs.existsSync(source)) throw new Error("本地图片不存在。");
+  if (!fileSystem.existsSync(source)) throw new Error("本地图片不存在。");
 
-  const stat = fs.statSync(source);
+  const stat = fileSystem.statSync(source);
   if (!stat.isFile()) throw new Error("本地图片路径必须指向文件。");
 
   const sourceExtension = path.extname(source).slice(1).toLowerCase();
@@ -52,8 +52,9 @@ function importLocalImage(sourcePath, destinationDir, createId) {
     throw new Error("图片存储名称无效。");
   }
 
-  fs.mkdirSync(destinationDir, { recursive: true });
-  fs.copyFileSync(source, path.join(destinationDir, id));
+  fileSystem.mkdirSync(destinationDir, { recursive: true });
+  const buffer = fileSystem.readFileSync(source);
+  writeBufferAtomically(path.join(destinationDir, id), buffer, undefined, fileSystem);
   return { id, type, size: stat.size };
 }
 

@@ -16,7 +16,6 @@ let undoTimer = null;
 let pendingUndoTask = null;
 let detailSaveTimer = null;
 const localImageUrls = new Map();
-const obsidianImageImports = new Map();
 
 const undoButton = document.createElement("button");
 undoButton.type = "button";
@@ -150,25 +149,30 @@ function renderMarkdownLine(line) {
 }
 
 function importObsidianImage(sourcePath) {
-  if (!obsidianImageImports.has(sourcePath)) {
-    const request = api.importLongTaskImage(sourcePath);
-    obsidianImageImports.set(sourcePath, request);
-    const releaseRequest = () => {
-      if (obsidianImageImports.get(sourcePath) === request) obsidianImageImports.delete(sourcePath);
-    };
-    request.then(releaseRequest, releaseRequest);
-  }
-  return obsidianImageImports.get(sourcePath);
+  return api.importLongTaskImage(sourcePath);
 }
 
 async function importObsidianImageLine(line) {
+  const editor = $("#task-detail-notes");
+  const taskId = viewState.taskId;
   const raw = line?.dataset.raw || "";
   const sourcePath = LongTaskUtils.parseObsidianImagePath(raw);
   if (!sourcePath || line.dataset.importingImage === sourcePath) return;
   line.dataset.importingImage = sourcePath;
   try {
     const saved = await importObsidianImage(sourcePath);
-    if (!saved?.id || line.dataset.raw !== raw) return;
+    if (!saved?.id) return;
+    if (
+      viewState.mode !== "detail"
+      || viewState.taskId !== taskId
+      || !line.isConnected
+      || line.closest("#task-detail-notes") !== editor
+      || line.classList.contains("editing")
+      || line.dataset.raw !== raw
+    ) {
+      await cleanupSavedImages([saved]);
+      return;
+    }
     line.dataset.raw = `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`;
     delete line.dataset.importingImage;
     renderMarkdownLine(line);
@@ -329,17 +333,15 @@ function isSupportedImageFile(file) {
   return Boolean(file) && (IMAGE_MIME_TYPES.has(String(file.type || "").toLowerCase()) || IMAGE_FILE_NAME.test(String(file.name || "")));
 }
 function imageFilesFromTransfer(transfer) {
+  return filesFromTransfer(transfer).filter(isSupportedImageFile);
+}
+function filesFromTransfer(transfer) {
   const files = Array.from(transfer?.files || []);
-  const knownFiles = new Set(files);
-  Array.from(transfer?.items || []).forEach((item) => {
-    if (item.kind !== "file") return;
-    const file = item.getAsFile?.();
-    if (file && !knownFiles.has(file)) {
-      knownFiles.add(file);
-      files.push(file);
-    }
-  });
-  return files.filter(isSupportedImageFile);
+  if (files.length) return files;
+  return Array.from(transfer?.items || [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile?.())
+    .filter(Boolean);
 }
 function transferHasFiles(transfer) {
   return Array.from(transfer?.files || []).length > 0
@@ -743,8 +745,9 @@ $("#task-detail-notes").addEventListener("keydown", (event) => {
 });
 $("#task-detail-notes").addEventListener("paste", (event) => {
   const line = event.target.closest(".markdown-line.editing");
+  const transferFiles = filesFromTransfer(event.clipboardData);
   const imageFiles = imageFilesFromTransfer(event.clipboardData);
-  if (imageFiles.length) {
+  if (imageFiles.length && imageFiles.length === transferFiles.length) {
     event.preventDefault();
     insertImageFilesIntoNotes(line, imageFiles, line ? caretOffset(line) : undefined).catch(() => alert(tr("imageImportFailed")));
     return;
@@ -770,8 +773,9 @@ $("#task-detail-notes").addEventListener("drop", (event) => {
   if (!transferHasFiles(event.dataTransfer)) return;
   event.preventDefault();
   setImageDropState(false);
+  const transferFiles = filesFromTransfer(event.dataTransfer);
   const imageFiles = imageFilesFromTransfer(event.dataTransfer);
-  if (!imageFiles.length) {
+  if (!imageFiles.length || imageFiles.length !== transferFiles.length) {
     alert(tr("imageImportFailed"));
     return;
   }

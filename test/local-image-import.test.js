@@ -64,3 +64,21 @@ test("writes note images atomically and removes a failed temporary file", () => 
     assert.equal(fs.existsSync(failedTarget), false);
   });
 });
+
+test("imports an absolute-path image through the atomic writer", () => {
+  const { importLocalImage } = require(modulePath);
+  withTempDirectory((root) => {
+    const source = path.join(root, "source.png");
+    const destination = path.join(root, "managed");
+    fs.writeFileSync(source, Buffer.from("image"));
+    const failingFs = Object.assign(Object.create(fs), {
+      renameSync() { throw new Error("rename failed"); },
+    });
+    assert.throws(
+      () => importLocalImage(source, destination, () => "saved.png", failingFs),
+      /rename failed/,
+    );
+    assert.equal(fs.existsSync(path.join(destination, "saved.png")), false);
+    assert.equal(fs.readdirSync(destination).length, 0);
+  });
+});
