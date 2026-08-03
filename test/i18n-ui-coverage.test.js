@@ -43,3 +43,13 @@ test("standalone timer windows follow the selected interface language", () => {
   assert.match(timerJs, /applyTimerCopy/);
   assert.match(timerJs, /tr\(copy\.key\)/);
 });
+
+test("work type switch translates only the visible side labels", () => {
+  const indexHtml = fs.readFileSync(path.join(renderer, "index.html"), "utf8");
+  assert.match(indexHtml, /class="work-type-label maintenance-label"/);
+  assert.match(indexHtml, /class="work-type-label core-label"/);
+  assert.match(i18nJs, /\.switch-row \.maintenance-label/);
+  assert.match(i18nJs, /\.switch-row \.core-label/);
+  assert.doesNotMatch(i18nJs, /\.switch-row span:first-child/);
+  assert.doesNotMatch(i18nJs, /\.switch-row span:last-child/);
+});

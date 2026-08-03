@@ -48,7 +48,9 @@ test("limits long-task drag affordance to the colored control area", () => {
   assert.match(css, /8px 16px 0 currentColor/);
   assert.match(css, /\.long-task-drag-zone\s*\{[^}]*grid-template-rows:\s*20px 24px/s);
   assert.match(css, /\.long-task-check input\s*\{[^}]*margin:\s*0/s);
-  assert.match(css, /\.back-button\s*\{[^}]*font-family:\s*"Arial Black"/s);
+  assert.match(css, /\.back-button\s*\{[^}]*--back-accent:/s);
+  assert.match(css, /\.back-button::before\s*\{/);
+  assert.match(css, /\.back-button::after\s*\{/);
 });
 
 test("does not show an undo button for daily task completion", () => {
