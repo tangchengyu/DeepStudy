@@ -322,24 +322,50 @@ function pasteIntoMarkdownLine(line, text) {
   requestAnimationFrame(() => placeCaretAt(tailLine, 0));
   saveDetailEdits();
 }
-function clipboardImageFile(event) {
-  return [...(event.clipboardData?.items || [])]
-    .find((item) => item.kind === "file" && /^image\//i.test(item.type))
-    ?.getAsFile() || null;
+const IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/x-ms-bmp"]);
+const IMAGE_FILE_NAME = /\.(?:png|jpe?g|gif|webp|bmp)$/i;
+function isSupportedImageFile(file) {
+  return Boolean(file) && (IMAGE_MIME_TYPES.has(String(file.type || "").toLowerCase()) || IMAGE_FILE_NAME.test(String(file.name || "")));
 }
-async function pasteImageIntoNotes(line, file) {
+function imageFilesFromTransfer(transfer) {
+  const files = Array.from(transfer?.files || []);
+  const knownFiles = new Set(files);
+  Array.from(transfer?.items || []).forEach((item) => {
+    if (item.kind !== "file") return;
+    const file = item.getAsFile?.();
+    if (file && !knownFiles.has(file)) {
+      knownFiles.add(file);
+      files.push(file);
+    }
+  });
+  return files.filter(isSupportedImageFile);
+}
+function transferHasFiles(transfer) {
+  return Array.from(transfer?.files || []).length > 0
+    || Array.from(transfer?.items || []).some((item) => item.kind === "file")
+    || Array.from(transfer?.types || []).includes("Files");
+}
+function lastNoteLine() {
+  return $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
+}
+async function insertImageFilesIntoNotes(line, files, offset) {
   const target = line || $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
   const text = target.classList.contains("editing") ? target.textContent : target.dataset.raw || "";
-  const offset = target.classList.contains("editing") ? caretOffset(target) : text.length;
-  const saved = await api.saveLongTaskImage({
-    buffer: await file.arrayBuffer(),
-    type: file.type,
-    name: file.name,
-  });
-  if (!saved?.id) throw new Error(tr("imageSaveFailed"));
-  const raw = `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`;
+  const insertionOffset = Math.min(text.length, Math.max(0, Number(offset ?? text.length) || 0));
+  const imageFiles = Array.from(files || []).filter(isSupportedImageFile);
+  if (!imageFiles.length) return;
+  const savedImages = await Promise.all(imageFiles.map(async (file) => {
+    const saved = await api.saveLongTaskImage({
+      buffer: await file.arrayBuffer(),
+      type: file.type,
+      name: file.name,
+    });
+    if (!saved?.id) throw new Error(tr("imageSaveFailed"));
+    return saved;
+  }));
+  const imageLines = savedImages.map((saved) => `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`);
   if (!target.parentElement) $("#task-detail-notes").append(target);
-  const insertedLines = LongTaskUtils.imageInsertionLines(text, offset, [raw]);
+  const insertedLines = LongTaskUtils.imageInsertionLines(text, insertionOffset, imageLines);
   target.dataset.raw = insertedLines.shift() || "";
   renderMarkdownLine(target);
   let anchor = target;
@@ -349,6 +375,13 @@ async function pasteImageIntoNotes(line, file) {
     anchor = next;
   });
   saveDetailEdits();
+}
+function noteLineAtPoint(x, y) {
+  const line = document.elementFromPoint(x, y)?.closest(".markdown-line");
+  return line?.closest("#task-detail-notes") ? line : null;
+}
+function setImageDropState(active) {
+  $("#task-detail-notes").classList.toggle("image-drop-active", Boolean(active));
 }
 function currentDetailTask() {
   return tasks.find((item) => item.id === viewState.taskId && item.status === "active");
@@ -680,15 +713,39 @@ $("#task-detail-notes").addEventListener("keydown", (event) => {
 });
 $("#task-detail-notes").addEventListener("paste", (event) => {
   const line = event.target.closest(".markdown-line.editing");
-  const imageFile = clipboardImageFile(event);
-  if (imageFile) {
+  const imageFiles = imageFilesFromTransfer(event.clipboardData);
+  if (imageFiles.length) {
     event.preventDefault();
-    pasteImageIntoNotes(line, imageFile).catch((error) => alert(error.message));
+    insertImageFilesIntoNotes(line, imageFiles, line ? caretOffset(line) : undefined).catch(() => alert(tr("imageImportFailed")));
+    return;
+  }
+  if (transferHasFiles(event.clipboardData)) {
+    event.preventDefault();
     return;
   }
   if (!line) return;
   event.preventDefault();
   pasteIntoMarkdownLine(line, event.clipboardData.getData("text/plain"));
+});
+$("#task-detail-notes").addEventListener("dragover", (event) => {
+  if (!transferHasFiles(event.dataTransfer)) return;
+  event.preventDefault();
+  setImageDropState(true);
+});
+$("#task-detail-notes").addEventListener("dragleave", (event) => {
+  if (!event.currentTarget.contains(event.relatedTarget)) setImageDropState(false);
+});
+$("#task-detail-notes").addEventListener("drop", (event) => {
+  if (!transferHasFiles(event.dataTransfer)) return;
+  event.preventDefault();
+  setImageDropState(false);
+  const imageFiles = imageFilesFromTransfer(event.dataTransfer);
+  if (!imageFiles.length) return;
+  const line = noteLineAtPoint(event.clientX, event.clientY) || lastNoteLine();
+  const offset = line.classList.contains("editing") ? caretOffset(line) : (line.dataset.raw || "").length;
+  insertImageFilesIntoNotes(line, imageFiles, offset)
+    .catch(() => alert(tr("imageImportFailed")))
+    .finally(() => setImageDropState(false));
 });
 $("#task-detail-menu").addEventListener("click", (event) => {
   event.stopPropagation();

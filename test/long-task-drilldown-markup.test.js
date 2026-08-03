@@ -47,15 +47,53 @@ test("stores pasted note images as local app files and hydrates them for display
   assert.doesNotMatch(longTasksJs, /readAsDataURL/);
 });
 
-test("captures pasted image insertion state before persistence awaits", () => {
-  const start = longTasksJs.indexOf("async function pasteImageIntoNotes");
+test("captures image insertion state before persistence awaits", () => {
+  const start = longTasksJs.indexOf("async function insertImageFilesIntoNotes");
   const end = longTasksJs.indexOf("\nfunction currentDetailTask", start);
   const handler = longTasksJs.slice(start, end);
   const firstAwait = handler.indexOf("await ");
   assert.ok(firstAwait >= 0);
-  for (const statement of ["const target =", "const text =", "const offset ="]) {
+  for (const statement of ["const target =", "const text =", "const insertionOffset ="]) {
     assert.ok(handler.indexOf(statement) >= 0 && handler.indexOf(statement) < firstAwait, `${statement} must precede the first await`);
   }
+});
+
+test("imports supported clipboard and dropped image files into task notes", () => {
+  assert.match(longTasksJs, /function imageFilesFromTransfer\(transfer\)/);
+  assert.match(longTasksJs, /function isSupportedImageFile\(file\)/);
+  assert.match(longTasksJs, /image\/png/);
+  assert.match(longTasksJs, /image\/jpeg/);
+  assert.match(longTasksJs, /image\/gif/);
+  assert.match(longTasksJs, /image\/webp/);
+  assert.match(longTasksJs, /image\/(?:bmp|x-ms-bmp)/);
+  assert.match(longTasksJs, /png\|jpe\?g\|gif\|webp\|bmp/i);
+  assert.match(longTasksJs, /transfer\?\.files/);
+  assert.match(longTasksJs, /transfer\?\.items/);
+  assert.match(longTasksJs, /item\.kind === "file"/);
+  assert.match(longTasksJs, /async function insertImageFilesIntoNotes\(line, files, offset\)/);
+  assert.match(longTasksJs, /api\.saveLongTaskImage/);
+  assert.match(longTasksJs, /imageFilesFromTransfer\(event\.clipboardData\)/);
+  assert.match(longTasksJs, /imageFilesFromTransfer\(event\.dataTransfer\)/);
+  assert.match(longTasksJs, /insertImageFilesIntoNotes\(line, imageFiles, line \? caretOffset\(line\) : undefined\)/);
+  assert.match(longTasksJs, /event\.preventDefault\(\);\s*\n\s*insertImageFilesIntoNotes\(line, imageFiles/s);
+});
+
+test("shows and clears a quadrant-colored image drop state", () => {
+  assert.match(longTasksJs, /function noteLineAtPoint\(x, y\)/);
+  assert.match(longTasksJs, /function setImageDropState\(active\)/);
+  assert.match(longTasksJs, /"dragover"/);
+  assert.match(longTasksJs, /"dragleave"/);
+  assert.match(longTasksJs, /"drop"/);
+  assert.match(longTasksJs, /setImageDropState\(false\)/);
+  assert.match(css, /\.task-detail-notes-editor\.image-drop-active\s*\{/);
+  assert.match(css, /var\(--detail-color, var\(--accent\)\)/);
+});
+
+test("documents all supported image intake workflows in both tutorial languages", () => {
+  assert.match(tutorialJs, /Explorer/);
+  assert.match(tutorialJs, /截图/);
+  assert.match(tutorialJs, /drag.*Explorer|Explorer.*drag/i);
+  assert.match(tutorialJs, /screenshot clipboard paste/i);
 });
 
 test("edits reminders directly from the long-task detail page", () => {
