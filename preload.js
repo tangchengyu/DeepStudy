@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openLongTasks: () => ipcRenderer.invoke("long-tasks:open"),
   listLongTasks: () => ipcRenderer.invoke("long-tasks:list"),
   saveLongTask: (task) => ipcRenderer.invoke("long-tasks:save", task),
+  saveLongTaskImage: (payload) => ipcRenderer.invoke("long-tasks:save-image", payload),
+  readLongTaskImage: (id) => ipcRenderer.invoke("long-tasks:read-image", id),
   deleteLongTask: (id) => ipcRenderer.invoke("long-tasks:delete", id),
   completeLongTask: (id) => ipcRenderer.invoke("long-tasks:complete", id),
   undoLongTaskCompletion: (task) => ipcRenderer.invoke("long-tasks:undo-complete", task),

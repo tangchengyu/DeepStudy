@@ -41,6 +41,12 @@ function tr(key, replacements = {}) {
 function currentLocale() {
   return window.DeepStudyI18n?.language?.() || "zh-CN";
 }
+function refreshLocaleSensitiveViews() {
+  DailyPlan.render();
+  TimeAudit.render();
+  DistractionList.render();
+  $("#work-type-toggle")?.dispatchEvent(new Event("change"));
+}
 function formatClock(ms, hundredths = false) {
   const n = Math.max(0, ms);
   const total = Math.floor(n / 1000);
@@ -363,11 +369,6 @@ const DailyPlan = (() => {
     render();
   }
   function render() {
-    $("#plan-date").textContent = new Intl.DateTimeFormat("zh-CN", {
-      month: "long",
-      day: "numeric",
-      weekday: "long",
-    }).format(new Date());
     $("#plan-date").textContent = new Intl.DateTimeFormat(currentLocale(), {
       month: "long",
       day: "numeric",
@@ -619,7 +620,7 @@ const DailyPlan = (() => {
   });
   window.electronAPI?.syncDailyPlan({ date: state.date, tasks: state.tasks }).catch(() => {});
   render();
-  return { addTasks, getTasks };
+  return { addTasks, getTasks, render };
 })();
 
 const AppSettings = (() => {
@@ -970,6 +971,7 @@ const AppSettings = (() => {
       const previousDefaults = defaultPrompts[previousLanguage] || defaultPrompts["zh-CN"];
       preferences = await PlannerBridge.saveAppPreferences({ language: $("#app-language-select").value });
       window.DeepStudyI18n?.setLanguage(preferences.language);
+      refreshLocaleSensitiveViews();
       const nextDefaults = defaultPrompts[preferences.language] || defaultPrompts["zh-CN"];
       if (!$("#planner-system-prompt").value.trim() || $("#planner-system-prompt").value.trim() === previousDefaults.daily) {
         $("#planner-system-prompt").value = nextDefaults.daily;
@@ -1002,6 +1004,7 @@ const AppSettings = (() => {
   window.electronAPI?.onAppPreferencesChanged((next) => {
     preferences = next || preferences;
     window.DeepStudyI18n?.setLanguage(preferences.language);
+    refreshLocaleSensitiveViews();
   });
   refreshAll().catch((error) => {
     $("#planner-config").textContent = error.message;
@@ -1340,6 +1343,7 @@ const AudioControls = (() => {
   const customPlayers = new Map();
   const menuButton = $("#noise-menu-button");
   const popover = $("#noise-popover");
+  document.body.append(popover);
   const noiseList = $("#noise-list");
   const customToggle = $("#noise-custom-toggle");
   const customPanel = $("#noise-custom-panel");
@@ -1532,15 +1536,22 @@ const AudioControls = (() => {
   function positionPopover() {
     if (popover.hidden) return;
     const trigger = menuButton.getBoundingClientRect();
-    const width = Math.min(300, window.innerWidth - 16);
-    const left = Math.min(Math.max(8, trigger.left), window.innerWidth - width - 8);
-    const below = trigger.bottom + 8;
-    const preferredTop = below + 220 > window.innerHeight && trigger.top > 260
-      ? Math.max(8, trigger.top - 260)
-      : Math.min(below, window.innerHeight - 120);
+    const edge = 8;
+    const width = Math.min(300, Math.max(180, window.innerWidth - edge * 2));
+    const left = Math.min(Math.max(edge, trigger.left), window.innerWidth - width - edge);
+    const viewportMaxHeight = Math.max(120, window.innerHeight - edge * 2);
+    const desiredHeight = Math.min(popover.scrollHeight || 260, viewportMaxHeight);
+    const belowTop = trigger.bottom + edge;
+    const belowSpace = window.innerHeight - belowTop - edge;
+    const aboveSpace = trigger.top - edge * 2;
+    const preferredTop = belowSpace >= Math.min(desiredHeight, 220) || belowSpace >= aboveSpace
+      ? belowTop
+      : trigger.top - edge - desiredHeight;
+    const top = Math.min(Math.max(edge, preferredTop), window.innerHeight - edge - Math.min(desiredHeight, 120));
     popover.style.setProperty("--noise-popover-left", `${left}px`);
     popover.style.setProperty("--noise-popover-right", "auto");
-    popover.style.setProperty("--noise-popover-top", `${preferredTop}px`);
+    popover.style.setProperty("--noise-popover-top", `${top}px`);
+    popover.style.setProperty("--noise-popover-max-height", `${Math.max(96, window.innerHeight - top - edge)}px`);
   }
   function setMenuOpen(open) {
     popover.hidden = !open;
@@ -1559,6 +1570,9 @@ const AudioControls = (() => {
   popover.addEventListener("click", (event) => event.stopPropagation());
   document.addEventListener("click", (event) => {
     if (!$("#noise-control").contains(event.target)) setMenuOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !popover.hidden) setMenuOpen(false);
   });
   window.addEventListener("resize", positionPopover);
   window.addEventListener("scroll", positionPopover, true);
@@ -1661,7 +1675,7 @@ function setTabsCollapsed(collapsed) {
   if (!header) return;
   header.classList.toggle("collapsed", collapsed);
   btn.textContent = collapsed ? "▸" : "▾";
-  btn.title = collapsed ? "展开" : "收起";
+  btn.title = collapsed ? tr("expand") : tr("collapse");
 }
 $("#collapse-tabs").addEventListener("click", () => {
   const header = document.querySelector(".mode-sticky-header");
@@ -1672,16 +1686,16 @@ $("#collapse-tabs").addEventListener("click", () => {
 
 const DistractionList = (() => {
   const configs = {
-    "controllable-interesting": ["可控 + 有意思", "提前处理掉"],
-    "controllable-boring": ["可控 + 没意思", "提前处理掉"],
-    "uncontrollable-interesting": ["不可控 + 有意思", "顿一下再回来"],
-    "uncontrollable-boring": ["不可控 + 没意思", "预设边界并规避"],
+    "controllable-interesting": () => [tr("controllableInteresting"), tr("handleAhead")],
+    "controllable-boring": () => [tr("controllableBoring"), tr("handleAhead")],
+    "uncontrollable-interesting": () => [tr("uncontrollableInteresting"), tr("pauseAndReturn")],
+    "uncontrollable-boring": () => [tr("uncontrollableBoring"), tr("setBoundaries")],
   };
   function add(text, control, interest, durationMs = 0, resolved = true) {
     const items = readJSON(KEYS.distractions, []);
     const item = {
       id: createId(),
-      text: String(text || "").trim() || "未命名干扰",
+      text: String(text || "").trim() || tr("unnamedDistraction"),
       control,
       interest,
       quadrant: `${control}-${interest}`,
@@ -1711,11 +1725,12 @@ const DistractionList = (() => {
     const items = readJSON(KEYS.distractions, []).filter(
       (x) => todayKey(new Date(x.timestamp)) === todayKey(),
     );
-    Object.entries(configs).forEach(([key, [title, advice]]) => {
+    Object.entries(configs).forEach(([key, copy]) => {
+      const [title, advice] = copy();
       const matched = items.filter((x) => x.quadrant === key);
       const details = document.createElement("details");
       details.className = "quadrant";
-      details.innerHTML = `<summary><div class="quadrant-head"><span>${title}</span><span class="quadrant-count">${matched.length}</span></div><div class="quadrant-advice">${advice}</div></summary><ul class="quadrant-list">${matched.length ? matched.map((x) => `<li><span>${escapeHTML(x.text)}${x.durationMs ? ` · ${formatMinutes(x.durationMs)}` : ""}</span><button class="distraction-delete" type="button" data-id="${x.id}" title="删除干扰">删除</button></li>`).join("") : '<li class="subtle">暂无记录</li>'}</ul>`;
+      details.innerHTML = `<summary><div class="quadrant-head"><span>${title}</span><span class="quadrant-count">${matched.length}</span></div><div class="quadrant-advice">${advice}</div></summary><ul class="quadrant-list">${matched.length ? matched.map((x) => `<li><span>${escapeHTML(x.text)}${x.durationMs ? ` · ${formatMinutes(x.durationMs)}` : ""}</span><button class="distraction-delete" type="button" data-id="${x.id}" title="${tr("deleteDistraction")}">${tr("deleteDistraction")}</button></li>`).join("") : `<li class="subtle">${tr("noRecords")}</li>`}</ul>`;
       root.append(details);
     });
   }
@@ -1765,10 +1780,10 @@ const FocusMode = (() => {
   function render() {
     display.textContent = formatClock(remaining).slice(3);
     $("#focus-start").textContent = running
-      ? "专注中"
+      ? tr("focusRunning")
       : remaining < selectedMs
-        ? "继续专注"
-        : "开始专注";
+        ? tr("continueFocus")
+        : tr("startFocus");
     $("#focus-start").disabled = running;
     $("#focus-pause").disabled = !running;
   }
@@ -1949,8 +1964,8 @@ const FocusMode = (() => {
       event.target.checked ? "core" : "maintenance",
     );
     $("#work-type-description").textContent = event.target.checked
-      ? "核心工作：高认知要求、直接推进目标"
-      : "维持性工作：流程化、支持性的日常事务";
+      ? tr("workTypeDesc")
+      : tr("maintenanceWorkDesc");
   });
   $("#work-type-toggle").dispatchEvent(new Event("change"));
   render();
@@ -1966,15 +1981,13 @@ const DistractionModal = (() => {
     const elapsed = Date.now() - openedAt;
     if (solving) {
       $("#modal-timer").textContent = `+${formatClock(elapsed).slice(3)}`;
-      $("#modal-help").textContent =
-        "正在记录干扰处理时长。处理完后立即回到专注。";
+      $("#modal-help").textContent = tr("distractionTiming");
     } else {
       $("#modal-timer").textContent = formatClock(
         Math.max(0, deadline - Date.now()),
       ).slice(3);
       if (Date.now() >= deadline)
-        $("#modal-help").textContent =
-          "两分钟已到。请选择回到专注，或明确继续解决。";
+        $("#modal-help").textContent = tr("distractionTimeUp");
     }
   }
   function open() {
@@ -2041,7 +2054,7 @@ const RestMode = (() => {
   function render() {
     $("#rest-timer").textContent = formatFlexibleClock(remaining);
     $("#rest-start").disabled = running || remaining <= 0;
-    $("#rest-start").textContent = remaining < total ? "继续休息" : "开始休息";
+    $("#rest-start").textContent = remaining < total ? tr("continueRest") : tr("startRest");
     $("#rest-pause").disabled = !running;
   }
   function captureSegment() {
@@ -2129,12 +2142,12 @@ const RestMode = (() => {
       const s = totalSec % 60;
       // Build inline edit UI
       timer.innerHTML = `
-        <div class="rest-edit-inline" role="group" aria-label="修改休息时长">
-          <label><span>时</span><input id="rest-edit-h" type="number" min="0" max="23" value="${h}" aria-label="小时" /></label>
+        <div class="rest-edit-inline" role="group" aria-label="${tr("editRestDuration")}">
+          <label><span>${tr("hourShort")}</span><input id="rest-edit-h" type="number" min="0" max="23" value="${h}" aria-label="${tr("hourShort")}" /></label>
           <span class="rest-edit-sep">:</span>
-          <label><span>分</span><input id="rest-edit-m" type="number" min="0" max="59" value="${m}" aria-label="分钟" /></label>
+          <label><span>${tr("minuteShort")}</span><input id="rest-edit-m" type="number" min="0" max="59" value="${m}" aria-label="${tr("minuteShort")}" /></label>
           <span class="rest-edit-sep">:</span>
-          <label><span>秒</span><input id="rest-edit-s" type="number" min="0" max="59" value="${s}" aria-label="秒" /></label>
+          <label><span>${tr("secondShort")}</span><input id="rest-edit-s" type="number" min="0" max="59" value="${s}" aria-label="${tr("secondShort")}" /></label>
         </div>`;
       const hInput = $("#rest-edit-h");
       const mInput = $("#rest-edit-m");

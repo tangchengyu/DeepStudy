@@ -1,0 +1,45 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const renderer = path.join(__dirname, "..", "renderer");
+const appJs = fs.readFileSync(path.join(renderer, "app.js"), "utf8");
+const i18nJs = fs.readFileSync(path.join(renderer, "i18n.js"), "utf8");
+const styles = fs.readFileSync(path.join(renderer, "styles.css"), "utf8");
+const timerHtml = fs.readFileSync(path.join(renderer, "timer.html"), "utf8");
+const timerJs = fs.readFileSync(path.join(renderer, "timer.js"), "utf8");
+
+test("dynamic focus, rest, and habit content uses translated copy", () => {
+  const dynamicKeys = [
+    "controllableInteresting",
+    "controllableBoring",
+    "uncontrollableInteresting",
+    "uncontrollableBoring",
+  ];
+  const staticKeys = [
+    "boxBreathing",
+    "wimHofBreathing",
+    "habitTargetValue",
+    "auditDescription",
+  ];
+  for (const key of [...dynamicKeys, ...staticKeys]) {
+    assert.match(i18nJs, new RegExp(`${key}:`));
+  }
+  for (const key of dynamicKeys) {
+    assert.match(appJs, new RegExp(`tr\\(\\"${key}\\"\\)`));
+  }
+  assert.doesNotMatch(appJs, /"controllable-interesting": \["可控 \+ 有意思"/);
+});
+
+test("white-noise popover is promoted to the root overlay layer", () => {
+  assert.match(appJs, /document\.body\.append\(popover\)/);
+  assert.match(appJs, /--noise-popover-max-height/);
+  assert.match(styles, /#noise-popover\s*\{[^}]*z-index:\s*250/s);
+});
+
+test("standalone timer windows follow the selected interface language", () => {
+  assert.match(timerHtml, /<script src="i18n\.js"><\/script>/);
+  assert.match(timerJs, /applyTimerCopy/);
+  assert.match(timerJs, /tr\(copy\.key\)/);
+});

@@ -1,5 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+const tr = (key, replacements = {}) => window.DeepStudyI18n?.t?.(key, replacements) || key;
 
 function formatClock(ms, precise = false) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -161,13 +162,22 @@ function setupCountdown() {
 const mode = new URLSearchParams(location.search).get("mode");
 const safeMode = mode === "countdown" ? "countdown" : "stopwatch";
 const copy = {
-  stopwatch: { title: "秒表", eyebrow: "STOPWATCH" },
-  countdown: { title: "倒计时", eyebrow: "COUNTDOWN" },
+  stopwatch: { key: "stopwatch", eyebrow: "STOPWATCH" },
+  countdown: { key: "countdown", eyebrow: "COUNTDOWN" },
 }[safeMode];
 
-document.title = copy.title;
-$("#timer-title").textContent = copy.title;
-$("#timer-eyebrow").textContent = copy.eyebrow;
+function applyTimerCopy() {
+  const title = tr(copy.key);
+  document.title = title;
+  $("#timer-title").textContent = title;
+  $("#timer-eyebrow").textContent = copy.eyebrow;
+  const alwaysOnTop = document.querySelector('label:has(#always-on-top)');
+  if (alwaysOnTop) alwaysOnTop.lastChild.textContent = ` ${tr("alwaysOnTop")}`;
+}
+
+applyTimerCopy();
+window.DeepStudyI18n?.ready?.then(applyTimerCopy);
+window.electronAPI?.onAppPreferencesChanged?.(() => setTimeout(applyTimerCopy));
 $("#stopwatch-panel").hidden = safeMode !== "stopwatch";
 $("#countdown-panel").hidden = safeMode !== "countdown";
 setupAlwaysOnTop();

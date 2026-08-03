@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu, Notification, nativeImage, powerMonitor, shell, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { createAppReadyRunner } = require("./renderer/app-lifecycle");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
@@ -264,6 +265,60 @@ function modelNetworkError(error, baseUrl) {
 
 function longTasksPath() {
   return path.join(app.getPath("userData"), "long-tasks.json");
+}
+
+function longTaskImagesDir() {
+  return path.join(app.getPath("userData"), "long-task-images");
+}
+
+function imageExtension(name = "", type = "") {
+  const named = path.extname(name).slice(1).toLowerCase();
+  const allowed = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
+  if (allowed.has(named)) return named === "jpeg" ? "jpg" : named;
+  if (/png/i.test(type)) return "png";
+  if (/jpe?g/i.test(type)) return "jpg";
+  if (/gif/i.test(type)) return "gif";
+  if (/webp/i.test(type)) return "webp";
+  if (/bmp/i.test(type)) return "bmp";
+  return "";
+}
+
+function imageTypeFromId(id = "") {
+  const extension = path.extname(id).slice(1).toLowerCase();
+  return {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    bmp: "image/bmp",
+  }[extension] || "application/octet-stream";
+}
+
+function safeLongTaskImagePath(id) {
+  const fileName = cleanString(id, "");
+  if (!fileName || path.basename(fileName) !== fileName || !imageExtension(fileName)) {
+    throw new Error("图片引用无效。");
+  }
+  return path.join(longTaskImagesDir(), fileName);
+}
+
+function longTaskImageIds(notes = "") {
+  return [...String(notes).matchAll(/deepstudy-image:\/\/([^\s)]+)/g)]
+    .map((match) => cleanString(match[1]))
+    .filter(Boolean);
+}
+
+function removeUnreferencedLongTaskImages(removedTasks, remainingTasks) {
+  const referenced = new Set(remainingTasks.flatMap((task) => longTaskImageIds(task.notes)));
+  for (const id of new Set(removedTasks.flatMap((task) => longTaskImageIds(task.notes)))) {
+    if (referenced.has(id)) continue;
+    try {
+      fs.rmSync(safeLongTaskImagePath(id), { force: true });
+    } catch {
+      // A missing or malformed attachment must not prevent task deletion.
+    }
+  }
 }
 
 function noiseDir() {
@@ -956,9 +1011,27 @@ ipcMain.handle("long-tasks:save", (_event, input) => {
   writeLongTasks(tasks);
   return normalized;
 });
+ipcMain.handle("long-tasks:save-image", (_event, payload = {}) => {
+  const buffer = normalizeNoiseBuffer(payload.buffer);
+  const extension = imageExtension(payload.name, payload.type);
+  if (!buffer || !buffer.length || !extension) throw new Error("请选择有效的本地图片。");
+  if (buffer.length > 16 * 1024 * 1024) throw new Error("图片不能超过 16 MB。");
+  const id = `${Date.now().toString(36)}-${crypto.randomBytes(8).toString("hex")}.${extension}`;
+  fs.mkdirSync(longTaskImagesDir(), { recursive: true });
+  fs.writeFileSync(safeLongTaskImagePath(id), buffer);
+  return { id, type: imageTypeFromId(id), size: buffer.length };
+});
+ipcMain.handle("long-tasks:read-image", (_event, id) => {
+  const target = safeLongTaskImagePath(id);
+  return { id: path.basename(target), type: imageTypeFromId(target), buffer: fs.readFileSync(target) };
+});
 ipcMain.handle("long-tasks:delete", (_event, id) => {
-  const tasks = readLongTasks().filter((task) => task.id !== cleanString(id));
+  const taskId = cleanString(id);
+  const existing = readLongTasks();
+  const removed = existing.filter((task) => task.id === taskId);
+  const tasks = existing.filter((task) => task.id !== taskId);
   writeLongTasks(tasks);
+  removeUnreferencedLongTaskImages(removed, tasks);
   return true;
 });
 ipcMain.handle("long-tasks:complete", (_event, id) => completeLongTask(id));

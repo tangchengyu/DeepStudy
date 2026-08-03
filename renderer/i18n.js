@@ -48,23 +48,40 @@
       back: "返回",
       focusTitle: "现在，只做一件事",
       startFocus: "开始专注",
+      focusRunning: "专注中",
+      continueFocus: "继续专注",
       pause: "暂停",
       resetButton: "重置",
       workTypeTitle: "当前任务类型",
       workTypeDesc: "核心工作：高认知要求、直接推进目标",
+      maintenanceWorkDesc: "维持性工作：流程化、支持性的日常事务",
       quickDistraction: "快速添加干扰",
       distractionTitle: "分心清单",
       distractionDesc: "按可控性与趣味性分类，找到下一次的应对方式。",
       distractionPlaceholder: "刚才是什么打断了你？",
       record: "记录",
       restTitle: "把注意力从专注模式切换到分散模式。",
+      restLead: "把注意力从",
+      restMiddle: "切换到",
+      restEnd: "。",
+      focusedModeTerm: "专注模式",
+      diffuseModeTerm: "分散模式",
+      focusedModeTip: "专注模式：大脑像聚光灯般集中资源解决具体问题。",
+      diffuseModeTip: "分散模式：大脑在放松状态下让思维发散并建立新的连接。",
       restBody: "在不使用电子产品娱乐的前提下，去做习惯性的、体力性的、亲近自然的、喜欢的事吧！",
       startRest: "开始休息",
+      continueRest: "继续休息",
       returnFocus: "返回专注",
       breathingTitle: "呼吸练习",
       breathingDesc: "跟随圆圈节奏呼吸，音频会在本机播放。",
+      boxBreathing: "4-4-4-4 腹式呼吸",
+      wimHofBreathing: "冰人呼吸法",
+      boxBreathingTip: "用等时的吸气、屏息、呼气、屏息帮助身体放松并恢复注意力。",
+      wimHofBreathingTip: "短时激活练习。避免饭后练习；如有不适请立即停止，不建议长期高频使用。",
       habitTarget: "长期目标",
+      habitTargetValue: "争取每日总专注时长达到 6 小时，每周达到 40 小时。",
       timeAudit: "时间审计",
+      auditDescription: "核心工作、维持工作、主动休息与分心的真实分配。",
       reflection: "每日反思",
       settingsTitle: "DeepStudy 设置",
       settingsIntro: "统一管理语言、API、AI 助手、好句库与使用教程。",
@@ -129,6 +146,18 @@
       uncontrollable: "不可控",
       interesting: "有意思",
       boring: "没意思",
+      controllableInteresting: "可控 + 有意思",
+      controllableBoring: "可控 + 没意思",
+      uncontrollableInteresting: "不可控 + 有意思",
+      uncontrollableBoring: "不可控 + 没意思",
+      handleAhead: "提前处理掉",
+      pauseAndReturn: "顿一下再回来",
+      setBoundaries: "预设边界并规避",
+      noRecords: "暂无记录",
+      unnamedDistraction: "未命名干扰",
+      deleteDistraction: "删除干扰",
+      expand: "展开",
+      collapse: "收起",
       reflectionHelp: "每周末可将前 7 天记录导出，交给自动化整理成周报。",
       reflectionPlaceholder: "今天在专注力管理方面有什么心得？今天又学到了哪些知识？见识了哪些风景？遇到了哪些挫折？哪些地方可以改进？",
       save: "保存",
@@ -181,6 +210,47 @@
       addFailed: "添加失败。",
       muyuNoise: "木鱼白噪音",
       rainNoise: "雨声白噪音",
+      pastedImageAlt: "粘贴的图片",
+      imageReadFailed: "本地图片读取失败。",
+      imageSaveFailed: "本地图片保存失败。",
+      dragLongTask: "拖动排序或移动象限",
+      containsNotes: "包含备注",
+      copyToToday: "复制到今日任务",
+      delete: "删除",
+      reminderPrefix: "提醒",
+      reminderOnce: "单次",
+      reminderDaily: "每天",
+      reminderWeekly: "每周",
+      taskNameRequired: "任务名称不能为空",
+      autoSaving: "正在保存...",
+      autoSaved: "已自动保存",
+      addLongTask: "新增长期任务",
+      editLongTask: "编辑长期任务",
+      notes: "备注",
+      quadrant: "所属象限",
+      reminderType: "提醒方式",
+      noReminder: "不提醒",
+      onceReminder: "单次提醒",
+      dailyReminder: "每天",
+      weeklyReminder: "每周",
+      dateAndTime: "日期和时间",
+      reminderTime: "提醒时间",
+      repeatWeekday: "重复星期",
+      saveTask: "保存任务",
+      moreTaskActions: "更多任务操作",
+      minuteCount: "{count} 分钟",
+      modalAlert: "注意力正在离开球门",
+      modalTitle: "先停一下，觉察发生了什么",
+      modalHelp: "两分钟内处理或记下干扰，然后回到当前任务。",
+      modalPlaceholder: "这次干扰是什么？",
+      endDistraction: "结束分心",
+      continueResolving: "继续解决干扰",
+      distractionTiming: "正在记录干扰处理时长。处理完后立即回到专注。",
+      distractionTimeUp: "两分钟已到。请选择回到专注，或明确继续解决。",
+      editRestDuration: "修改休息时长",
+      hourShort: "时",
+      minuteShort: "分",
+      secondShort: "秒",
     },
     "en-US": {
       settings: "Settings",
@@ -229,23 +299,40 @@
       back: "Back",
       focusTitle: "Now, Do One Thing",
       startFocus: "Start Focus",
+      focusRunning: "Focusing",
+      continueFocus: "Resume Focus",
       pause: "Pause",
       resetButton: "Reset",
       workTypeTitle: "Current Work Type",
       workTypeDesc: "Core work: high-cognition work that directly advances goals.",
+      maintenanceWorkDesc: "Maintenance work: routine, supportive work that keeps things running.",
       quickDistraction: "Quick Add Distraction",
       distractionTitle: "Distraction List",
       distractionDesc: "Sort by control and interest, then find a better response next time.",
       distractionPlaceholder: "What interrupted you just now?",
       record: "Record",
       restTitle: "Shift from focused mode to diffuse mode.",
+      restLead: "Shift attention from ",
+      restMiddle: " to ",
+      restEnd: ".",
+      focusedModeTerm: "focused mode",
+      diffuseModeTerm: "diffuse mode",
+      focusedModeTip: "Focused mode concentrates mental resources on a specific problem.",
+      diffuseModeTip: "Diffuse mode lets the mind relax, wander, and form new connections.",
       restBody: "Rest without digital entertainment. Move, breathe, go outside, or do something simple and restorative.",
       startRest: "Start Rest",
+      continueRest: "Resume Rest",
       returnFocus: "Return to Focus",
       breathingTitle: "Breathing Practice",
       breathingDesc: "Follow the circle rhythm. Audio plays locally on this computer.",
+      boxBreathing: "4-4-4-4 Box Breathing",
+      wimHofBreathing: "Wim Hof Breathing",
+      boxBreathingTip: "Use equal inhale, hold, exhale, and hold phases to relax and restore attention.",
+      wimHofBreathingTip: "A short activation exercise. Avoid it after meals, stop if uncomfortable, and do not practice it at high frequency.",
       habitTarget: "Long-Term Goal",
+      habitTargetValue: "Aim for 6 focused hours per day and 40 focused hours per week.",
       timeAudit: "Time Audit",
+      auditDescription: "See the real distribution of core work, maintenance, active rest, and distraction.",
       reflection: "Daily Reflection",
       settingsTitle: "DeepStudy Settings",
       settingsIntro: "Manage language, APIs, AI tools, quote room, and the guide in one place.",
@@ -310,6 +397,18 @@
       uncontrollable: "Uncontrollable",
       interesting: "Interesting",
       boring: "Boring",
+      controllableInteresting: "Controllable + Interesting",
+      controllableBoring: "Controllable + Boring",
+      uncontrollableInteresting: "Uncontrollable + Interesting",
+      uncontrollableBoring: "Uncontrollable + Boring",
+      handleAhead: "Handle it ahead of time",
+      pauseAndReturn: "Pause, then return",
+      setBoundaries: "Set a boundary and avoid it",
+      noRecords: "No records yet",
+      unnamedDistraction: "Unnamed distraction",
+      deleteDistraction: "Delete distraction",
+      expand: "Expand",
+      collapse: "Collapse",
       reflectionHelp: "At the end of the week, export the last 7 days and turn them into a weekly review.",
       reflectionPlaceholder: "What did you learn about focus today? What did you learn, see, struggle with, or want to improve?",
       save: "Save",
@@ -362,6 +461,47 @@
       addFailed: "Add failed.",
       muyuNoise: "Wooden Fish White Noise",
       rainNoise: "Rain White Noise",
+      pastedImageAlt: "Pasted image",
+      imageReadFailed: "Could not read the local image.",
+      imageSaveFailed: "Could not save the local image.",
+      dragLongTask: "Drag to reorder or move to another quadrant",
+      containsNotes: "Contains notes",
+      copyToToday: "Copy to Daily Plan",
+      delete: "Delete",
+      reminderPrefix: "Reminder",
+      reminderOnce: "Once",
+      reminderDaily: "Daily",
+      reminderWeekly: "Weekly",
+      taskNameRequired: "Task name is required",
+      autoSaving: "Saving...",
+      autoSaved: "Saved automatically",
+      addLongTask: "Add Long Task",
+      editLongTask: "Edit Long Task",
+      notes: "Notes",
+      quadrant: "Quadrant",
+      reminderType: "Reminder",
+      noReminder: "No reminder",
+      onceReminder: "Once",
+      dailyReminder: "Daily",
+      weeklyReminder: "Weekly",
+      dateAndTime: "Date and Time",
+      reminderTime: "Reminder Time",
+      repeatWeekday: "Repeat On",
+      saveTask: "Save Task",
+      moreTaskActions: "More task actions",
+      minuteCount: "{count} min",
+      modalAlert: "Your attention is drifting",
+      modalTitle: "Pause and notice what happened",
+      modalHelp: "Handle or record the distraction within two minutes, then return to your task.",
+      modalPlaceholder: "What distracted you?",
+      endDistraction: "End Distraction",
+      continueResolving: "Keep Resolving",
+      distractionTiming: "Timing this distraction. Return to focus as soon as it is handled.",
+      distractionTimeUp: "Two minutes are up. Return to focus or explicitly continue resolving it.",
+      editRestDuration: "Edit rest duration",
+      hourShort: "hr",
+      minuteShort: "min",
+      secondShort: "sec",
     },
   };
 
@@ -369,8 +509,12 @@
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
 
-  function t(key) {
-    return dictionaries[current]?.[key] || dictionaries["zh-CN"][key] || key;
+  function t(key, replacements = {}) {
+    let value = dictionaries[current]?.[key] || dictionaries["zh-CN"][key] || key;
+    Object.entries(replacements).forEach(([name, replacement]) => {
+      value = value.replaceAll(`{${name}}`, String(replacement));
+    });
+    return value;
   }
 
   function apply() {
@@ -412,8 +556,12 @@
       ["#rest-return-focus", "returnFocus"],
       ["#breathing-card h3", "breathingTitle"],
       ["#breathing-card > p", "breathingDesc"],
+      ['.breathing-btn[data-kind="box"] .term-tip', "boxBreathing"],
+      ['.breathing-btn[data-kind="wim"] .term-tip', "wimHofBreathing"],
       [".target-banner strong", "habitTarget"],
+      [".target-banner span", "habitTargetValue"],
       ['#habit-mode .card h3', "timeAudit"],
+      ['#habit-mode > .card .card-title-row p', "auditDescription"],
       [".reflection-card h3", "reflection"],
       ["#planner-settings-title", "settingsTitle"],
       [".app-settings-top p", "settingsIntro"],
@@ -455,6 +603,8 @@
       ["#long-ai-new", "newChat"],
       ["#long-ai-settings", "settings"],
       ["#long-ai-send", "generateChanges"],
+      ["#long-task-form-title", "addLongTask"],
+      ['#long-task-form button[type="submit"]', "saveTask"],
     ];
     textUpdates.forEach(([selector, key]) => {
       const node = document.querySelector(selector);
@@ -528,7 +678,30 @@
       ["#cd-start", "start"],
       ["#cd-pause", "pause"],
       ["#cd-reset", "resetButton"],
+      [".modal-alert", "modalAlert"],
+      ["#distraction-modal h2", "modalTitle"],
+      ["#modal-help", "modalHelp"],
+      ["#modal-end", "endDistraction"],
+      ["#modal-continue", "continueResolving"],
     ].forEach(([selector, key]) => setText(selector, key));
+    const restMessage = document.querySelector(".rest-message");
+    if (restMessage) {
+      const lines = restMessage.querySelectorAll(":scope > span");
+      if (lines[0]) {
+        const focused = document.createElement("span");
+        focused.className = "term-tip";
+        focused.tabIndex = 0;
+        focused.title = t("focusedModeTip");
+        focused.textContent = t("focusedModeTerm");
+        const diffuse = document.createElement("span");
+        diffuse.className = "term-tip";
+        diffuse.tabIndex = 0;
+        diffuse.title = t("diffuseModeTip");
+        diffuse.textContent = t("diffuseModeTerm");
+        lines[0].replaceChildren(document.createTextNode(t("restLead")), focused, document.createTextNode(t("restMiddle")), diffuse, document.createTextNode(t("restEnd")));
+      }
+      if (lines[1]) lines[1].textContent = t("restBody");
+    }
     setLabelText('label:has(#app-language-select)', "interfaceLanguage");
     setLabelText('label:has(#api-profile-select)', "savedApi");
     setLabelText('label:has(#api-profile-name)', "profileName");
@@ -540,10 +713,26 @@
     setLabelText('label:has(#planner-system-prompt)', "dailyPrompt");
     setLabelText('label:has(#long-system-prompt-main)', "longPrompt");
     setLabelText('label:has(#focus-duration-input)', "customFocusTime");
+    setLabelText('label:has(#long-task-title)', "taskName");
+    setLabelText('label:has(#long-task-notes)', "notes");
+    setLabelText('label:has(#long-task-quadrant)', "quadrant");
+    setLabelText('label:has(#long-reminder-kind)', "reminderType");
+    setLabelText('label:has(#long-reminder-at)', "dateAndTime");
+    setLabelText('label:has(#long-reminder-clock)', "reminderTime");
+    const repeatLegend = document.querySelector("#long-reminder-weekdays legend");
+    if (repeatLegend) repeatLegend.textContent = t("repeatWeekday");
     setSelectOption("#api-model-preset", "custom", "customModel");
     setSelectOption("#api-profile-select", "", "navApi");
     setSelectOption("#daily-ai-profile-select", "", "selectSavedApi");
     setSelectOption("#long-ai-profile-select-main", "", "selectSavedApi");
+    setSelectOption("#long-reminder-kind", "none", "noReminder");
+    setSelectOption("#long-reminder-kind", "once", "onceReminder");
+    setSelectOption("#long-reminder-kind", "daily", "dailyReminder");
+    setSelectOption("#long-reminder-kind", "weekly", "weeklyReminder");
+    setSelectOption("#long-task-quadrant", "important-urgent", "importantUrgent");
+    setSelectOption("#long-task-quadrant", "important-not-urgent", "importantNotUrgent");
+    setSelectOption("#long-task-quadrant", "urgent-not-important", "urgentNotImportant");
+    setSelectOption("#long-task-quadrant", "not-important-not-urgent", "notImportantNotUrgent");
     document.querySelectorAll('#distraction-control option[value="controllable"], #modal-control option[value="controllable"]').forEach((option) => option.textContent = t("controllable"));
     document.querySelectorAll('#distraction-control option[value="uncontrollable"], #modal-control option[value="uncontrollable"]').forEach((option) => option.textContent = t("uncontrollable"));
     document.querySelectorAll('#distraction-interest option[value="interesting"], #modal-interest option[value="interesting"]').forEach((option) => option.textContent = t("interesting"));
@@ -576,6 +765,14 @@
     if (soulInput) soulInput.placeholder = t("quotePlaceholder");
     const reflectionInput = document.querySelector("#reflection-input");
     if (reflectionInput) reflectionInput.placeholder = t("reflectionPlaceholder");
+    const modalDistractionInput = document.querySelector("#modal-distraction-text");
+    if (modalDistractionInput) modalDistractionInput.placeholder = t("modalPlaceholder");
+    document.querySelectorAll(".focus-duration-preset").forEach((button) => {
+      button.textContent = t("minuteCount", { count: button.dataset.minutes });
+    });
+    document.querySelectorAll(".preset-row button[data-seconds]").forEach((button) => {
+      button.textContent = t("minuteCount", { count: Number(button.dataset.seconds) / 60 });
+    });
     const quadrantCount = document.querySelector("#quadrant-view-count")?.parentElement;
     if (quadrantCount) {
       const countValue = document.querySelector("#quadrant-view-count")?.textContent || "0";
@@ -594,6 +791,12 @@
     if (alwaysOnTop) alwaysOnTop.lastChild.textContent = ` ${t("alwaysOnTop")}`;
     const cardMode = document.querySelector('label:has(#auto-minimize)');
     if (cardMode) cardMode.lastChild.textContent = ` ${t("cardMode")}`;
+    const taskDetailMenu = document.querySelector("#task-detail-menu");
+    if (taskDetailMenu) taskDetailMenu.setAttribute("aria-label", t("moreTaskActions"));
+    const boxBreathing = document.querySelector('.breathing-btn[data-kind="box"]');
+    if (boxBreathing) boxBreathing.title = t("boxBreathingTip");
+    const wimBreathing = document.querySelector('.breathing-btn[data-kind="wim"]');
+    if (wimBreathing) wimBreathing.title = t("wimHofBreathingTip");
   }
 
   function setLanguage(language) {
@@ -604,7 +807,7 @@
   }
 
   function showLanguageChoice() {
-    if (document.body.classList.contains("long-task-window")) {
+    if (document.body.classList.contains("long-task-window") || document.body.classList.contains("timer-window")) {
       resolveReady(current);
       return;
     }
@@ -649,9 +852,10 @@
 
   window.electronAPI?.getAppPreferences?.()
     .then((preferences) => {
-      if (!localStorage.getItem(KEY) && preferences?.language) {
+      if (preferences?.language) {
         current = preferences.language;
-        if (document.body.classList.contains("long-task-window")) localStorage.setItem(KEY, current);
+        const secondaryWindow = document.body.classList.contains("long-task-window") || document.body.classList.contains("timer-window");
+        if (secondaryWindow || localStorage.getItem(KEY)) localStorage.setItem(KEY, current);
       }
       apply();
       showLanguageChoice();

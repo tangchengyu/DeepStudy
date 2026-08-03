@@ -469,9 +469,9 @@ select:focus {
   top: var(--noise-popover-top, 64px);
   left: var(--noise-popover-left, auto);
   right: var(--noise-popover-right, 16px);
-  z-index: 120;
+  z-index: 250;
   width: min(300px, calc(100vw - 16px));
-  max-height: calc(100vh - var(--noise-popover-top, 64px) - 10px);
+  max-height: var(--noise-popover-max-height, calc(100vh - var(--noise-popover-top, 64px) - 10px));
   overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--border);

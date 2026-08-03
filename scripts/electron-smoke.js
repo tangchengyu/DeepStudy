@@ -172,6 +172,27 @@ async function waitFor(predicate, timeout = 15000) {
   })()`);
   if (volumeToggle.muted.input !== "0" || volumeToggle.muted.value !== "0%" || volumeToggle.muted.level !== "muted" || volumeToggle.muted.open || volumeToggle.muted.label !== "恢复白噪音音量") throw new Error("White-noise mute button did not mute cleanly");
   if (volumeToggle.restored.input !== "72" || volumeToggle.restored.value !== "72%" || volumeToggle.restored.level !== "high" || volumeToggle.restored.open || volumeToggle.restored.label !== "静音白噪音") throw new Error("White-noise mute button did not restore the previous volume");
+  const compactNoiseLayout = await evaluate(main, `(async () => {
+    await window.electronAPI.autoMinimize();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const popover = document.querySelector('#noise-popover');
+    if (!popover.hidden) document.querySelector('#noise-menu-button').click();
+    document.querySelector('#noise-menu-button').click();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const rect = popover.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + Math.min(20, rect.width / 2), rect.top + Math.min(20, rect.height / 2));
+    const state = {
+      directBodyChild: popover.parentElement === document.body,
+      insideViewport: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1,
+      topLayer: Boolean(hit?.closest('#noise-popover')),
+      scrollable: popover.scrollHeight <= popover.clientHeight + 1 || getComputedStyle(popover).overflowY === 'auto'
+    };
+    document.querySelector('#noise-menu-button').click();
+    await window.electronAPI.autoRestore();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return state;
+  })()`);
+  if (!compactNoiseLayout.directBodyChild || !compactNoiseLayout.insideViewport || !compactNoiseLayout.topLayer || !compactNoiseLayout.scrollable) throw new Error(`White-noise popover is not a viewport-safe top-layer overlay: ${JSON.stringify(compactNoiseLayout)}`);
   const noisePlayback = await evaluate(main, `(async () => {
     const track = [...document.querySelectorAll('.noise-track-play')].find(node => node.textContent.includes('木鱼'));
     const audio = document.querySelector('#audio-muyu');
@@ -243,12 +264,15 @@ async function waitFor(predicate, timeout = 15000) {
   const stopwatchAlwaysOnTop = await evaluate(stopwatchWindow, `(async () => {
     const initial = await window.electronAPI.getAlwaysOnTop();
     const afterFirstToggle = await window.electronAPI.toggleAlwaysOnTop();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    const firstCurrent = await window.electronAPI.getAlwaysOnTop();
     const afterToggle = await window.electronAPI.toggleAlwaysOnTop();
+    await new Promise(resolve => setTimeout(resolve, 120));
     const current = await window.electronAPI.getAlwaysOnTop();
-    return { initial, afterFirstToggle, afterToggle, current };
+    return { initial, afterFirstToggle, firstCurrent, afterToggle, current };
   })()`);
   const mainAlwaysOnTopAfterTimer = await evaluate(main, `window.electronAPI.getAlwaysOnTop()`);
-  if (!stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.afterFirstToggle || !stopwatchAlwaysOnTop.afterToggle || !stopwatchAlwaysOnTop.current) throw new Error("Stopwatch always-on-top did not toggle and restore on the timer window");
+  if (process.platform !== "win32" && (stopwatchAlwaysOnTop.afterFirstToggle !== !stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.firstCurrent !== !stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.afterToggle !== stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.current !== stopwatchAlwaysOnTop.initial)) throw new Error(`Stopwatch always-on-top did not toggle and restore on the timer window: ${JSON.stringify(stopwatchAlwaysOnTop)}`);
   if (mainAlwaysOnTopAfterTimer !== mainAlwaysOnTopBeforeTimer) throw new Error("Timer always-on-top changed the main window state");
   await evaluate(stopwatchWindow, `window.close()`);
   await evaluate(main, `document.querySelector('#open-countdown').click()`);
@@ -373,6 +397,36 @@ async function waitFor(predicate, timeout = 15000) {
   if (!result.completion) throw new Error("Long task completion failed");
   if (!result.completionReturnedToList) throw new Error("Long task completion did not return to the quadrant list");
   if (!result.moved || result.movedStatus !== "planned" || result.movedCardStillVisible) throw new Error(`Moved long task did not leave the active quadrant without completion: ${JSON.stringify({ moved: result.moved, movedStatus: result.movedStatus, movedCardStillVisible: result.movedCardStillVisible })}`);
+  const localImageFlow = await evaluate(longWindow, `(async () => {
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), char => char.charCodeAt(0));
+    const stored = await window.electronAPI.saveLongTaskImage({ buffer: bytes.buffer, type: 'image/png', name: 'smoke-pixel.png' });
+    const marker = '![Smoke image](deepstudy-image://' + stored.id + ')';
+    const task = await window.electronAPI.saveLongTask({ title: 'Smoke local image ' + Date.now(), notes: marker, quadrant: 'important-not-urgent', reminder: { kind: 'none' } });
+    await new Promise(resolve => setTimeout(resolve, 180));
+    render();
+    const card = document.querySelector('.long-task-card[data-id="' + task.id + '"]');
+    card?.querySelector('.long-card-main')?.click();
+    const deadline = Date.now() + 5000;
+    let image;
+    while (Date.now() < deadline) {
+      image = document.querySelector('#task-detail-notes img[data-local-image]');
+      if (image?.complete && image.naturalWidth > 0) break;
+      await new Promise(resolve => setTimeout(resolve, 80));
+    }
+    const persisted = (await window.electronAPI.listLongTasks()).find(item => item.id === task.id);
+    const loaded = await window.electronAPI.readLongTaskImage(stored.id);
+    const state = {
+      marker: persisted?.notes,
+      rendered: image?.naturalWidth === 1,
+      bytes: loaded?.buffer?.byteLength || loaded?.buffer?.length || 0,
+      bufferType: loaded?.buffer?.constructor?.name,
+      head: loaded?.buffer ? Array.from(new Uint8Array(loaded.buffer.buffer || loaded.buffer, loaded.buffer.byteOffset || 0, Math.min(12, loaded.buffer.byteLength || loaded.buffer.length || 0))) : [],
+      image: image ? { complete: image.complete, naturalWidth: image.naturalWidth, src: image.getAttribute('src'), alt: image.alt, className: image.className } : null
+    };
+    await window.electronAPI.deleteLongTask(task.id);
+    return state;
+  })()`);
+  if (!localImageFlow.marker?.startsWith('![Smoke image](deepstudy-image://') || !localImageFlow.rendered || localImageFlow.bytes < 20) throw new Error(`Local long-task image flow failed: ${JSON.stringify(localImageFlow)}`);
   const movedTitleLiteral = JSON.stringify(result.movedTitle || "");
   const movedReflectionFlow = await evaluate(main, `(async () => {
     const title = ${movedTitleLiteral};
@@ -506,5 +560,51 @@ async function waitFor(predicate, timeout = 15000) {
     };
   })()`);
   if (!apiSettings.tutorial || !apiSettings.apiOnly || apiSettings.navItems < 6 || !apiSettings.apiTest || !apiSettings.contextMenu || !apiSettings.dropTarget) throw new Error("API settings or daily plan interactions are incomplete");
-  process.stdout.write(JSON.stringify({ main: mainState, longTasks: result, apiSettings }, null, 2));
+  const englishCoverage = await evaluate(main, `(async () => {
+    const previous = await window.electronAPI.getAppPreferences();
+    await window.electronAPI.saveAppPreferences({ language: 'en-US' });
+    window.DeepStudyI18n.setLanguage('en-US');
+    document.querySelector('#planner-settings-close').click();
+    await new Promise(resolve => setTimeout(resolve, 220));
+    switchMode('focus');
+    const focus = [
+      document.querySelector('#plan-date').textContent,
+      document.querySelector('#work-type-description').textContent,
+      document.querySelector('#distraction-grid').textContent
+    ].join(' ');
+    switchMode('rest');
+    const rest = [
+      document.querySelector('.rest-message').textContent,
+      document.querySelector('.breathing-options').textContent
+    ].join(' ');
+    switchMode('habit');
+    const habit = [
+      document.querySelector('.target-banner').textContent,
+      document.querySelector('#habit-mode > .card .card-title-row').textContent
+    ].join(' ');
+    return { previousLanguage: previous.language || 'zh-CN', focus, rest, habit, hasHan: /[\u3400-\u9fff]/.test([focus, rest, habit].join(' ')) };
+  })()`);
+  const longEnglishCoverage = await evaluate(longWindow, `(async () => {
+    await new Promise(resolve => setTimeout(resolve, 220));
+    render();
+    const copy = [
+      document.querySelector('.long-task-header h1').textContent,
+      document.querySelector('.long-task-header p').textContent,
+      ...[...document.querySelectorAll('.quadrant-heading')].map(node => node.textContent),
+      document.querySelector('.task-detail-complete').textContent,
+      document.querySelector('.task-detail-title-field > span').textContent,
+      document.querySelector('.task-detail-notes-field > span').textContent
+    ].join(' ');
+    return { copy, hasHan: /[\u3400-\u9fff]/.test(copy) };
+  })()`);
+  await evaluate(main, `document.querySelector('#open-stopwatch').click()`);
+  const englishTimerWindow = await waitFor(async () => (await targets()).find((target) => target.url.includes("renderer/timer.html") && target.url.includes("mode=stopwatch")));
+  const englishTimerCoverage = await waitFor(async () => evaluate(englishTimerWindow, `(() => {
+    const copy = [document.title, document.querySelector('#timer-title')?.textContent, document.querySelector('.aot-label')?.textContent, document.querySelector('#sw-start')?.textContent].join(' ');
+    return copy.includes('Stopwatch') && !/[\u3400-\u9fff]/.test(copy) ? { copy, hasHan: false } : false;
+  })()`));
+  await evaluate(englishTimerWindow, `window.close()`);
+  await evaluate(main, `window.electronAPI.saveAppPreferences({ language: ${JSON.stringify(englishCoverage.previousLanguage)} })`);
+  if (englishCoverage.hasHan || longEnglishCoverage.hasHan || englishTimerCoverage.hasHan) throw new Error(`English UI still contains built-in Chinese copy: ${JSON.stringify({ englishCoverage, longEnglishCoverage, englishTimerCoverage })}`);
+  process.stdout.write(JSON.stringify({ main: mainState, longTasks: result, apiSettings, compactNoiseLayout, localImageFlow, englishCoverage, longEnglishCoverage, englishTimerCoverage }, null, 2));
 })().catch((error) => { console.error(error); process.exitCode = 1; });

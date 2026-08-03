@@ -15,6 +15,7 @@ let suppressTaskOpenUntil = 0;
 let undoTimer = null;
 let pendingUndoTask = null;
 let detailSaveTimer = null;
+const localImageUrls = new Map();
 
 const undoButton = document.createElement("button");
 undoButton.type = "button";
@@ -122,8 +123,13 @@ function markdownLineToHTML(value) {
   const raw = String(value || "");
   const trimmed = raw.trim();
   if (!trimmed) return "<br>";
-  const image = trimmed.match(/^!\[([^\]]*)\]\((data:image\/[^)]+)\)$/i);
-  if (image) return `<figure class="markdown-image"><img src="${escapeHTML(image[2])}" alt="${escapeHTML(image[1] || "图片")}" /></figure>`;
+  const image = trimmed.match(/^!\[([^\]]*)\]\((data:image\/[^)]+|deepstudy-image:\/\/[a-z0-9._-]+)\)$/i);
+  if (image) {
+    const alt = escapeHTML(image[1] || tr("pastedImageAlt"));
+    const localId = image[2].match(/^deepstudy-image:\/\/([a-z0-9._-]+)$/i)?.[1];
+    if (localId) return `<figure class="markdown-image"><img data-local-image="${escapeHTML(localId)}" alt="${alt}" /></figure>`;
+    return `<figure class="markdown-image"><img src="${escapeHTML(image[2])}" alt="${alt}" /></figure>`;
+  }
   const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
   if (heading) return `<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
   const listItem = trimmed.match(/^[-*]\s+(.+)$/);
@@ -136,6 +142,30 @@ function renderMarkdownLine(line) {
   line.contentEditable = "false";
   line.classList.remove("editing");
   line.innerHTML = markdownLineToHTML(line.dataset.raw || "");
+  hydrateMarkdownImages(line);
+}
+
+async function localImageUrl(id) {
+  if (localImageUrls.has(id)) return localImageUrls.get(id);
+  const item = await api.readLongTaskImage(id);
+  if (!item?.buffer) throw new Error(tr("imageReadFailed"));
+  const url = URL.createObjectURL(new Blob([item.buffer], { type: item.type || "image/png" }));
+  localImageUrls.set(id, url);
+  return url;
+}
+
+function hydrateMarkdownImages(scope = document) {
+  scope.querySelectorAll?.("img[data-local-image]").forEach((image) => {
+    if (image.dataset.loading === "true" || image.src) return;
+    image.dataset.loading = "true";
+    localImageUrl(image.dataset.localImage)
+      .then((url) => { image.src = url; })
+      .catch((error) => {
+        image.classList.add("load-error");
+        image.alt = error.message;
+      })
+      .finally(() => { delete image.dataset.loading; });
+  });
 }
 function createMarkdownLine(raw = "") {
   const line = document.createElement("div");
@@ -202,6 +232,7 @@ function renderNotesEditor(notes) {
   const editor = $("#task-detail-notes");
   const lines = String(notes || "").split(/\r?\n/);
   editor.replaceChildren(...(lines.length ? lines : [""]).map(createMarkdownLine));
+  hydrateMarkdownImages(editor);
 }
 function notesEditorValue() {
   return $$("#task-detail-notes .markdown-line").map((line) => (
@@ -262,17 +293,14 @@ function clipboardImageFile(event) {
     .find((item) => item.kind === "file" && /^image\//i.test(item.type))
     ?.getAsFile() || null;
 }
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error || new Error("图片读取失败"));
-    reader.readAsDataURL(file);
-  });
-}
 async function pasteImageIntoNotes(line, file) {
-  const dataUrl = await readFileAsDataUrl(file);
-  const raw = `![图片](${dataUrl})`;
+  const saved = await api.saveLongTaskImage({
+    buffer: await file.arrayBuffer(),
+    type: file.type,
+    name: file.name,
+  });
+  if (!saved?.id) throw new Error(tr("imageSaveFailed"));
+  const raw = `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`;
   const target = line || $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
   if (!target.parentElement) $("#task-detail-notes").append(target);
   if (target.classList.contains("editing") && !target.textContent.trim()) {
@@ -318,14 +346,16 @@ undoButton.addEventListener("click", async () => {
 });
 function reminderLabel(reminder) {
   if (!reminder?.enabled || reminder.kind === "none") return "";
-  if (reminder.kind === "once") return `单次 · ${new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(reminder.at))}`;
-  if (reminder.kind === "daily") return `每天 · ${reminder.time}`;
-  return `每周 ${reminder.weekdays.map((day) => "日一二三四五六"[day]).join("、")} · ${reminder.time}`;
+  if (reminder.kind === "once") return `${tr("reminderOnce")} · ${new Intl.DateTimeFormat(currentLocale(), { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(reminder.at))}`;
+  if (reminder.kind === "daily") return `${tr("reminderDaily")} · ${reminder.time}`;
+  const weekdayFormatter = new Intl.DateTimeFormat(currentLocale(), { weekday: "short", timeZone: "UTC" });
+  const weekdays = reminder.weekdays.map((day) => weekdayFormatter.format(new Date(Date.UTC(2026, 7, 2 + day)))).join(currentLocale() === "en-US" ? ", " : "、");
+  return `${tr("reminderWeekly")} ${weekdays} · ${reminder.time}`;
 }
 function taskCard(task) {
   const card = document.createElement("article");
   card.className = `long-task-card ${QUADRANT_META[task.quadrant]?.className || ""}`; card.tabIndex = 0; card.dataset.id = task.id;
-  card.innerHTML = `<div class="long-task-drag-zone" draggable="true" title="拖动排序或移动象限" aria-label="拖动排序或移动象限"><label class="long-task-check" title="标记完成"><input type="checkbox" aria-label="标记完成"></label><span class="long-task-drag-grip" aria-hidden="true"></span></div><div class="long-card-main"><header><button class="long-task-title-button" type="button" tabindex="-1">${escapeHTML(task.title)}</button>${task.notes ? '<span class="task-note-indicator" title="包含备注" aria-label="包含备注">▤</span>' : ""}</header>${task.notes ? `<p>${escapeHTML(task.notes)}</p>` : ""}${reminderLabel(task.reminder) ? `<span class="task-reminder">${escapeHTML(reminderLabel(task.reminder))}</span>` : ""}</div>`;
+  card.innerHTML = `<div class="long-task-drag-zone" draggable="true" title="${tr("dragLongTask")}" aria-label="${tr("dragLongTask")}"><label class="long-task-check" title="${tr("markDone")}"><input type="checkbox" aria-label="${tr("markDone")}"></label><span class="long-task-drag-grip" aria-hidden="true"></span></div><div class="long-card-main"><header><button class="long-task-title-button" type="button" tabindex="-1">${escapeHTML(task.title)}</button>${task.notes ? `<span class="task-note-indicator" title="${tr("containsNotes")}" aria-label="${tr("containsNotes")}">▤</span>` : ""}</header>${task.notes ? `<p>${escapeHTML(task.notes)}</p>` : ""}${reminderLabel(task.reminder) ? `<span class="task-reminder">${escapeHTML(reminderLabel(task.reminder))}</span>` : ""}</div>`;
   card.addEventListener("click", (event) => {
     if (event.target.closest(".long-task-check") || event.target.closest(".long-task-drag-zone")) return;
     openTaskDetail(task.id);
@@ -390,8 +420,8 @@ function hideTaskMenu() {
 function showTaskMenu(task, x, y) {
   taskMenu.replaceChildren();
   [
-    ["copy-today", "复制到今日任务"],
-    ["delete", "删除"],
+    ["copy-today", tr("copyToToday")],
+    ["delete", tr("delete")],
   ].forEach(([action, label]) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -454,7 +484,7 @@ function renderTaskDetail(task) {
   renderNotesEditor(task.notes || "");
   const meta = [];
   const reminder = reminderLabel(task.reminder);
-  if (reminder) meta.push(`提醒：${reminder}`);
+  if (reminder) meta.push(`${tr("reminderPrefix")}: ${reminder}`);
   if (task.createdAt) meta.push(`${currentLocale() === "en-US" ? "Created" : "创建于"} ${new Intl.DateTimeFormat(currentLocale(), { year: "numeric", month: "long", day: "numeric" }).format(new Date(task.createdAt))}`);
   $("#task-detail-meta").replaceChildren(...meta.map((text) => Object.assign(document.createElement("span"), { textContent: text })));
   $("#task-detail-check").checked = false;
@@ -468,16 +498,16 @@ function saveDetailEdits() {
   const title = $("#task-detail-title").value.trim();
   const notes = notesEditorValue();
   if (!title) {
-    $("#task-detail-save-status").textContent = "任务名称不能为空";
+    $("#task-detail-save-status").textContent = tr("taskNameRequired");
     return;
   }
   Object.assign(task, { title, notes, updatedAt: Date.now() });
-  $("#task-detail-save-status").textContent = "正在保存...";
+  $("#task-detail-save-status").textContent = tr("autoSaving");
   clearTimeout(detailSaveTimer);
   detailSaveTimer = setTimeout(async () => {
     try {
       await api.saveLongTask(task);
-      $("#task-detail-save-status").textContent = "已自动保存";
+      $("#task-detail-save-status").textContent = tr("autoSaved");
     } catch (error) {
       $("#task-detail-save-status").textContent = error.message;
     }
@@ -505,7 +535,7 @@ async function reload() {
 }
 
 function showForm(task = {}) {
-  $("#long-task-form-title").textContent = task.id ? "编辑长期任务" : "新增长期任务";
+  $("#long-task-form-title").textContent = task.id ? tr("editLongTask") : tr("addLongTask");
   $("#long-task-id").value = task.id || ""; $("#long-task-title").value = task.title || ""; $("#long-task-notes").value = task.notes || ""; $("#long-task-quadrant").value = task.quadrant || "important-not-urgent";
   const reminder = task.reminder || { kind: "none", time: "09:00", weekdays: [] }; $("#long-reminder-kind").value = reminder.kind || "none"; $("#long-reminder-at").value = reminder.at ? new Date(new Date(reminder.at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""; $("#long-reminder-clock").value = reminder.time || "09:00";
   $$("#long-reminder-weekdays input").forEach((input) => input.checked = (reminder.weekdays || []).includes(Number(input.value)));
