@@ -55,12 +55,18 @@ function renderInlineMarkdown(value) {
 function markdownToHTML(value) {
   const lines = String(value || "").split(/\r?\n/);
   const html = [];
-  let inList = false;
+  let listType = "";
   const closeList = () => {
-    if (inList) {
-      html.push("</ul>");
-      inList = false;
+    if (listType) {
+      html.push(`</${listType}>`);
+      listType = "";
     }
+  };
+  const openList = (type) => {
+    if (listType === type) return;
+    closeList();
+    html.push(`<${type}>`);
+    listType = type;
   };
   lines.forEach((line) => {
     const trimmed = line.trim();
@@ -76,11 +82,14 @@ function markdownToHTML(value) {
     }
     const listItem = trimmed.match(/^[-*]\s+(.+)$/);
     if (listItem) {
-      if (!inList) {
-        html.push("<ul>");
-        inList = true;
-      }
+      openList("ul");
       html.push(`<li>${renderInlineMarkdown(listItem[1])}</li>`);
+      return;
+    }
+    const orderedItem = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (orderedItem) {
+      openList("ol");
+      html.push(`<li>${renderInlineMarkdown(orderedItem[1])}</li>`);
       return;
     }
     closeList();
@@ -126,10 +135,16 @@ function reminderLabel(reminder) {
 }
 function taskCard(task) {
   const card = document.createElement("article");
-  card.className = "long-task-card"; card.draggable = true; card.tabIndex = 0; card.dataset.id = task.id;
-  card.innerHTML = `<label class="long-task-check" title="标记完成"><input type="checkbox" aria-label="标记完成"></label><div class="long-card-main"><header><button class="long-task-title-button" type="button">${escapeHTML(task.title)}</button>${task.notes ? '<span class="task-note-indicator" title="包含备注" aria-label="包含备注">▤</span>' : ""}</header>${task.notes ? `<p>${escapeHTML(task.notes)}</p>` : ""}${reminderLabel(task.reminder) ? `<span class="task-reminder">${escapeHTML(reminderLabel(task.reminder))}</span>` : ""}</div>`;
-  card.querySelector(".long-task-title-button").addEventListener("click", (event) => {
-    event.stopPropagation();
+  card.className = `long-task-card ${QUADRANT_META[task.quadrant]?.className || ""}`; card.tabIndex = 0; card.dataset.id = task.id;
+  card.innerHTML = `<div class="long-task-drag-zone" draggable="true" title="拖动排序或移动象限" aria-label="拖动排序或移动象限"><label class="long-task-check" title="标记完成"><input type="checkbox" aria-label="标记完成"></label><span class="long-task-drag-grip" aria-hidden="true"></span></div><div class="long-card-main"><header><button class="long-task-title-button" type="button" tabindex="-1">${escapeHTML(task.title)}</button>${task.notes ? '<span class="task-note-indicator" title="包含备注" aria-label="包含备注">▤</span>' : ""}</header>${task.notes ? `<p>${escapeHTML(task.notes)}</p>` : ""}${reminderLabel(task.reminder) ? `<span class="task-reminder">${escapeHTML(reminderLabel(task.reminder))}</span>` : ""}</div>`;
+  card.addEventListener("click", (event) => {
+    if (event.target.closest(".long-task-check") || event.target.closest(".long-task-drag-zone")) return;
+    openTaskDetail(task.id);
+  });
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target.closest(".long-task-check") || event.target.closest(".long-task-drag-zone")) return;
+    event.preventDefault();
     openTaskDetail(task.id);
   });
   card.addEventListener("contextmenu", (event) => {
@@ -150,7 +165,8 @@ function taskCard(task) {
       alert(error.message);
     }
   });
-  card.addEventListener("dragstart", (event) => {
+  const dragZone = card.querySelector(".long-task-drag-zone");
+  dragZone.addEventListener("dragstart", (event) => {
     hideTaskMenu();
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", task.id);
@@ -158,7 +174,7 @@ function taskCard(task) {
     api.setLongTaskDragPayload?.({ id: task.id, title: task.title }).catch(() => {});
     card.classList.add("dragging");
   });
-  card.addEventListener("dragend", () => {
+  dragZone.addEventListener("dragend", () => {
     suppressTaskOpenUntil = Date.now() + 180;
     card.classList.remove("dragging");
     clearDragPlaceholder();

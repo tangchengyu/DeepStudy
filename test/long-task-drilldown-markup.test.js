@@ -6,6 +6,8 @@ const path = require("node:path");
 const renderer = path.join(__dirname, "..", "renderer");
 const html = fs.readFileSync(path.join(renderer, "long-tasks.html"), "utf8");
 const css = fs.readFileSync(path.join(renderer, "long-tasks.css"), "utf8");
+const longTasksJs = fs.readFileSync(path.join(renderer, "long-tasks.js"), "utf8");
+const appJs = fs.readFileSync(path.join(renderer, "app.js"), "utf8");
 
 test("declares board, quadrant list, and task detail views", () => {
   for (const id of ["quadrant-board-view", "quadrant-list-view", "task-detail-view", "quadrant-view-list", "task-detail-notes"]) {
@@ -17,6 +19,20 @@ test("declares board, quadrant list, and task detail views", () => {
 test("keeps task notes safe and readable in the detail view", () => {
   assert.match(html, /<textarea id="task-detail-notes"/);
   assert.match(html, /id="task-detail-markdown"/);
+  assert.match(html, /支持 Markdown 格式渲染/);
   assert.match(css, /\.task-detail-notes-field textarea\s*\{[^}]*line-height:\s*1\.75/s);
   assert.match(css, /\.task-detail-markdown\s*\{/);
+  assert.match(longTasksJs, /orderedItem/);
+});
+
+test("limits long-task drag affordance to the colored control area", () => {
+  assert.match(longTasksJs, /long-task-drag-zone/);
+  assert.match(longTasksJs, /card\.addEventListener\("click"/);
+  assert.doesNotMatch(longTasksJs, /card\.draggable\s*=\s*true/);
+  assert.match(css, /\.long-task-drag-zone:hover\s*\{[^}]*cursor:\s*grab/s);
+});
+
+test("does not show an undo button for daily task completion", () => {
+  assert.doesNotMatch(appJs, /undo-complete-button/);
+  assert.match(appJs, /Reflections\.syncCompletedTasks\(state\.tasks\)/);
 });

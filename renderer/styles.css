@@ -2191,20 +2191,6 @@ button:disabled {
 .settings-status.success {
   color: var(--accent-hover);
 }
-.undo-complete-button {
-  position: sticky;
-  bottom: 0;
-  z-index: 25;
-  min-height: 34px;
-  margin-top: -2px;
-  border: 1px solid rgba(112, 173, 153, 0.36);
-  border-radius: var(--radius-sm);
-  background: #ffffff;
-  color: var(--accent-hover);
-  box-shadow: 0 10px 26px rgba(44, 62, 56, 0.12);
-  font-size: 12px;
-  font-weight: 800;
-}
 @media (max-width: 520px) {
   .provider-switch {
     grid-template-columns: 1fr;
