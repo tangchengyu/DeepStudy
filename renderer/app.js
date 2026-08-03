@@ -31,6 +31,16 @@ function todayKey(date = new Date()) {
   const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return d.toISOString().slice(0, 10);
 }
+function tr(key, replacements = {}) {
+  let value = window.DeepStudyI18n?.t?.(key) || key;
+  Object.entries(replacements).forEach(([name, replacement]) => {
+    value = value.replaceAll(`{${name}}`, String(replacement));
+  });
+  return value;
+}
+function currentLocale() {
+  return window.DeepStudyI18n?.language?.() || "zh-CN";
+}
 function formatClock(ms, hundredths = false) {
   const n = Math.max(0, ms);
   const total = Math.floor(n / 1000);
@@ -44,6 +54,10 @@ function formatClock(ms, hundredths = false) {
 }
 function formatMinutes(ms) {
   const minutes = Math.round(ms / 60000);
+  if (currentLocale() === "en-US") {
+    if (minutes < 60) return `${minutes} min`;
+    return `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
+  }
   if (minutes < 60) return `${minutes} 分钟`;
   return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`;
 }
@@ -178,12 +192,20 @@ const TimeAudit = (() => {
     const sums = aggregate(entries);
     const used = Object.values(sums).reduce((a, b) => a + b, 0);
     const remaining = Math.max(0, baseline - used);
-    const labels = [
-      ["core", "核心工作"],
-      ["maintenance", "维持工作"],
-      ["rest", "主动休息"],
-      ["distraction", "分心"],
-    ];
+    const labels = currentLocale() === "en-US"
+      ? [
+        ["core", "Core Work"],
+        ["maintenance", "Maintenance"],
+        ["rest", "Active Rest"],
+        ["distraction", "Distraction"],
+      ]
+      : [
+        ["core", "核心工作"],
+        ["maintenance", "维持工作"],
+        ["rest", "主动休息"],
+        ["distraction", "分心"],
+      ];
+    const dateLocale = currentLocale();
     const segments = PlannerUtils.buildTimelineSegments(
       entries,
       bounds.start,
@@ -191,7 +213,7 @@ const TimeAudit = (() => {
     )
       .map(
         (segment) =>
-          `<div class="audit-segment ${segment.category}" style="left:${segment.leftPercentage}%;width:${segment.widthPercentage}%" title="${new Intl.DateTimeFormat("zh-CN", { month: days === 1 ? undefined : "numeric", day: days === 1 ? undefined : "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(segment.start))}–${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(segment.end))} · ${formatMinutes(segment.durationMs)}"></div>`,
+          `<div class="audit-segment ${segment.category}" style="left:${segment.leftPercentage}%;width:${segment.widthPercentage}%" title="${new Intl.DateTimeFormat(dateLocale, { month: days === 1 ? undefined : "numeric", day: days === 1 ? undefined : "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(segment.start))}–${new Intl.DateTimeFormat(dateLocale, { hour: "2-digit", minute: "2-digit" }).format(new Date(segment.end))} · ${formatMinutes(segment.durationMs)}"></div>`,
       )
       .join("");
     const tickCount = days === 1 ? 4 : 7;
@@ -200,7 +222,7 @@ const TimeAudit = (() => {
       const label =
         days === 1
           ? `${String(index * 6).padStart(2, "0")}:00`
-          : new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(new Date(time));
+          : new Intl.DateTimeFormat(dateLocale, { month: "numeric", day: "numeric" }).format(new Date(time));
       return `<span style="left:${(index / tickCount) * 100}%">${label}</span>`;
     }).join("");
     const legend =
@@ -210,18 +232,18 @@ const TimeAudit = (() => {
             `<div class="legend-item"><i class="legend-dot audit-segment ${key}"></i>${label}<br><strong>${formatMinutes(sums[key])}</strong></div>`,
         )
         .join("") +
-      `<div class="legend-item"><i class="legend-dot"></i>剩余<br><strong>${formatMinutes(remaining)}</strong></div>`;
-    return `<div class="audit-block"><div class="audit-heading"><strong>${title}</strong><span>已记录 ${formatMinutes(used)}</span></div><div class="audit-track" aria-label="实际时间线">${segments}</div><div class="audit-ruler">${ticks}</div><div class="audit-legend">${legend}</div></div>`;
+      `<div class="legend-item"><i class="legend-dot"></i>${currentLocale() === "en-US" ? "Remaining" : "剩余"}<br><strong>${formatMinutes(remaining)}</strong></div>`;
+    return `<div class="audit-block"><div class="audit-heading"><strong>${title}</strong><span>${currentLocale() === "en-US" ? "Recorded" : "已记录"} ${formatMinutes(used)}</span></div><div class="audit-track" aria-label="${currentLocale() === "en-US" ? "Actual timeline" : "实际时间线"}">${segments}</div><div class="audit-ruler">${ticks}</div><div class="audit-legend">${legend}</div></div>`;
   }
   function render() {
     const root = $("#time-audit");
     if (root)
       root.innerHTML =
-        block("今日 · 24 小时", 1, 86400000) +
-        block("近 7 天 · 168 小时", 7, 604800000);
+        block(currentLocale() === "en-US" ? "Today · 24 Hours" : "今日 · 24 小时", 1, 86400000) +
+        block(currentLocale() === "en-US" ? "Last 7 Days · 168 Hours" : "近 7 天 · 168 小时", 7, 604800000);
     const status = $("#audit-refresh-status");
     if (status)
-      status.textContent = `每 10 分钟刷新 · ${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date())}`;
+      status.textContent = `${currentLocale() === "en-US" ? "Refreshes every 10 min" : "每 10 分钟刷新"} · ${new Intl.DateTimeFormat(currentLocale(), { hour: "2-digit", minute: "2-digit" }).format(new Date())}`;
   }
   return { add, render };
 })();
@@ -346,6 +368,11 @@ const DailyPlan = (() => {
       day: "numeric",
       weekday: "long",
     }).format(new Date());
+    $("#plan-date").textContent = new Intl.DateTimeFormat(currentLocale(), {
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    }).format(new Date());
     const list = $("#plan-list");
     list.replaceChildren();
     $("#plan-empty").hidden = state.tasks.length > 0;
@@ -373,7 +400,7 @@ const DailyPlan = (() => {
         });
         const handle = document.createElement("span");
         handle.className = "task-drag-handle";
-        handle.title = "拖动排序";
+        handle.title = tr("dragSort");
         const label = document.createElement("label");
         label.className = "plan-check";
         const check = document.createElement("input");
@@ -419,7 +446,7 @@ const DailyPlan = (() => {
     contextMenu.replaceChildren();
     const priority = document.createElement("button");
     priority.type = "button";
-    priority.textContent = task.priority ? "取消优先任务" : "加入优先任务";
+    priority.textContent = task.priority ? tr("removePriority") : tr("addPriority");
     priority.addEventListener("click", () => {
       togglePriority(task.id);
       hideTaskMenu();
@@ -633,14 +660,7 @@ const AppSettings = (() => {
     });
   }
   function sectionTitle(section) {
-    return ({
-      general: "常规与语言",
-      api: "新建 API 配置",
-      "daily-ai": "每日任务 AI",
-      "long-ai": "长期任务 AI",
-      soul: "灵魂按摩间",
-      help: "使用教程",
-    })[section] || "常规与语言";
+    return $(`[data-settings-section="${section}"]`)?.textContent || window.DeepStudyI18n?.t?.("settingsTitle") || "DeepStudy 设置";
   }
   function selectSection(section = "general") {
     const target = $(".settings-section[data-section=\"" + section + "\"]") ? section : "general";
@@ -673,9 +693,9 @@ const AppSettings = (() => {
     const merged = new Map();
     [...(dailyConfig?.apiProfiles || []), ...(longConfig?.apiProfiles || [])].forEach((profile) => merged.set(profile.id, profile));
     apiProfiles = [...merged.values()];
-    populateProfileSelect($("#api-profile-select"), dailyConfig?.activeApiProfileId || "", "新建 API 配置");
-    populateProfileSelect($("#daily-ai-profile-select"), dailyConfig?.activeApiProfileId || "");
-    populateProfileSelect($("#long-ai-profile-select-main"), longConfig?.activeApiProfileId || "");
+    populateProfileSelect($("#api-profile-select"), dailyConfig?.activeApiProfileId || "", tr("navApi"));
+    populateProfileSelect($("#daily-ai-profile-select"), dailyConfig?.activeApiProfileId || "", tr("selectSavedApi"));
+    populateProfileSelect($("#long-ai-profile-select-main"), longConfig?.activeApiProfileId || "", tr("selectSavedApi"));
     $("#api-profile-delete").disabled = !$("#api-profile-select").value;
   }
   function profileById(id) {
@@ -692,7 +712,7 @@ const AppSettings = (() => {
     $("#api-model").value = currentModel;
     $("#api-profile-delete").disabled = true;
     renderCredentialState(true);
-    setStatus("正在新建 API 配置，请填写名称和 API Key。", "");
+    setStatus(tr("newApiStatus"), "");
     $("#api-profile-name").focus();
   }
   function applySavedProfile() {
@@ -709,7 +729,7 @@ const AppSettings = (() => {
     selectMatchingApiPreset();
     renderCredentialState(false);
     $("#api-profile-delete").disabled = false;
-    setStatus(`已选择"${profile.label}"，可直接保存并使用。`, "success");
+    setStatus(tr("selectedProfile"), "success");
   }
   function detachSavedProfileIfChanged() {
     if (!$("#api-profile-select").value) return;
@@ -722,7 +742,7 @@ const AppSettings = (() => {
       $("#api-profile-select").value = "";
       $("#api-profile-name").value = "";
       renderCredentialState(true);
-      setStatus("模型信息已修改，请输入 API Key 保存为新配置。", "");
+      setStatus(tr("modelChanged"), "");
     }
   }
   function applyApiPreset() {
@@ -744,7 +764,7 @@ const AppSettings = (() => {
     status.className = `settings-status${kind ? ` ${kind}` : ""}`;
   }
   function renderSummary(config) {
-    $("#planner-config").textContent = `${config.api.model || "未配置"} · API 运行`;
+    $("#planner-config").textContent = `${config.api.model || tr("notConfigured")} · ${tr("apiReady")}`;
   }
   async function refreshSummary() {
     const config = await PlannerBridge.getPlannerConfig();
@@ -773,7 +793,7 @@ const AppSettings = (() => {
   }
   async function open(section = "general") {
     modal.hidden = false;
-    setStatus("正在读取配置…");
+    setStatus(tr("readingConfig"));
     try {
       await refreshAll();
       setStatus("");
@@ -804,7 +824,7 @@ const AppSettings = (() => {
   async function saveApiConfig() {
     const button = $("#planner-settings-save");
     button.disabled = true;
-    setStatus("正在保存…");
+    setStatus(tr("saving"));
     try {
       const config = await PlannerBridge.savePlannerConfig({
         mode: "api",
@@ -822,7 +842,7 @@ const AppSettings = (() => {
       longConfig = await PlannerBridge.getLongTaskAiConfig();
       renderSummary(config);
       populateSavedProfiles();
-      setStatus("API 配置已保存。", "success");
+      setStatus(tr("savedApiStatus"), "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
@@ -831,7 +851,7 @@ const AppSettings = (() => {
   }
   async function saveDailyAiConfig() {
     $("#daily-ai-save").disabled = true;
-    setStatus("正在保存每日任务 AI 设置…");
+    setStatus(tr("savingDailyAi"));
     try {
       dailyConfig = await PlannerBridge.savePlannerConfig({
         mode: "api",
@@ -840,7 +860,7 @@ const AppSettings = (() => {
       });
       renderSummary(dailyConfig);
       populateSavedProfiles();
-      setStatus("每日任务 AI 设置已保存。", "success");
+      setStatus(tr("savedDailyAi"), "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
@@ -849,7 +869,7 @@ const AppSettings = (() => {
   }
   async function saveLongAiConfig() {
     $("#long-ai-save-main").disabled = true;
-    setStatus("正在保存长期任务 AI 设置…");
+    setStatus(tr("savingLongAi"));
     try {
       longConfig = await PlannerBridge.saveLongTaskAiConfig({
         mode: "api",
@@ -857,7 +877,7 @@ const AppSettings = (() => {
         systemPrompt: $("#long-system-prompt-main").value,
       });
       populateSavedProfiles();
-      setStatus("长期任务 AI 设置已保存。", "success");
+      setStatus(tr("savedLongAi"), "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
@@ -872,7 +892,7 @@ const AppSettings = (() => {
   }
   async function testApi() {
     $("#api-test").disabled = true;
-    setStatus("正在测试 API…");
+    setStatus(tr("testingApi"));
     try {
       const result = await PlannerBridge.testApiConfig({
         profileId: $("#api-profile-select").value,
@@ -881,10 +901,10 @@ const AppSettings = (() => {
         apiKey: $("#api-key").value,
       });
       setStatus(result.message, "success");
-      showAppAlert("验证成功", result.message);
+      showAppAlert(tr("testSuccess"), result.message);
     } catch (error) {
       setStatus(error.message, "error");
-      showAppAlert("验证失败", error.message);
+      showAppAlert(tr("testFailed"), error.message);
     } finally {
       $("#api-test").disabled = false;
     }
@@ -894,9 +914,9 @@ const AppSettings = (() => {
     const profileId = select.value;
     const profile = profileById(profileId);
     if (!profile) return;
-    if (!confirm(`删除已保存的 API 配置"${profile.label}"？`)) return;
+    if (!confirm(`${tr("deleteApiConfirm")} "${profile.label}"?`)) return;
     $("#api-profile-delete").disabled = true;
-    setStatus("正在删除 API 配置…");
+    setStatus(tr("deletingApi"));
     try {
       const config = await PlannerBridge.deletePlannerApiProfile(profileId);
       dailyConfig = config;
@@ -911,7 +931,7 @@ const AppSettings = (() => {
         renderCredentialState(true);
       }
       renderSummary(dailyConfig);
-      setStatus("API 配置已删除。", "success");
+      setStatus(tr("deletedApi"), "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
@@ -922,7 +942,7 @@ const AppSettings = (() => {
   $("#app-settings-open").addEventListener("click", () => open("general"));
   $("#planner-settings-open").addEventListener("click", () => open("daily-ai"));
   $("#planner-settings-close").addEventListener("click", close);
-  $("#planner-settings-cancel").addEventListener("click", close);
+  $("#planner-settings-cancel")?.addEventListener("click", close);
   $("#planner-settings-save").addEventListener("click", saveApiConfig);
   $("#daily-ai-save").addEventListener("click", saveDailyAiConfig);
   $("#long-ai-save-main").addEventListener("click", saveLongAiConfig);
@@ -957,7 +977,7 @@ const AppSettings = (() => {
       if (!$("#long-system-prompt-main").value.trim() || $("#long-system-prompt-main").value.trim() === previousDefaults.long) {
         $("#long-system-prompt-main").value = nextDefaults.long;
       }
-      setStatus("语言设置已保存。", "success");
+      setStatus(tr("languageSaved"), "success");
     } catch (error) {
       setStatus(error.message, "error");
     }
@@ -1074,7 +1094,7 @@ const PlannerChat = (() => {
       if (added.length)
         state.messages.push({
           role: "system",
-          content: `已添加 ${added.length} 项到今日计划。`,
+          content: tr("addPlanResult", { count: added.length }),
         });
     } catch (error) {
       state.messages.push({
@@ -1349,6 +1369,11 @@ const AudioControls = (() => {
   function allPlayers() {
     return defaultTracks.map((track) => track.player).concat([...customPlayers.values()]);
   }
+  function trackName(track) {
+    if (track.id === "muyu") return tr("muyuNoise");
+    if (track.id === "rain") return tr("rainNoise");
+    return track.name;
+  }
   function applyVolume() {
     allPlayers().forEach((player) => {
       player.volume = volume;
@@ -1356,7 +1381,7 @@ const AudioControls = (() => {
     volumeInput.value = String(Math.round(volume * 100));
     volumeValue.textContent = `${Math.round(volume * 100)}%`;
     const volumeLevel = volume === 0 ? "muted" : volume < 0.5 ? "low" : "high";
-    const muteTitle = volume === 0 ? "恢复白噪音音量" : "静音白噪音";
+    const muteTitle = volume === 0 ? tr("unmuteNoise") : tr("muteNoise");
     muteButton.dataset.volumeLevel = volumeLevel;
     muteButton.title = muteTitle;
     muteButton.setAttribute("aria-label", muteTitle);
@@ -1378,7 +1403,7 @@ const AudioControls = (() => {
   function playbackErrorMessage(track, player, error) {
     const mediaCode = player?.error?.code;
     const detail = mediaCode ? `（媒体错误 ${mediaCode}）` : "";
-    return `${track.name}播放失败${detail}。${error?.message ? ` ${error.message}` : ""}`;
+    return `${trackName(track)} ${currentLocale() === "en-US" ? "failed to play" : "播放失败"}${detail}。${error?.message ? ` ${error.message}` : ""}`;
   }
   function stopOtherTracks(trackId) {
     allTracks().forEach((track) => {
@@ -1420,12 +1445,12 @@ const AudioControls = (() => {
       state.setAttribute("aria-hidden", "true");
       const label = document.createElement("span");
       label.className = "noise-track-label";
-      label.textContent = track.name;
+      label.textContent = trackName(track);
       play.append(state, label);
-      play.title = track.name;
+      play.title = trackName(track);
       play.classList.toggle("active", activeTrackId === track.id);
       play.setAttribute("aria-pressed", String(activeTrackId === track.id));
-      play.setAttribute("aria-label", `${activeTrackId === track.id ? "暂停" : "播放"}${track.name}`);
+      play.setAttribute("aria-label", `${activeTrackId === track.id ? tr("pauseVerb") : tr("play")} ${trackName(track)}`);
       play.addEventListener("click", () => toggleTrack(track));
       row.append(play);
       if (track.kind === "custom") {
@@ -1433,7 +1458,7 @@ const AudioControls = (() => {
         remove.type = "button";
         remove.className = "noise-remove";
         remove.textContent = "×";
-        remove.title = "删除";
+        remove.title = currentLocale() === "en-US" ? "Delete" : "删除";
         remove.addEventListener("click", async () => {
           if (activeTrackId === track.id) {
             const player = customPlayers.get(track.id);
@@ -1458,7 +1483,7 @@ const AudioControls = (() => {
       if (activeTrackId === track.id && !player.paused) {
         player.pause();
         activeTrackId = "";
-        setStatus(`已暂停${track.name}。`);
+        setStatus(tr("pausedNoise", { name: trackName(track) }));
         renderTracks();
         return;
       }
@@ -1466,10 +1491,10 @@ const AudioControls = (() => {
       if (volume === 0) setVolume(lastNonZeroVolume || 0.7);
       player.volume = volume;
       player.playbackRate = rate;
-      setStatus(`正在加载${track.name}…`);
+      setStatus(tr("loadingNoise", { name: trackName(track) }));
       await player.play();
       activeTrackId = track.id;
-      setStatus(`正在播放${track.name}。`);
+      setStatus(tr("playingNoise", { name: trackName(track) }));
       renderTracks();
     } catch (error) {
       console.warn(error);
@@ -1494,7 +1519,7 @@ const AudioControls = (() => {
   function chooseFile(file) {
     selectedFile = file && file.type.startsWith("audio/") ? file : null;
     addFile.disabled = !selectedFile;
-    setStatus(selectedFile ? `已选择：${selectedFile.name}` : "请选择音频文件。", !selectedFile);
+    setStatus(selectedFile ? tr("selectedFile", { name: selectedFile.name }) : tr("selectAudioFile"), !selectedFile);
   }
   function toggleMute() {
     if (volume > 0) {
@@ -1504,10 +1529,24 @@ const AudioControls = (() => {
       setVolume(lastNonZeroVolume || 0.7);
     }
   }
+  function positionPopover() {
+    if (popover.hidden) return;
+    const trigger = menuButton.getBoundingClientRect();
+    const width = Math.min(300, window.innerWidth - 16);
+    const left = Math.min(Math.max(8, trigger.left), window.innerWidth - width - 8);
+    const below = trigger.bottom + 8;
+    const preferredTop = below + 220 > window.innerHeight && trigger.top > 260
+      ? Math.max(8, trigger.top - 260)
+      : Math.min(below, window.innerHeight - 120);
+    popover.style.setProperty("--noise-popover-left", `${left}px`);
+    popover.style.setProperty("--noise-popover-right", "auto");
+    popover.style.setProperty("--noise-popover-top", `${preferredTop}px`);
+  }
   function setMenuOpen(open) {
     popover.hidden = !open;
     menuButton.classList.toggle("active", open || Boolean(activeTrackId));
     menuButton.setAttribute("aria-expanded", String(open));
+    if (open) requestAnimationFrame(positionPopover);
   }
   menuButton.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -1521,6 +1560,8 @@ const AudioControls = (() => {
   document.addEventListener("click", (event) => {
     if (!$("#noise-control").contains(event.target)) setMenuOpen(false);
   });
+  window.addEventListener("resize", positionPopover);
+  window.addEventListener("scroll", positionPopover, true);
   customToggle.addEventListener("click", () => {
     customPanel.hidden = !customPanel.hidden;
   });
@@ -1540,7 +1581,7 @@ const AudioControls = (() => {
   addFile.addEventListener("click", async () => {
     if (!selectedFile) return;
     addFile.disabled = true;
-    setStatus("正在添加...");
+    setStatus(tr("adding"));
     try {
       const buffer = await selectedFile.arrayBuffer();
       const item = await window.electronAPI?.addCustomNoise({
@@ -1551,11 +1592,11 @@ const AudioControls = (() => {
       customTracks.push({ ...item, kind: "custom" });
       selectedFile = null;
       fileInput.value = "";
-      setStatus("已添加到我的白噪音。");
+      setStatus(tr("noiseAdded"));
       renderTracks();
     } catch (error) {
       addFile.disabled = false;
-      setStatus(error.message || "添加失败。", true);
+      setStatus(error.message || tr("addFailed"), true);
     }
   });
   $$(".audio-rate").forEach((button) =>
@@ -1594,7 +1635,7 @@ function setGateVisible(visible) {
   $("#gate-view").hidden = !visible;
   $("#mode-shell").hidden = visible;
   $("#app-settings-open").hidden = !visible;
-  $("#tutorial-open").hidden = !visible;
+  if ($("#tutorial-open")) $("#tutorial-open").hidden = !visible;
 }
 
 $$(".mode-tab").forEach((button) =>

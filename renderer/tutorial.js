@@ -2,7 +2,7 @@
   const SEEN_KEY = "deepstudy.tutorial.seen.v1";
   const launchButton = document.querySelector("#tutorial-open");
   const timerMode = new URLSearchParams(location.search).get("mode");
-  if (!launchButton || timerMode) return;
+  if (timerMode) return;
 
   const zhSteps = [
     {
@@ -104,7 +104,7 @@
     {
       target: "#back-to-gate",
       title: "教程完成",
-      description: "“返回”会带你回到注意力空间入口。以后只要尚未进入工作区，点击顶栏的“使用教程”就能重新查看本教程。",
+      description: "“返回”会带你回到注意力空间入口。以后可以从“设置”里的“使用教程”栏目重新查看本教程。",
       view: "focus",
     },
   ];
@@ -125,7 +125,7 @@
     { target: "#quick-distraction", title: "Capture Distraction", description: "When distracted, click Quick Add Distraction or press <kbd>Ctrl</kbd> + <kbd>D</kbd>. Capture it first, then return attention to the task.", view: "focus" },
     { target: "#breathing-card", title: "Rest Is Not More Input", description: "Rest Mode includes a timer, breathing practice, and local audio prompts. Movement or breathing helps recovery more than scrolling.", view: "rest" },
     { target: "#habit-mode", title: "Build Long Feedback", description: "Use Habit Building to review time audit, focus records, and Daily Reflection, then adjust tomorrow's plan.", view: "habit" },
-    { target: "#back-to-gate", title: "Guide Complete", description: "Back returns to the gate. You can open this guide again from the top bar.", view: "focus" },
+    { target: "#back-to-gate", title: "Guide Complete", description: "Back returns to the gate. You can open this guide again from Settings > Guide.", view: "focus" },
   ];
   function steps() {
     return window.DeepStudyI18n?.language?.() === "en-US" ? enSteps : zhSteps;
@@ -316,7 +316,7 @@
     setGateVisible(true);
     switchMode("focus");
     document.querySelector("#main-area")?.scrollTo({ top: 0, behavior: "auto" });
-    const focusTarget = previousFocus?.isConnected ? previousFocus : launchButton;
+    const focusTarget = previousFocus?.isConnected ? previousFocus : (launchButton || document.querySelector("#app-settings-open"));
     focusTarget?.focus({ preventScroll: true });
   }
 
@@ -366,7 +366,7 @@
     }
   }
 
-  launchButton.addEventListener("click", start);
+  launchButton?.addEventListener("click", start);
   nextButton.addEventListener("click", next);
   previousButton.addEventListener("click", previous);
   closeButton.addEventListener("click", finish);

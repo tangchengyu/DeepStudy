@@ -193,8 +193,22 @@ select:focus {
   padding: 0 8px;
 }
 .is-minimized .planner-chat {
-  grid-column: 1 / -1;
-  max-height: 28vh;
+  grid-area: chat;
+  position: static;
+  width: 100%;
+  max-height: none;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+.is-minimized .planner-chat #planner-config,
+.is-minimized .planner-messages {
+  display: none;
+}
+.is-minimized .planner-form textarea {
+  min-height: 74px;
+  resize: none;
 }
 .is-minimized .mode-sticky-header {
   margin-bottom: 4px;
@@ -451,11 +465,14 @@ select:focus {
   width: 26px;
 }
 #noise-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
-  width: 260px;
+  position: fixed;
+  top: var(--noise-popover-top, 64px);
+  left: var(--noise-popover-left, auto);
+  right: var(--noise-popover-right, 16px);
+  z-index: 120;
+  width: min(300px, calc(100vw - 16px));
+  max-height: calc(100vh - var(--noise-popover-top, 64px) - 10px);
+  overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -465,10 +482,10 @@ select:focus {
 /* 卡片界面模式下白噪音浮窗适配窗口宽度 */
 .is-minimized #noise-popover {
   position: fixed;
-  right: 8px;
-  top: 54px;
+  right: var(--noise-popover-right, 8px);
+  top: var(--noise-popover-top, 44px);
   width: calc(100vw - 16px);
-  max-width: 260px;
+  max-width: 300px;
 }
 /* Audio controls inside noise-popover — 播放速率 + 音量 */
 .noise-audio-controls {
@@ -938,18 +955,19 @@ select:focus {
 .planner-chat {
   position: absolute;
   z-index: 30;
-  left: 18px;
-  right: 18px;
-  bottom: 18px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: min(520px, calc(100% - 36px));
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: rgba(255, 253, 249, 0.96);
-  box-shadow: 0 18px 48px rgba(44, 62, 56, 0.18);
+  gap: 10px;
+  max-height: min(500px, calc(100% - 18px));
+  padding: 14px 18px 18px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: rgba(255, 253, 249, 0.98);
+  box-shadow: 0 -14px 34px rgba(44, 62, 56, 0.13);
   backdrop-filter: blur(8px);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -974,7 +992,8 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  min-height: 70px;
+  min-height: 0;
+  max-height: 180px;
   overflow: auto;
 }
 .chat-message {
@@ -998,6 +1017,7 @@ select:focus {
   gap: 7px;
 }
 .planner-form textarea {
+  min-height: 104px;
   padding: 9px;
   resize: vertical;
 }
@@ -1951,7 +1971,10 @@ button:disabled {
 .settings-card,
 .app-settings-card {
   width: min(940px, calc(100vw - 36px));
-  max-height: min(760px, calc(100vh - 40px));
+  height: min(760px, calc(100vh - 40px));
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   padding: 0;
   border-color: var(--border);
@@ -1978,8 +2001,7 @@ button:disabled {
 .app-settings-layout {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
-  min-height: 520px;
-  max-height: calc(100vh - 190px);
+  min-height: 0;
 }
 .settings-nav {
   display: grid;
@@ -2009,8 +2031,10 @@ button:disabled {
 }
 .settings-content {
   min-width: 0;
+  min-height: 0;
   padding: 22px 26px;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .settings-section {
   display: none;
@@ -2276,9 +2300,14 @@ button:disabled {
   gap: 8px;
   font-weight: 400;
 }
-.settings-status {
+.settings-status:empty {
+  display: none;
+}
+.settings-status:not(:empty) {
   min-height: 20px;
-  margin-top: 12px;
+  margin: 0;
+  padding: 8px 24px 14px 214px;
+  border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -2571,7 +2600,7 @@ button:disabled {
   .planner-chat {
     grid-area: chat;
     min-height: 0;
-    max-height: min(34vh, 220px);
+    max-height: none;
     overflow: hidden;
   }
   #main-area {
@@ -2622,7 +2651,7 @@ button:disabled {
     min-height: 72px;
   }
   .planner-chat {
-    max-height: min(38vh, 240px);
+    max-height: none;
   }
 }
 

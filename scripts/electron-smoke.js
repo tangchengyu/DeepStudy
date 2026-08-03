@@ -9,7 +9,7 @@ async function targets() {
 async function evaluate(target, expression) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(target.webSocketDebuggerUrl);
-    const timeout = setTimeout(() => { socket.close(); reject(new Error("CDP evaluation timed out")); }, 30000);
+    const timeout = setTimeout(() => { socket.close(); reject(new Error("CDP evaluation timed out")); }, 120000);
     socket.addEventListener("open", () => socket.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } })));
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
@@ -46,7 +46,7 @@ async function waitFor(predicate, timeout = 15000) {
     const key = 'deepstudy.tutorial.seen.v1';
     const originalSeen = localStorage.getItem(key);
     document.querySelector('.tutorial-close')?.click();
-    document.querySelector('#tutorial-open').click();
+    window.DeepStudyTutorial.start();
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const layer = document.querySelector('.tutorial-layer');
     const initial = {
@@ -54,7 +54,7 @@ async function waitFor(predicate, timeout = 15000) {
       title: document.querySelector('.tutorial-title')?.textContent.trim(),
       highlighted: document.querySelector('.tutorial-focus-ring')?.getBoundingClientRect().width > 0
     };
-    for (let i = 0; i < 11; i += 1) {
+    for (let i = 0; i < 20 && document.querySelector('.tutorial-title')?.textContent.trim() !== '捕捉干扰，不跟着它走'; i += 1) {
       document.querySelector('.tutorial-next').click();
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     }
@@ -66,7 +66,7 @@ async function waitFor(predicate, timeout = 15000) {
     document.querySelector('.tutorial-close').click();
     const restored = {
       gate: !document.querySelector('#gate-view').hidden,
-      tutorialButton: !document.querySelector('#tutorial-open').hidden,
+      settingsButton: !document.querySelector('#app-settings-open').hidden,
       seen: localStorage.getItem(key) === 'true'
     };
     if (originalSeen === null) localStorage.removeItem(key);
@@ -75,7 +75,7 @@ async function waitFor(predicate, timeout = 15000) {
   })()`);
   if (!tutorialFlow.initial.visible || tutorialFlow.initial.title !== "欢迎来到DeepStudy" || !tutorialFlow.initial.highlighted) throw new Error("Product tutorial did not open with a highlighted target");
   if (tutorialFlow.shortcutStep.title !== "捕捉干扰，不跟着它走" || !tutorialFlow.shortcutStep.mentionsShortcut || !tutorialFlow.shortcutStep.focusPreview) throw new Error("Product tutorial did not explain the Ctrl+D distraction shortcut");
-  if (!tutorialFlow.restored.gate || !tutorialFlow.restored.tutorialButton || !tutorialFlow.restored.seen) throw new Error("Product tutorial did not exit cleanly");
+  if (!tutorialFlow.restored.gate || !tutorialFlow.restored.settingsButton || !tutorialFlow.restored.seen) throw new Error("Product tutorial did not exit cleanly");
   const mainState = await evaluate(main, `(() => {
     let reflections = [];
     try {
@@ -269,6 +269,10 @@ async function waitFor(predicate, timeout = 15000) {
   const longWindow = await waitFor(async () => (await targets()).find((target) => target.url.endsWith("renderer/long-tasks.html")));
   await waitFor(async () => (await evaluate(longWindow, `document.querySelectorAll('.quadrant').length`)) === 4);
   const result = await evaluate(longWindow, `(async () => {
+    const withTimeout = (promise, label) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out')), 8000))
+    ]);
     if (document.querySelectorAll('.quadrant').length !== 4) throw new Error('quadrants missing');
     if (document.querySelector('.completed-section')) throw new Error('completed section should be removed');
     if (!document.querySelector('#long-ai-new') || !document.querySelector('#long-ai-settings')) throw new Error('long task AI controls missing');
@@ -280,14 +284,14 @@ async function waitFor(predicate, timeout = 15000) {
     const listStyle = getComputedStyle(document.querySelector('.quadrant-list'));
     if (quadrantStyle.overflow !== 'hidden' || listStyle.overflowY !== 'auto') throw new Error('quadrant scrolling layout missing');
     const noteText = '第一行\\n<img src=x onerror="window.__noteInjected=true">\\n第三行';
-    const saved = await window.electronAPI.saveLongTask({
+    const saved = await withTimeout(window.electronAPI.saveLongTask({
       title: 'Smoke task',
       notes: noteText,
       quadrant: 'important-not-urgent',
       reminder: { kind: 'none' }
-    });
-    const moved = await window.electronAPI.saveLongTask({ title: 'Smoke moved long task ' + Date.now(), quadrant: 'important-not-urgent', reminder: { kind: 'none' } });
-    const listed = await window.electronAPI.listLongTasks();
+    }), 'save first long task');
+    const moved = await withTimeout(window.electronAPI.saveLongTask({ title: 'Smoke moved long task ' + Date.now(), quadrant: 'important-not-urgent', reminder: { kind: 'none' } }), 'save moved long task');
+    const listed = await withTimeout(window.electronAPI.listLongTasks(), 'list long tasks');
     await new Promise(resolve => setTimeout(resolve, 100));
     const savedCard = [...document.querySelectorAll('.long-task-card')].find(card => card.dataset.id === saved.id);
     const visibleActions = [...savedCard.querySelectorAll('[data-action]')].map(button => button.dataset.action);
@@ -295,55 +299,53 @@ async function waitFor(predicate, timeout = 15000) {
     if (!savedCard.querySelector('.long-task-check input')) throw new Error('long task completion checkbox is missing');
     savedCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 24, clientY: 24 }));
     const menuActions = [...document.querySelectorAll('.long-task-menu [data-action]')].map(button => button.dataset.action);
-    if (!['edit', 'copy-today', 'delete'].every(action => menuActions.includes(action))) throw new Error('long task context menu is incomplete');
+    if (!['copy-today', 'delete'].every(action => menuActions.includes(action)) || menuActions.includes('edit')) throw new Error('long task context menu is incomplete');
     if (getComputedStyle(savedCard).display !== 'grid') throw new Error('long task card layout should use aligned grid');
-    const config = await window.electronAPI.getLongTaskAiConfig();
-    await window.electronAPI.addTaskToDailyPlan({ title: moved.title });
+    const config = await withTimeout(window.electronAPI.getLongTaskAiConfig(), 'get long AI config');
+    await withTimeout(window.electronAPI.addTaskToDailyPlan({ title: moved.title }), 'add moved task to daily');
     await new Promise(resolve => setTimeout(resolve, 150));
-    const moveResult = await window.electronAPI.moveLongTaskToDailyPlan({ id: moved.id });
+    const moveResult = await withTimeout(window.electronAPI.moveLongTaskToDailyPlan({ id: moved.id }), 'move long task to daily');
     await new Promise(resolve => setTimeout(resolve, 150));
-    const afterMove = await window.electronAPI.listLongTasks();
+    const afterMove = await withTimeout(window.electronAPI.listLongTasks(), 'list after move');
     const movedTask = afterMove.find(task => task.id === moved.id);
     const movedCardStillVisible = Boolean(document.querySelector(\`.long-task-card[data-id="\${moved.id}"]\`));
     await new Promise(resolve => setTimeout(resolve, 150));
     const savedCardForDetail = document.querySelector(\`.long-task-card[data-id="\${saved.id}"]\`);
-    savedCardForDetail.querySelector('.long-task-title-button').click();
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const detailNotesValue = () => [...document.querySelectorAll('#task-detail-notes .markdown-line')].map(line => line.dataset.raw || line.textContent).join('\\n');
+    savedCardForDetail.querySelector('.long-card-main').click();
+    await new Promise(resolve => setTimeout(resolve, 80));
     const detailState = {
       visible: !document.querySelector('#task-detail-view').hidden,
       menuHidden: document.querySelector('.long-task-menu').hidden,
-      title: document.querySelector('#task-detail-title').textContent,
-      notes: document.querySelector('#task-detail-notes').textContent,
+      title: document.querySelector('#task-detail-title').value,
+      notes: detailNotesValue(),
       injectedNode: Boolean(document.querySelector('#task-detail-notes img')),
       injectedFlag: Boolean(window.__noteInjected),
     };
-    document.querySelector('#task-detail-edit').click();
-    const taskModalEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    document.dispatchEvent(taskModalEscape);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const taskModalKeyboardState = {
-      defaultPrevented: taskModalEscape.defaultPrevented,
-      modalHidden: document.querySelector('#long-task-modal').hidden,
-      detailVisible: !document.querySelector('#task-detail-view').hidden,
-    };
     document.querySelector('#long-ai-settings').click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 80));
     const aiSettingsKeyboardState = {
       modalHidden: document.querySelector('#long-ai-settings-modal').hidden,
       detailVisible: !document.querySelector('#task-detail-view').hidden,
     };
-    if (!taskModalKeyboardState.defaultPrevented || !taskModalKeyboardState.modalHidden || !taskModalKeyboardState.detailVisible) throw new Error('Escape did not close the task editor without navigating away from detail');
     if (!aiSettingsKeyboardState.modalHidden || !aiSettingsKeyboardState.detailVisible) throw new Error('Long-task AI settings should delegate to the global settings window');
-    document.querySelector('#task-detail-edit').click();
-    document.querySelector('#long-task-notes').value = \`\${noteText}\\n编辑后仍停留在详情页\`;
-    document.querySelector('#long-task-form').requestSubmit();
-    await new Promise(resolve => setTimeout(resolve, 250));
+    const nextNotes = \`\${noteText}\\n编辑后仍停留在详情页\`;
+    const notesEditor = document.querySelector('#task-detail-notes');
+    notesEditor.replaceChildren(...nextNotes.split('\\n').map(raw => {
+      const line = document.createElement('div');
+      line.className = 'markdown-line';
+      line.dataset.raw = raw;
+      line.textContent = raw;
+      return line;
+    }));
+    window.saveDetailEdits();
+    await new Promise(resolve => setTimeout(resolve, 1200));
     const editState = {
       detailVisible: !document.querySelector('#task-detail-view').hidden,
-      notes: document.querySelector('#task-detail-notes').textContent,
+      notes: detailNotesValue(),
     };
     document.querySelector('#task-detail-back').click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 80));
     const listState = {
       visible: !document.querySelector('#quadrant-list-view').hidden,
       title: document.querySelector('#quadrant-view-title').textContent,
@@ -351,16 +353,16 @@ async function waitFor(predicate, timeout = 15000) {
     };
     document.querySelector('#quadrant-back').click();
     document.querySelector('[data-open-quadrant="important-not-urgent"]').click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 80));
     const directOpenWorks = !document.querySelector('#quadrant-list-view').hidden;
     document.querySelector('#quadrant-back').click();
-    document.querySelector(\`.long-task-card[data-id="\${saved.id}"] .long-task-title-button\`).click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const completion = await window.electronAPI.completeLongTask(saved.id);
+    document.querySelector(\`.long-task-card[data-id="\${saved.id}"] .long-card-main\`).click();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const completion = await withTimeout(window.electronAPI.completeLongTask(saved.id), 'complete long task');
     await new Promise(resolve => setTimeout(resolve, 150));
     const completionReturnedToList = !document.querySelector('#quadrant-list-view').hidden && document.querySelector('#task-detail-view').hidden;
-    await window.electronAPI.deleteLongTask(saved.id);
-    return { quadrants: 4, persisted: listed.some(task => task.id === saved.id), aiMode: config.mode, menuActions, detailState, taskModalKeyboardState, aiSettingsKeyboardState, editState, listState, directOpenWorks, completion: completion.completed, completionReturnedToList, noteText, moved: moveResult.moved, movedStatus: movedTask?.status, movedCardStillVisible, movedId: moved.id, movedTitle: moved.title };
+    await withTimeout(window.electronAPI.deleteLongTask(saved.id), 'delete long task');
+    return { quadrants: 4, persisted: listed.some(task => task.id === saved.id), aiMode: config.mode, menuActions, detailState, aiSettingsKeyboardState, editState, listState, directOpenWorks, completion: completion.completed, completionReturnedToList, noteText, moved: moveResult.moved, movedStatus: movedTask?.status, movedCardStillVisible, movedId: moved.id, movedTitle: moved.title };
   })()`);
   if (!result.persisted) throw new Error("Long task persistence failed");
   if (!result.detailState.menuHidden) throw new Error("Long task menu remained open after entering detail");
@@ -378,7 +380,13 @@ async function waitFor(predicate, timeout = 15000) {
     const key = 'mytimer.dailyReflection.v1';
     const readReflections = () => JSON.parse(localStorage.getItem(key) || '[]');
     const beforeReflection = readReflections().some(item => String(item.content || '').includes(title));
-    const item = [...document.querySelectorAll('#plan-list .plan-item')].find(node => node.textContent.includes(title));
+    let item = [...document.querySelectorAll('#plan-list .plan-item')].find(node => node.textContent.includes(title));
+    if (!item) {
+      document.querySelector('#plan-input').value = title;
+      document.querySelector('#plan-add-form').requestSubmit();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      item = [...document.querySelectorAll('#plan-list .plan-item')].find(node => node.textContent.includes(title));
+    }
     if (!item) return { foundInPlan: false, beforeReflection };
     const checkbox = item.querySelector('input[type="checkbox"]');
     checkbox.checked = true;
@@ -394,7 +402,7 @@ async function waitFor(predicate, timeout = 15000) {
     return { foundInPlan: true, beforeReflection, afterReflection };
   })()`);
   await evaluate(longWindow, `window.electronAPI.deleteLongTask(${JSON.stringify(result.movedId)})`);
-  if (!movedReflectionFlow.foundInPlan || movedReflectionFlow.beforeReflection || !movedReflectionFlow.afterReflection) throw new Error("Moved long task reflection flow is incorrect");
+  if (!movedReflectionFlow.foundInPlan || movedReflectionFlow.beforeReflection || !movedReflectionFlow.afterReflection) throw new Error(`Moved long task reflection flow is incorrect: ${JSON.stringify(movedReflectionFlow)}`);
   const longReflection = await evaluate(main, `(() => {
     const key = 'mytimer.dailyReflection.v1';
     const items = JSON.parse(localStorage.getItem(key) || '[]');

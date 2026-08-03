@@ -23,7 +23,7 @@
     return {
       id: cleanText(value.id, 80) || `lt-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      notes: String(value.notes || "").trim().slice(0, 10000),
+      notes: String(value.notes || "").trim().slice(0, 2_000_000),
       quadrant: QUADRANTS.includes(value.quadrant) ? value.quadrant : "important-not-urgent",
       status: ["completed", "planned"].includes(value.status) ? value.status : "active",
       reminder: normalizeReminder(value.reminder),

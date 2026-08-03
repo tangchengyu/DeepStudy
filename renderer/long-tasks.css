@@ -88,6 +88,8 @@
 .markdown-line ul, .markdown-line ol { margin: 0 0 0 22px; padding: 0; }
 .markdown-line li { margin: 0; }
 .markdown-line code { padding: 1px 5px; border-radius: 5px; background: var(--surface-3); font-family: Consolas, monospace; font-size: .9em; }
+.markdown-image { margin: 6px 0; }
+.markdown-image img { display: block; max-width: 100%; max-height: 520px; border: 1px solid color-mix(in srgb, var(--detail-color, var(--accent)) 24%, var(--border)); border-radius: var(--radius-sm); object-fit: contain; box-shadow: 0 8px 20px rgba(44,62,56,.08); }
 .task-detail-save-status { min-height: 18px; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
 @media (max-width: 900px) { .long-task-app { overflow: auto; }.quadrant-board { flex: none; grid-template-columns: 1fr; grid-template-rows: none; height: auto; }.quadrant { min-height: 245px; }.long-task-window { min-width: 0; }.long-task-header { flex-direction: column; } }
 @media (max-width: 720px) { .long-task-card { grid-template-columns: 48px minmax(0, 1fr); } }

@@ -23,6 +23,26 @@ undoButton.hidden = true;
 undoButton.textContent = "撤回完成";
 document.body.append(undoButton);
 
+function tr(key, replacements = {}) {
+  let value = window.DeepStudyI18n?.t?.(key) || key;
+  Object.entries(replacements).forEach(([name, replacement]) => {
+    value = value.replaceAll(`{${name}}`, String(replacement));
+  });
+  return value;
+}
+function currentLocale() {
+  return window.DeepStudyI18n?.language?.() || "zh-CN";
+}
+function quadrantLabel(quadrant) {
+  const labels = {
+    "important-urgent": "importantUrgent",
+    "important-not-urgent": "importantNotUrgent",
+    "urgent-not-important": "urgentNotImportant",
+    "not-important-not-urgent": "notImportantNotUrgent",
+  };
+  return tr(labels[quadrant] || "") || QUADRANT_META[quadrant]?.label || "";
+}
+
 function openQuadrant(quadrant) {
   if (!LongTaskUtils.QUADRANTS.includes(quadrant)) return;
   viewState = { mode: "quadrant", quadrant, taskId: null };
@@ -102,6 +122,8 @@ function markdownLineToHTML(value) {
   const raw = String(value || "");
   const trimmed = raw.trim();
   if (!trimmed) return "<br>";
+  const image = trimmed.match(/^!\[([^\]]*)\]\((data:image\/[^)]+)\)$/i);
+  if (image) return `<figure class="markdown-image"><img src="${escapeHTML(image[2])}" alt="${escapeHTML(image[1] || "图片")}" /></figure>`;
   const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
   if (heading) return `<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
   const listItem = trimmed.match(/^[-*]\s+(.+)$/);
@@ -184,7 +206,7 @@ function renderNotesEditor(notes) {
 function notesEditorValue() {
   return $$("#task-detail-notes .markdown-line").map((line) => (
     line.classList.contains("editing") ? line.textContent : line.dataset.raw || ""
-  )).join("\n").slice(0, 10000);
+  )).join("\n");
 }
 function splitMarkdownLine(line) {
   const text = line.textContent;
@@ -235,6 +257,36 @@ function pasteIntoMarkdownLine(line, text) {
   requestAnimationFrame(() => placeCaretAt(tailLine, 0));
   saveDetailEdits();
 }
+function clipboardImageFile(event) {
+  return [...(event.clipboardData?.items || [])]
+    .find((item) => item.kind === "file" && /^image\//i.test(item.type))
+    ?.getAsFile() || null;
+}
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("图片读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+async function pasteImageIntoNotes(line, file) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const raw = `![图片](${dataUrl})`;
+  const target = line || $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
+  if (!target.parentElement) $("#task-detail-notes").append(target);
+  if (target.classList.contains("editing") && !target.textContent.trim()) {
+    target.dataset.raw = raw;
+    finishMarkdownLineEdit(target);
+  } else if (!target.classList.contains("editing") && !String(target.dataset.raw || "").trim()) {
+    target.dataset.raw = raw;
+    renderMarkdownLine(target);
+  } else {
+    const imageLine = createMarkdownLine(raw);
+    target.after(imageLine);
+  }
+  saveDetailEdits();
+}
 function currentDetailTask() {
   return tasks.find((item) => item.id === viewState.taskId && item.status === "active");
 }
@@ -244,7 +296,7 @@ function isDetailEditorFocused() {
 function showLongUndo(task) {
   pendingUndoTask = { ...task, status: "active", completedAt: null };
   undoButton.hidden = false;
-  undoButton.textContent = `撤回完成：${task.title}`;
+  undoButton.textContent = `${currentLocale() === "en-US" ? "Undo completion" : "撤回完成"}：${task.title}`;
   clearTimeout(undoTimer);
   undoTimer = setTimeout(() => {
     undoButton.hidden = true;
@@ -391,19 +443,19 @@ function renderBoard() {
 
 function renderQuadrantList() {
   const quadrantTasks = LongTaskUtils.activeTasksForQuadrant(tasks, viewState.quadrant);
-  $("#quadrant-view-title").textContent = QUADRANT_META[viewState.quadrant].label;
+  $("#quadrant-view-title").textContent = quadrantLabel(viewState.quadrant);
   $("#quadrant-view-count").textContent = String(quadrantTasks.length);
   $("#quadrant-view-list").replaceChildren(...quadrantTasks.map(taskCard));
 }
 
 function renderTaskDetail(task) {
-  $("#task-detail-quadrant").textContent = QUADRANT_META[task.quadrant].label;
+  $("#task-detail-quadrant").textContent = quadrantLabel(task.quadrant);
   $("#task-detail-title").value = task.title;
   renderNotesEditor(task.notes || "");
   const meta = [];
   const reminder = reminderLabel(task.reminder);
   if (reminder) meta.push(`提醒：${reminder}`);
-  if (task.createdAt) meta.push(`创建于 ${new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(new Date(task.createdAt))}`);
+  if (task.createdAt) meta.push(`${currentLocale() === "en-US" ? "Created" : "创建于"} ${new Intl.DateTimeFormat(currentLocale(), { year: "numeric", month: "long", day: "numeric" }).format(new Date(task.createdAt))}`);
   $("#task-detail-meta").replaceChildren(...meta.map((text) => Object.assign(document.createElement("span"), { textContent: text })));
   $("#task-detail-check").checked = false;
   $("#task-detail-check").disabled = false;
@@ -504,6 +556,12 @@ $("#task-detail-notes").addEventListener("keydown", (event) => {
 });
 $("#task-detail-notes").addEventListener("paste", (event) => {
   const line = event.target.closest(".markdown-line.editing");
+  const imageFile = clipboardImageFile(event);
+  if (imageFile) {
+    event.preventDefault();
+    pasteImageIntoNotes(line, imageFile).catch((error) => alert(error.message));
+    return;
+  }
   if (!line) return;
   event.preventDefault();
   pasteIntoMarkdownLine(line, event.clipboardData.getData("text/plain"));
