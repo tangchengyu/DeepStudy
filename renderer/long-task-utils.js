@@ -200,12 +200,23 @@
       .sort((a, b) => (Number(a.order) - Number(b.order)) || (Number(a.createdAt) - Number(b.createdAt)));
   }
 
+  function detailReturnView(view = {}) {
+    const quadrant = QUADRANTS.includes(view.quadrant) ? view.quadrant : null;
+    if (view.returnMode === "quadrant" && quadrant) return { mode: "quadrant", quadrant, taskId: null };
+    return { mode: "board", quadrant: null, taskId: null };
+  }
+
+  function newTaskDefaultsForView(view = {}) {
+    return view.mode === "quadrant" && QUADRANTS.includes(view.quadrant) ? { quadrant: view.quadrant } : {};
+  }
+
   function resolveLongTaskView(view = {}, tasks = []) {
     const quadrant = QUADRANTS.includes(view.quadrant) ? view.quadrant : null;
     if (view.mode === "detail" && quadrant && view.taskId) {
       const task = (Array.isArray(tasks) ? tasks : []).find((item) => item?.id === view.taskId && item.status === "active");
-      if (task) return { mode: "detail", quadrant: task.quadrant, taskId: task.id, task };
-      return { mode: "quadrant", quadrant, taskId: null, task: null };
+      const returnMode = view.returnMode === "board" ? "board" : "quadrant";
+      if (task) return { mode: "detail", quadrant: task.quadrant, taskId: task.id, returnMode, task };
+      return { ...detailReturnView({ quadrant, returnMode }), task: null };
     }
     if (view.mode === "quadrant" && quadrant) {
       return { mode: "quadrant", quadrant, taskId: null, task: null };
@@ -213,5 +224,5 @@
     return { mode: "board", quadrant: null, taskId: null, task: null };
   }
 
-  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, dueTasks, extractJson, fallbackAiOperationsFromText, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, resolveLongTaskView };
+  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, resolveLongTaskView };
 });

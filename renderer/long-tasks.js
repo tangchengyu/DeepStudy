@@ -56,12 +56,12 @@ function openTaskDetail(taskId) {
   const task = tasks.find((item) => item.id === taskId && item.status === "active");
   if (!task) return;
   hideTaskMenu();
-  viewState = { mode: "detail", quadrant: task.quadrant, taskId };
+  viewState = { mode: "detail", quadrant: task.quadrant, taskId, returnMode: viewState.mode === "quadrant" ? "quadrant" : "board" };
   render();
 }
 
 function navigateBack() {
-  if (viewState.mode === "detail") viewState = { mode: "quadrant", quadrant: viewState.quadrant, taskId: null };
+  if (viewState.mode === "detail") viewState = LongTaskUtils.detailReturnView(viewState);
   else if (viewState.mode === "quadrant") viewState = { mode: "board", quadrant: null, taskId: null };
   else return;
   render();
@@ -603,7 +603,9 @@ function saveDetailEdits() {
 
 function render() {
   const resolved = LongTaskUtils.resolveLongTaskView(viewState, tasks);
-  viewState = { mode: resolved.mode, quadrant: resolved.quadrant, taskId: resolved.taskId };
+  viewState = resolved.mode === "detail"
+    ? { mode: resolved.mode, quadrant: resolved.quadrant, taskId: resolved.taskId, returnMode: resolved.returnMode }
+    : { mode: resolved.mode, quadrant: resolved.quadrant, taskId: resolved.taskId };
   setVisibleView(viewState.mode);
   if (viewState.mode === "board") renderBoard();
   else if (viewState.mode === "quadrant") renderQuadrantList();
@@ -634,7 +636,7 @@ $$('[data-open-quadrant]').forEach((button) => button.addEventListener("click", 
 $("#quadrant-back").addEventListener("click", navigateBack);
 $("#task-detail-back").addEventListener("click", navigateBack);
 function newTaskDefaults() {
-  return viewState.mode === "quadrant" ? { quadrant: viewState.quadrant } : {};
+  return LongTaskUtils.newTaskDefaultsForView(viewState);
 }
 $("#long-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#quadrant-add").addEventListener("click", () => showForm(newTaskDefaults()));

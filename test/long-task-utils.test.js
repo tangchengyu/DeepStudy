@@ -4,7 +4,9 @@ const {
   activeTasksForQuadrant,
   applyPriorityDecision,
   dueTasks,
+  detailReturnView,
   fallbackAiOperationsFromText,
+  newTaskDefaultsForView,
   nextReminderAt,
   normalizeAiOperations,
   normalizeTask,
@@ -104,6 +106,7 @@ test("keeps detail on the latest active task and falls back when it disappears",
     mode: "detail",
     quadrant: "urgent-not-important",
     taskId: "a",
+    returnMode: "quadrant",
     task: active,
   });
   assert.deepEqual(resolveLongTaskView({ mode: "detail", quadrant: "important-urgent", taskId: "missing" }, []), {
@@ -112,4 +115,33 @@ test("keeps detail on the latest active task and falls back when it disappears",
     taskId: null,
     task: null,
   });
+});
+
+test("returns board detail views to the board when the task is unavailable", () => {
+  assert.deepEqual(detailReturnView({ mode: "detail", quadrant: "urgent-not-important", returnMode: "board" }), {
+    mode: "board",
+    quadrant: null,
+    taskId: null,
+  });
+  assert.deepEqual(resolveLongTaskView({ mode: "detail", quadrant: "urgent-not-important", taskId: "missing", returnMode: "board" }, []), {
+    mode: "board",
+    quadrant: null,
+    taskId: null,
+    task: null,
+  });
+});
+
+test("returns quadrant detail views to their source quadrant", () => {
+  assert.deepEqual(detailReturnView({ mode: "detail", quadrant: "urgent-not-important", returnMode: "quadrant" }), {
+    mode: "quadrant",
+    quadrant: "urgent-not-important",
+    taskId: null,
+  });
+});
+
+test("preselects the active quadrant only when creating from its list", () => {
+  assert.deepEqual(newTaskDefaultsForView({ mode: "quadrant", quadrant: "urgent-not-important" }), {
+    quadrant: "urgent-not-important",
+  });
+  assert.deepEqual(newTaskDefaultsForView({ mode: "board", quadrant: null }), {});
 });
