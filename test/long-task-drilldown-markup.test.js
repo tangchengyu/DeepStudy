@@ -47,6 +47,17 @@ test("stores pasted note images as local app files and hydrates them for display
   assert.doesNotMatch(longTasksJs, /readAsDataURL/);
 });
 
+test("captures pasted image insertion state before persistence awaits", () => {
+  const start = longTasksJs.indexOf("async function pasteImageIntoNotes");
+  const end = longTasksJs.indexOf("\nfunction currentDetailTask", start);
+  const handler = longTasksJs.slice(start, end);
+  const firstAwait = handler.indexOf("await ");
+  assert.ok(firstAwait >= 0);
+  for (const statement of ["const target =", "const text =", "const offset ="]) {
+    assert.ok(handler.indexOf(statement) >= 0 && handler.indexOf(statement) < firstAwait, `${statement} must precede the first await`);
+  }
+});
+
 test("edits reminders directly from the long-task detail page", () => {
   for (const id of [
     "task-detail-reminder",
