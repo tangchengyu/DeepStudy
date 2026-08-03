@@ -322,6 +322,15 @@ function removeUnreferencedLongTaskImages(removedTasks, remainingTasks) {
   }
 }
 
+function discardUnreferencedLongTaskImage(id) {
+  const target = safeLongTaskImagePath(id);
+  const fileName = path.basename(target);
+  const referenced = readLongTasks().some((task) => longTaskImageIds(task.notes).includes(fileName));
+  if (referenced) return false;
+  fs.rmSync(target, { force: true });
+  return true;
+}
+
 function noiseDir() {
   return path.join(app.getPath("userData"), "noise");
 }
@@ -1022,6 +1031,7 @@ ipcMain.handle("long-tasks:save-image", (_event, payload = {}) => {
   fs.writeFileSync(safeLongTaskImagePath(id), buffer);
   return { id, type: imageTypeFromId(id), size: buffer.length };
 });
+ipcMain.handle("long-tasks:discard-image", (_event, id) => discardUnreferencedLongTaskImage(id));
 ipcMain.handle("long-tasks:import-image-path", (_event, sourcePath) => {
   return importLocalImage(sourcePath, longTaskImagesDir());
 });

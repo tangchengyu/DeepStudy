@@ -348,13 +348,20 @@ function transferHasFiles(transfer) {
 function lastNoteLine() {
   return $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
 }
+async function cleanupSavedImages(savedImages) {
+  const results = await Promise.allSettled(savedImages.map((saved) => api.discardLongTaskImage(saved.id)));
+  results.forEach((result) => {
+    if (result.status === "rejected") console.warn("Failed to discard an incomplete image import:", result.reason);
+  });
+}
 async function insertImageFilesIntoNotes(line, files, offset) {
   const target = line || $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
   const text = target.classList.contains("editing") ? target.textContent : target.dataset.raw || "";
   const insertionOffset = Math.min(text.length, Math.max(0, Number(offset ?? text.length) || 0));
   const imageFiles = Array.from(files || []).filter(isSupportedImageFile);
   if (!imageFiles.length) return;
-  const savedImages = await Promise.all(imageFiles.map(async (file) => {
+  finishMarkdownLineEdit(target);
+  const saveResults = await Promise.allSettled(imageFiles.map(async (file) => {
     const saved = await api.saveLongTaskImage({
       buffer: await file.arrayBuffer(),
       type: file.type,
@@ -363,6 +370,14 @@ async function insertImageFilesIntoNotes(line, files, offset) {
     if (!saved?.id) throw new Error(tr("imageSaveFailed"));
     return saved;
   }));
+  const savedImages = saveResults
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value);
+  const failedSave = saveResults.find((result) => result.status === "rejected");
+  if (failedSave) {
+    await cleanupSavedImages(savedImages);
+    throw failedSave.reason;
+  }
   const imageLines = savedImages.map((saved) => `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`);
   if (!target.parentElement) $("#task-detail-notes").append(target);
   const insertedLines = LongTaskUtils.imageInsertionLines(text, insertionOffset, imageLines);

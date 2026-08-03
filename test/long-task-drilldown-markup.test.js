@@ -58,6 +58,46 @@ test("captures image insertion state before persistence awaits", () => {
   }
 });
 
+test("freezes the editable image target before persistence begins", () => {
+  const start = longTasksJs.indexOf("async function insertImageFilesIntoNotes");
+  const end = longTasksJs.indexOf("\nfunction currentDetailTask", start);
+  const handler = longTasksJs.slice(start, end);
+  const freeze = handler.indexOf("finishMarkdownLineEdit(target)");
+  const firstAwait = handler.indexOf("await ");
+  assert.ok(freeze >= 0, "the target line must be synchronously frozen");
+  assert.ok(freeze < firstAwait, "the target line must be frozen before persistence awaits");
+});
+
+test("discards every completed image save when a batch cannot be inserted", () => {
+  assert.match(preloadJs, /discardLongTaskImage: \(id\) => ipcRenderer\.invoke\("long-tasks:discard-image", id\)/);
+  assert.match(mainJs, /ipcMain\.handle\("long-tasks:discard-image"/);
+  assert.match(mainJs, /function discardUnreferencedLongTaskImage\(id\)/);
+  const discardStart = mainJs.indexOf("function discardUnreferencedLongTaskImage");
+  const discardEnd = mainJs.indexOf("\nfunction noiseDir", discardStart);
+  const discardHandler = mainJs.slice(discardStart, discardEnd);
+  assert.match(discardHandler, /safeLongTaskImagePath\(id\)/);
+  assert.match(discardHandler, /readLongTasks\(\)/);
+  assert.match(discardHandler, /longTaskImageIds\(task\.notes\)/);
+  assert.match(discardHandler, /if \(referenced\) return false/);
+  assert.match(discardHandler, /fs\.rmSync\(target, \{ force: true \}\)/);
+
+  const start = longTasksJs.indexOf("async function insertImageFilesIntoNotes");
+  const end = longTasksJs.indexOf("\nfunction currentDetailTask", start);
+  const handler = longTasksJs.slice(start, end);
+  assert.match(handler, /Promise\.allSettled\(imageFiles\.map/);
+  assert.match(handler, /result\.status === "fulfilled"/);
+  const cleanup = handler.indexOf("await cleanupSavedImages(savedImages)");
+  const failure = handler.indexOf("throw failedSave.reason");
+  assert.ok(cleanup >= 0 && cleanup < failure, "successful saves must be discarded before the batch rejects");
+
+  const cleanupStart = longTasksJs.indexOf("async function cleanupSavedImages");
+  const cleanupEnd = longTasksJs.indexOf("\nasync function insertImageFilesIntoNotes", cleanupStart);
+  const cleanupHandler = longTasksJs.slice(cleanupStart, cleanupEnd);
+  assert.match(cleanupHandler, /savedImages\.map/);
+  assert.match(cleanupHandler, /api\.discardLongTaskImage\(saved\.id\)/);
+  assert.match(cleanupHandler, /Promise\.allSettled/);
+});
+
 test("imports supported clipboard and dropped image files into task notes", () => {
   assert.match(longTasksJs, /function imageFilesFromTransfer\(transfer\)/);
   assert.match(longTasksJs, /function isSupportedImageFile\(file\)/);
