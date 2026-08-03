@@ -337,16 +337,17 @@ async function pasteImageIntoNotes(line, file) {
   const raw = `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`;
   const target = line || $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
   if (!target.parentElement) $("#task-detail-notes").append(target);
-  if (target.classList.contains("editing") && !target.textContent.trim()) {
-    target.dataset.raw = raw;
-    finishMarkdownLineEdit(target);
-  } else if (!target.classList.contains("editing") && !String(target.dataset.raw || "").trim()) {
-    target.dataset.raw = raw;
-    renderMarkdownLine(target);
-  } else {
-    const imageLine = createMarkdownLine(raw);
-    target.after(imageLine);
-  }
+  const text = target.classList.contains("editing") ? target.textContent : target.dataset.raw || "";
+  const offset = target.classList.contains("editing") ? caretOffset(target) : text.length;
+  const insertedLines = LongTaskUtils.imageInsertionLines(text, offset, [raw]);
+  target.dataset.raw = insertedLines.shift() || "";
+  renderMarkdownLine(target);
+  let anchor = target;
+  insertedLines.forEach((insertedLine) => {
+    const next = createMarkdownLine(insertedLine);
+    anchor.after(next);
+    anchor = next;
+  });
   saveDetailEdits();
 }
 function currentDetailTask() {

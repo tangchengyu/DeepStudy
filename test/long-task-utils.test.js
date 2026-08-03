@@ -6,6 +6,7 @@ const {
   dueTasks,
   detailReturnView,
   fallbackAiOperationsFromText,
+  imageInsertionLines,
   newTaskDefaultsForView,
   nextReminderAt,
   normalizeAiOperations,
@@ -13,6 +14,40 @@ const {
   parseObsidianImagePath,
   resolveLongTaskView,
 } = require("../renderer/long-task-utils");
+
+test("inserts image lines at a caret in the middle of a markdown line", () => {
+  assert.deepEqual(
+    imageInsertionLines("前半后半", 2, ["![a](deepstudy-image://a.png)", "![b](deepstudy-image://b.png)"]),
+    ["前半", "![a](deepstudy-image://a.png)", "![b](deepstudy-image://b.png)", "后半"],
+  );
+});
+
+test("replaces an empty markdown line with image lines", () => {
+  assert.deepEqual(
+    imageInsertionLines("", 0, ["![a](deepstudy-image://a.png)"]),
+    ["![a](deepstudy-image://a.png)"],
+  );
+});
+
+test("places image lines before text at offset zero", () => {
+  assert.deepEqual(
+    imageInsertionLines("正文", 0, ["![a](deepstudy-image://a.png)"]),
+    ["![a](deepstudy-image://a.png)", "正文"],
+  );
+});
+
+test("places image lines after text at the line end", () => {
+  assert.deepEqual(
+    imageInsertionLines("正文", 2, ["![a](deepstudy-image://a.png)"]),
+    ["正文", "![a](deepstudy-image://a.png)"],
+  );
+});
+
+test("clamps image insertion offsets to the markdown line bounds", () => {
+  const image = ["![a](deepstudy-image://a.png)"];
+  assert.deepEqual(imageInsertionLines("正文", -1, image), ["![a](deepstudy-image://a.png)", "正文"]);
+  assert.deepEqual(imageInsertionLines("正文", 99, image), ["正文", "![a](deepstudy-image://a.png)"]);
+});
 
 test("normalizes a long task and its reminder", () => {
   const task = normalizeTask({ title: "  写论文  ", quadrant: "important-urgent", reminder: { kind: "weekly", time: "18:30", weekdays: [1, 3, 3] } }, 10);

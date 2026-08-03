@@ -15,6 +15,14 @@
     return match[1];
   }
 
+  function imageInsertionLines(text, offset, imageMarkdownLines) {
+    const source = String(text || "");
+    const position = Math.min(source.length, Math.max(0, Number(offset) || 0));
+    const before = source.slice(0, position);
+    const after = source.slice(position);
+    return [before, ...imageMarkdownLines, after].filter((line) => line !== "");
+  }
+
   function normalizeReminder(value = {}) {
     const kind = ["once", "daily", "weekly"].includes(value.kind) ? value.kind : "none";
     const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time || "") ? value.time : "09:00";
@@ -224,5 +232,5 @@
     return { mode: "board", quadrant: null, taskId: null, task: null };
   }
 
-  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, resolveLongTaskView };
+  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, imageInsertionLines, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, resolveLongTaskView };
 });
