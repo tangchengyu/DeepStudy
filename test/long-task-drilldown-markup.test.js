@@ -98,6 +98,30 @@ test("discards every completed image save when a batch cannot be inserted", () =
   assert.match(cleanupHandler, /Promise\.allSettled/);
 });
 
+test("abandons delayed image inserts when the task or target line changes", () => {
+  const start = longTasksJs.indexOf("async function insertImageFilesIntoNotes");
+  const end = longTasksJs.indexOf("\nfunction currentDetailTask", start);
+  const handler = longTasksJs.slice(start, end);
+  assert.match(handler, /const taskId = viewState\.taskId/);
+  assert.match(handler, /viewState\.mode !== "detail"/);
+  assert.match(handler, /viewState\.taskId !== taskId/);
+  assert.match(handler, /!target\.isConnected/);
+  assert.match(handler, /target\.classList\.contains\("editing"\)/);
+  assert.match(handler, /\(target\.dataset\.raw \|\| ""\) !== text/);
+  const staleCheck = handler.indexOf('viewState.mode !== "detail"');
+  const mutation = handler.indexOf("target.dataset.raw =");
+  assert.ok(staleCheck >= 0 && staleCheck < mutation, "stale imports must stop before mutating the editor");
+});
+
+test("rejects oversized image files before reading their bytes", () => {
+  const start = longTasksJs.indexOf("async function insertImageFilesIntoNotes");
+  const end = longTasksJs.indexOf("\nfunction currentDetailTask", start);
+  const handler = longTasksJs.slice(start, end);
+  const sizeCheck = handler.indexOf("file.size > MAX_IMAGE_BYTES");
+  const readBytes = handler.indexOf("file.arrayBuffer()");
+  assert.ok(sizeCheck >= 0 && sizeCheck < readBytes, "file size must be checked before arrayBuffer");
+});
+
 test("imports supported clipboard and dropped image files into task notes", () => {
   assert.match(longTasksJs, /function imageFilesFromTransfer\(transfer\)/);
   assert.match(longTasksJs, /function isSupportedImageFile\(file\)/);
@@ -127,6 +151,12 @@ test("shows and clears a quadrant-colored image drop state", () => {
   assert.match(longTasksJs, /setImageDropState\(false\)/);
   assert.match(css, /\.task-detail-notes-editor\.image-drop-active\s*\{/);
   assert.match(css, /var\(--detail-color, var\(--accent\)\)/);
+});
+
+test("uses an active note caret for drops and reports unsupported files", () => {
+  assert.match(longTasksJs, /const activeLine = \$\("#task-detail-notes \.markdown-line\.editing"\)/);
+  assert.match(longTasksJs, /const line = activeLine \|\| noteLineAtPoint/);
+  assert.match(longTasksJs, /if \(!imageFiles\.length\) \{\s*alert\(tr\("imageImportFailed"\)\)/s);
 });
 
 test("documents all supported image intake workflows in both tutorial languages", () => {

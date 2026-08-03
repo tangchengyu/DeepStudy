@@ -12,6 +12,22 @@ const IMAGE_TYPES = {
   bmp: "image/bmp",
 };
 
+function writeBufferAtomically(targetPath, buffer, createTempName, fileSystem = fs) {
+  const directory = path.dirname(targetPath);
+  const tempNameFactory = typeof createTempName === "function"
+    ? createTempName
+    : () => `.${path.basename(targetPath)}.${crypto.randomBytes(8).toString("hex")}.tmp`;
+  const tempName = path.basename(String(tempNameFactory()));
+  const tempPath = path.join(directory, tempName);
+  try {
+    fileSystem.writeFileSync(tempPath, buffer, { flag: "wx" });
+    fileSystem.renameSync(tempPath, targetPath);
+  } catch (error) {
+    try { fileSystem.rmSync(tempPath, { force: true }); } catch {}
+    throw error;
+  }
+}
+
 function importLocalImage(sourcePath, destinationDir, createId) {
   const source = String(sourcePath || "").trim();
   if (!source || (!path.isAbsolute(source) && !path.win32.isAbsolute(source))) {
@@ -41,4 +57,4 @@ function importLocalImage(sourcePath, destinationDir, createId) {
   return { id, type, size: stat.size };
 }
 
-module.exports = { MAX_IMAGE_BYTES, importLocalImage };
+module.exports = { MAX_IMAGE_BYTES, importLocalImage, writeBufferAtomically };

@@ -324,6 +324,7 @@ function pasteIntoMarkdownLine(line, text) {
 }
 const IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/x-ms-bmp"]);
 const IMAGE_FILE_NAME = /\.(?:png|jpe?g|gif|webp|bmp)$/i;
+const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 function isSupportedImageFile(file) {
   return Boolean(file) && (IMAGE_MIME_TYPES.has(String(file.type || "").toLowerCase()) || IMAGE_FILE_NAME.test(String(file.name || "")));
 }
@@ -355,11 +356,14 @@ async function cleanupSavedImages(savedImages) {
   });
 }
 async function insertImageFilesIntoNotes(line, files, offset) {
+  const editor = $("#task-detail-notes");
+  const taskId = viewState.taskId;
   const target = line || $("#task-detail-notes .markdown-line:last-child") || createMarkdownLine("");
   const text = target.classList.contains("editing") ? target.textContent : target.dataset.raw || "";
   const insertionOffset = Math.min(text.length, Math.max(0, Number(offset ?? text.length) || 0));
   const imageFiles = Array.from(files || []).filter(isSupportedImageFile);
   if (!imageFiles.length) return;
+  if (imageFiles.some((file) => file.size > MAX_IMAGE_BYTES)) throw new Error(tr("imageImportFailed"));
   finishMarkdownLineEdit(target);
   const saveResults = await Promise.allSettled(imageFiles.map(async (file) => {
     const saved = await api.saveLongTaskImage({
@@ -377,6 +381,17 @@ async function insertImageFilesIntoNotes(line, files, offset) {
   if (failedSave) {
     await cleanupSavedImages(savedImages);
     throw failedSave.reason;
+  }
+  if (
+    viewState.mode !== "detail"
+    || viewState.taskId !== taskId
+    || !target.isConnected
+    || target.closest("#task-detail-notes") !== editor
+    || target.classList.contains("editing")
+    || (target.dataset.raw || "") !== text
+  ) {
+    await cleanupSavedImages(savedImages);
+    return false;
   }
   const imageLines = savedImages.map((saved) => `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`);
   if (!target.parentElement) $("#task-detail-notes").append(target);
@@ -736,6 +751,7 @@ $("#task-detail-notes").addEventListener("paste", (event) => {
   }
   if (transferHasFiles(event.clipboardData)) {
     event.preventDefault();
+    alert(tr("imageImportFailed"));
     return;
   }
   if (!line) return;
@@ -755,8 +771,12 @@ $("#task-detail-notes").addEventListener("drop", (event) => {
   event.preventDefault();
   setImageDropState(false);
   const imageFiles = imageFilesFromTransfer(event.dataTransfer);
-  if (!imageFiles.length) return;
-  const line = noteLineAtPoint(event.clientX, event.clientY) || lastNoteLine();
+  if (!imageFiles.length) {
+    alert(tr("imageImportFailed"));
+    return;
+  }
+  const activeLine = $("#task-detail-notes .markdown-line.editing");
+  const line = activeLine || noteLineAtPoint(event.clientX, event.clientY) || lastNoteLine();
   const offset = line.classList.contains("editing") ? caretOffset(line) : (line.dataset.raw || "").length;
   insertImageFilesIntoNotes(line, imageFiles, offset)
     .catch(() => alert(tr("imageImportFailed")))

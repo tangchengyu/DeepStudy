@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createAppReadyRunner } = require("./renderer/app-lifecycle");
-const { importLocalImage } = require("./renderer/local-image-import");
+const { importLocalImage, writeBufferAtomically } = require("./renderer/local-image-import");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
 const APP_DATA_DIR_NAME = "deepstudy";
@@ -1028,7 +1028,7 @@ ipcMain.handle("long-tasks:save-image", (_event, payload = {}) => {
   if (buffer.length > 16 * 1024 * 1024) throw new Error("图片不能超过 16 MB。");
   const id = `${Date.now().toString(36)}-${crypto.randomBytes(8).toString("hex")}.${extension}`;
   fs.mkdirSync(longTaskImagesDir(), { recursive: true });
-  fs.writeFileSync(safeLongTaskImagePath(id), buffer);
+  writeBufferAtomically(safeLongTaskImagePath(id), buffer);
   return { id, type: imageTypeFromId(id), size: buffer.length };
 });
 ipcMain.handle("long-tasks:discard-image", (_event, id) => discardUnreferencedLongTaskImage(id));

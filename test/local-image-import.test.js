@@ -44,3 +44,23 @@ test("rejects unsafe or unsupported local image paths", () => {
     assert.throws(() => importLocalImage(oversized, destination), /16 MB/);
   });
 });
+
+test("writes note images atomically and removes a failed temporary file", () => {
+  const { writeBufferAtomically } = require(modulePath);
+  withTempDirectory((root) => {
+    const target = path.join(root, "saved.png");
+    writeBufferAtomically(target, Buffer.from("image"), () => "pending.tmp");
+    assert.equal(fs.readFileSync(target, "utf8"), "image");
+    assert.equal(fs.existsSync(path.join(root, "pending.tmp")), false);
+
+    const failedTarget = path.join(root, "failed.png");
+    assert.throws(
+      () => writeBufferAtomically(failedTarget, Buffer.from("partial"), () => "failed.tmp", Object.assign(Object.create(fs), {
+        renameSync() { throw new Error("rename failed"); },
+      })),
+      /rename failed/,
+    );
+    assert.equal(fs.existsSync(path.join(root, "failed.tmp")), false);
+    assert.equal(fs.existsSync(failedTarget), false);
+  });
+});
