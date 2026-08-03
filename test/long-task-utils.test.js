@@ -8,6 +8,7 @@ const {
   nextReminderAt,
   normalizeAiOperations,
   normalizeTask,
+  parseObsidianImagePath,
   resolveLongTaskView,
 } = require("../renderer/long-task-utils");
 
@@ -41,6 +42,17 @@ test("parses confirmed AI operations and rejects unknown ids", () => {
   const existing = [normalizeTask({ id: "a", title: "任务 A" }, 1)];
   assert.equal(normalizeAiOperations('{"operations":[{"action":"update","id":"a","task":{"title":"任务 A+","quadrant":"important-urgent"}}]}', existing)[0].task.title, "任务 A+");
   assert.throws(() => normalizeAiOperations('{"operations":[{"action":"delete","id":"missing"}]}', existing));
+});
+
+test("extracts an Obsidian Windows absolute image path", () => {
+  assert.equal(typeof parseObsidianImagePath, "function");
+  assert.equal(
+    parseObsidianImagePath("![[C:\\Users\\DELL\\Desktop\\论文阅读步骤.png]]"),
+    "C:\\Users\\DELL\\Desktop\\论文阅读步骤.png",
+  );
+  assert.equal(parseObsidianImagePath("![[C:/Users/DELL/Desktop/论文阅读步骤.png]]"), "C:/Users/DELL/Desktop/论文阅读步骤.png");
+  assert.equal(parseObsidianImagePath("![[relative.png]]"), null);
+  assert.equal(parseObsidianImagePath("![[C:\\Users\\DELL\\Desktop\\notes.txt]]"), null);
 });
 
 test("parses long-task JSON even when the model adds trailing prose", () => {

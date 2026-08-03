@@ -9,6 +9,12 @@
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
   }
 
+  function parseObsidianImagePath(value) {
+    const match = String(value || "").trim().match(/^!\[\[([a-z]:[\\/][^\]\r\n]+)\]\]$/i);
+    if (!match || !/\.(?:png|jpe?g|gif|webp|bmp)$/i.test(match[1])) return null;
+    return match[1];
+  }
+
   function normalizeReminder(value = {}) {
     const kind = ["once", "daily", "weekly"].includes(value.kind) ? value.kind : "none";
     const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time || "") ? value.time : "09:00";
@@ -207,5 +213,5 @@
     return { mode: "board", quadrant: null, taskId: null, task: null };
   }
 
-  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, dueTasks, extractJson, fallbackAiOperationsFromText, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, resolveLongTaskView };
+  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, dueTasks, extractJson, fallbackAiOperationsFromText, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, resolveLongTaskView };
 });

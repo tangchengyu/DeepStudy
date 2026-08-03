@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { createAppReadyRunner } = require("./renderer/app-lifecycle");
+const { importLocalImage } = require("./renderer/local-image-import");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
 const APP_DATA_DIR_NAME = "deepstudy";
@@ -1020,6 +1021,9 @@ ipcMain.handle("long-tasks:save-image", (_event, payload = {}) => {
   fs.mkdirSync(longTaskImagesDir(), { recursive: true });
   fs.writeFileSync(safeLongTaskImagePath(id), buffer);
   return { id, type: imageTypeFromId(id), size: buffer.length };
+});
+ipcMain.handle("long-tasks:import-image-path", (_event, sourcePath) => {
+  return importLocalImage(sourcePath, longTaskImagesDir());
 });
 ipcMain.handle("long-tasks:read-image", (_event, id) => {
   const target = safeLongTaskImagePath(id);

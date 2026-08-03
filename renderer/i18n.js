@@ -213,6 +213,8 @@
       pastedImageAlt: "粘贴的图片",
       imageReadFailed: "本地图片读取失败。",
       imageSaveFailed: "本地图片保存失败。",
+      imageImporting: "正在导入本地图片…",
+      imageImportFailed: "本地图片导入失败，请检查文件是否仍存在且格式受支持。",
       dragLongTask: "拖动排序或移动象限",
       containsNotes: "包含备注",
       copyToToday: "复制到今日任务",
@@ -236,6 +238,9 @@
       dateAndTime: "日期和时间",
       reminderTime: "提醒时间",
       repeatWeekday: "重复星期",
+      reminderSettings: "提醒设置",
+      reminderPastTime: "请选择晚于当前时间的提醒日期和时间。",
+      reminderWeekdayRequired: "请至少选择一个重复星期。",
       saveTask: "保存任务",
       moreTaskActions: "更多任务操作",
       minuteCount: "{count} 分钟",
@@ -464,6 +469,8 @@
       pastedImageAlt: "Pasted image",
       imageReadFailed: "Could not read the local image.",
       imageSaveFailed: "Could not save the local image.",
+      imageImporting: "Importing local image...",
+      imageImportFailed: "Could not import the local image. Check that it still exists and uses a supported format.",
       dragLongTask: "Drag to reorder or move to another quadrant",
       containsNotes: "Contains notes",
       copyToToday: "Copy to Daily Plan",
@@ -487,6 +494,9 @@
       dateAndTime: "Date and Time",
       reminderTime: "Reminder Time",
       repeatWeekday: "Repeat On",
+      reminderSettings: "Reminder Settings",
+      reminderPastTime: "Choose a reminder date and time later than now.",
+      reminderWeekdayRequired: "Choose at least one repeat day.",
       saveTask: "Save Task",
       moreTaskActions: "More task actions",
       minuteCount: "{count} min",
@@ -598,6 +608,7 @@
       [".task-detail-complete span", "markDone"],
       [".task-detail-title-field span", "taskName"],
       [".task-detail-notes-field > span", "markdownSupport"],
+      [".task-detail-reminder-title", "reminderSettings"],
       ["#long-ai-panel header strong", "longAiTitle"],
       ["#long-ai-panel header p", "longAiDesc"],
       ["#long-ai-new", "newChat"],
@@ -719,8 +730,13 @@
     setLabelText('label:has(#long-reminder-kind)', "reminderType");
     setLabelText('label:has(#long-reminder-at)', "dateAndTime");
     setLabelText('label:has(#long-reminder-clock)', "reminderTime");
+    setLabelText('label:has(#task-detail-reminder-kind)', "reminderType");
+    setLabelText('label:has(#task-detail-reminder-at)', "dateAndTime");
+    setLabelText('label:has(#task-detail-reminder-clock)', "reminderTime");
     const repeatLegend = document.querySelector("#long-reminder-weekdays legend");
     if (repeatLegend) repeatLegend.textContent = t("repeatWeekday");
+    const detailRepeatLegend = document.querySelector("#task-detail-reminder-weekdays legend");
+    if (detailRepeatLegend) detailRepeatLegend.textContent = t("repeatWeekday");
     setSelectOption("#api-model-preset", "custom", "customModel");
     setSelectOption("#api-profile-select", "", "navApi");
     setSelectOption("#daily-ai-profile-select", "", "selectSavedApi");
@@ -729,6 +745,15 @@
     setSelectOption("#long-reminder-kind", "once", "onceReminder");
     setSelectOption("#long-reminder-kind", "daily", "dailyReminder");
     setSelectOption("#long-reminder-kind", "weekly", "weeklyReminder");
+    setSelectOption("#task-detail-reminder-kind", "none", "noReminder");
+    setSelectOption("#task-detail-reminder-kind", "once", "onceReminder");
+    setSelectOption("#task-detail-reminder-kind", "daily", "dailyReminder");
+    setSelectOption("#task-detail-reminder-kind", "weekly", "weeklyReminder");
+    const weekdayNames = current === "en-US" ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] : ["一", "二", "三", "四", "五", "六", "日"];
+    document.querySelectorAll("#task-detail-reminder-weekdays .weekday-options label").forEach((label, index) => {
+      const textNode = Array.from(label.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+      if (textNode) textNode.textContent = weekdayNames[index];
+    });
     setSelectOption("#long-task-quadrant", "important-urgent", "importantUrgent");
     setSelectOption("#long-task-quadrant", "important-not-urgent", "importantNotUrgent");
     setSelectOption("#long-task-quadrant", "urgent-not-important", "urgentNotImportant");

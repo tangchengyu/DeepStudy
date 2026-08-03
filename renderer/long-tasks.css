@@ -79,6 +79,22 @@
 .task-detail-title-field input { width: 100%; min-height: 58px; padding: 4px 0; border: 0; border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-size: clamp(28px, 4vw, 42px); line-height: 1.2; font-weight: 850; }
 .task-detail-title-field input:focus { box-shadow: inset 0 -2px 0 var(--detail-color, var(--accent)); }
 .task-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--text-muted); font-size: 12px; }
+.task-detail-reminder { margin-top: 18px; border: 1px solid color-mix(in srgb, var(--detail-color, var(--accent)) 28%, var(--border)); border-radius: var(--radius-sm); background: rgba(255,255,255,.62); overflow: hidden; }
+.task-detail-reminder summary { min-height: 48px; display: flex; align-items: center; gap: 14px; padding: 10px 16px; color: var(--text); cursor: pointer; list-style: none; }
+.task-detail-reminder summary::-webkit-details-marker { display: none; }
+.task-detail-reminder summary::before { content: ""; width: 10px; height: 10px; flex: 0 0 auto; border: 3px solid var(--detail-color, var(--accent)); border-radius: 50%; box-shadow: 0 0 0 5px var(--detail-soft, var(--accent-soft)); }
+.task-detail-reminder summary::after { content: "+"; margin-left: auto; color: color-mix(in srgb, var(--detail-color, var(--accent)) 70%, var(--text)); font-size: 20px; font-weight: 700; }
+.task-detail-reminder[open] summary::after { content: "−"; }
+.task-detail-reminder-title { font-size: 14px; font-weight: 800; }
+#task-detail-reminder-summary { color: var(--text-muted); font-size: 13px; }
+.task-detail-reminder-body { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 14px; padding: 16px; border-top: 1px solid color-mix(in srgb, var(--detail-color, var(--accent)) 20%, var(--border)); background: color-mix(in srgb, var(--detail-soft, var(--accent-soft)) 35%, rgba(255,255,255,.74)); }
+.task-detail-reminder-body > label { display: grid; gap: 6px; color: var(--text-muted); font-size: 12px; font-weight: 750; }
+.task-detail-reminder-body select, .task-detail-reminder-body input[type="datetime-local"], .task-detail-reminder-body input[type="time"] { width: 100%; min-height: 42px; }
+.task-detail-reminder-body fieldset { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; }
+.task-detail-reminder-body legend { margin-bottom: 8px; color: var(--text-muted); font-size: 12px; font-weight: 750; }
+.task-detail-reminder-body .weekday-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.task-detail-reminder-body .weekday-options label { min-width: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: rgba(255,255,255,.72); color: var(--text); font-size: 12px; cursor: pointer; }
+.task-detail-reminder-error { grid-column: 1 / -1; min-height: 18px; color: var(--red); font-size: 12px; }
 .task-detail-notes-editor { width: 100%; min-height: 260px; padding: 24px 24px 24px 26px; border: 1px solid color-mix(in srgb, var(--detail-color, var(--accent)) 32%, var(--border)); border-left: 4px solid var(--detail-color, var(--accent)); border-radius: var(--radius-sm); background: rgba(255,255,255,.68); color: var(--text); font-size: 16px; line-height: 1.72; font-weight: 500; overflow-wrap: anywhere; cursor: text; }
 .task-detail-notes-editor:focus-within { box-shadow: 0 10px 28px rgba(44,62,56,.08); }
 .markdown-line { min-height: 1.72em; padding: 2px 0; border-radius: 7px; outline: none; white-space: normal; }
@@ -92,7 +108,12 @@
 .markdown-line code { padding: 1px 5px; border-radius: 5px; background: var(--surface-3); font-family: Consolas, monospace; font-size: .9em; }
 .markdown-image { margin: 6px 0; }
 .markdown-image img { display: block; max-width: 100%; max-height: 520px; border: 1px solid color-mix(in srgb, var(--detail-color, var(--accent)) 24%, var(--border)); border-radius: var(--radius-sm); object-fit: contain; box-shadow: 0 8px 20px rgba(44,62,56,.08); }
+.markdown-image-status { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 8px 12px; border: 1px dashed color-mix(in srgb, var(--detail-color, var(--accent)) 35%, var(--border)); border-radius: 8px; background: var(--detail-soft, var(--accent-soft)); color: var(--text-muted); font-size: 13px; }
+.markdown-image-status::before { content: ""; width: 8px; height: 8px; border: 2px solid var(--detail-color, var(--accent)); border-right-color: transparent; border-radius: 50%; animation: image-import-spin .8s linear infinite; }
+.markdown-image-error { color: var(--red); }
+.markdown-image-error::before { border-color: var(--red); animation: none; }
+@keyframes image-import-spin { to { transform: rotate(360deg); } }
 .task-detail-save-status { min-height: 18px; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
 @media (max-width: 900px) { .long-task-app { overflow: auto; }.quadrant-board { flex: none; grid-template-columns: 1fr; grid-template-rows: none; height: auto; }.quadrant { min-height: 245px; }.long-task-window { min-width: 0; }.long-task-header { flex-direction: column; } }
-@media (max-width: 720px) { .long-task-card { grid-template-columns: 48px minmax(0, 1fr); } }
+@media (max-width: 720px) { .long-task-card { grid-template-columns: 48px minmax(0, 1fr); }.task-detail-reminder-body { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .long-ai-panel { transition: none; } }

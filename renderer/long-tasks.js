@@ -16,6 +16,7 @@ let undoTimer = null;
 let pendingUndoTask = null;
 let detailSaveTimer = null;
 const localImageUrls = new Map();
+const obsidianImageImports = new Map();
 
 const undoButton = document.createElement("button");
 undoButton.type = "button";
@@ -123,6 +124,8 @@ function markdownLineToHTML(value) {
   const raw = String(value || "");
   const trimmed = raw.trim();
   if (!trimmed) return "<br>";
+  const obsidianImagePath = LongTaskUtils.parseObsidianImagePath(trimmed);
+  if (obsidianImagePath) return `<span class="markdown-image-status">${escapeHTML(tr("imageImporting"))}</span>`;
   const image = trimmed.match(/^!\[([^\]]*)\]\((data:image\/[^)]+|deepstudy-image:\/\/[a-z0-9._-]+)\)$/i);
   if (image) {
     const alt = escapeHTML(image[1] || tr("pastedImageAlt"));
@@ -143,6 +146,37 @@ function renderMarkdownLine(line) {
   line.classList.remove("editing");
   line.innerHTML = markdownLineToHTML(line.dataset.raw || "");
   hydrateMarkdownImages(line);
+  importObsidianImageLine(line);
+}
+
+function importObsidianImage(sourcePath) {
+  if (!obsidianImageImports.has(sourcePath)) {
+    const request = api.importLongTaskImage(sourcePath);
+    obsidianImageImports.set(sourcePath, request);
+    const releaseRequest = () => {
+      if (obsidianImageImports.get(sourcePath) === request) obsidianImageImports.delete(sourcePath);
+    };
+    request.then(releaseRequest, releaseRequest);
+  }
+  return obsidianImageImports.get(sourcePath);
+}
+
+async function importObsidianImageLine(line) {
+  const raw = line?.dataset.raw || "";
+  const sourcePath = LongTaskUtils.parseObsidianImagePath(raw);
+  if (!sourcePath || line.dataset.importingImage === sourcePath) return;
+  line.dataset.importingImage = sourcePath;
+  try {
+    const saved = await importObsidianImage(sourcePath);
+    if (!saved?.id || line.dataset.raw !== raw) return;
+    line.dataset.raw = `![${tr("pastedImageAlt")}](deepstudy-image://${saved.id})`;
+    delete line.dataset.importingImage;
+    renderMarkdownLine(line);
+    saveDetailEdits();
+  } catch {
+    if (line.dataset.raw !== raw) return;
+    line.innerHTML = `<span class="markdown-image-status markdown-image-error">${escapeHTML(tr("imageImportFailed"))}</span>`;
+  }
 }
 
 async function localImageUrl(id) {
@@ -319,7 +353,8 @@ function currentDetailTask() {
   return tasks.find((item) => item.id === viewState.taskId && item.status === "active");
 }
 function isDetailEditorFocused() {
-  return [$("#task-detail-title"), $("#task-detail-notes")].includes(document.activeElement) || Boolean(document.activeElement.closest?.("#task-detail-notes"));
+  return [$("#task-detail-title"), $("#task-detail-notes")].includes(document.activeElement)
+    || Boolean(document.activeElement.closest?.("#task-detail-notes, #task-detail-reminder"));
 }
 function showLongUndo(task) {
   pendingUndoTask = { ...task, status: "active", completedAt: null };
@@ -478,15 +513,62 @@ function renderQuadrantList() {
   $("#quadrant-view-list").replaceChildren(...quadrantTasks.map(taskCard));
 }
 
+function detailReminderSummary(reminder) {
+  return reminderLabel(reminder) || tr("noReminder");
+}
+
+function populateDetailReminder(reminder = {}) {
+  const value = reminder || {};
+  $("#task-detail-reminder-kind").value = value.kind || "none";
+  $("#task-detail-reminder-at").value = value.at
+    ? new Date(new Date(value.at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    : "";
+  $("#task-detail-reminder-clock").value = value.time || "09:00";
+  $$("#task-detail-reminder-weekdays input").forEach((input) => {
+    input.checked = (value.weekdays || []).includes(Number(input.value));
+  });
+  $("#task-detail-reminder-error").textContent = "";
+  renderDetailReminderFields();
+}
+
+function readDetailReminder() {
+  const kind = $("#task-detail-reminder-kind").value;
+  return {
+    kind,
+    at: $("#task-detail-reminder-at").value ? new Date($("#task-detail-reminder-at").value).toISOString() : null,
+    time: $("#task-detail-reminder-clock").value || "09:00",
+    weekdays: $$("#task-detail-reminder-weekdays input:checked").map((input) => Number(input.value)),
+    enabled: kind !== "none",
+    lastTriggeredAt: null,
+  };
+}
+
+function validateDetailReminder(reminder, task = currentDetailTask()) {
+  if (reminder.kind === "once") {
+    const at = Date.parse(reminder.at);
+    const unchanged = reminder.at && reminder.at === task?.reminder?.at;
+    if (!Number.isFinite(at) || (at <= Date.now() && !unchanged)) return tr("reminderPastTime");
+  }
+  if (reminder.kind === "weekly" && !reminder.weekdays.length) return tr("reminderWeekdayRequired");
+  return "";
+}
+
+function renderDetailReminderFields() {
+  const kind = $("#task-detail-reminder-kind").value;
+  $("#task-detail-reminder-once").hidden = kind !== "once";
+  $("#task-detail-reminder-time").hidden = !["daily", "weekly"].includes(kind);
+  $("#task-detail-reminder-weekdays").hidden = kind !== "weekly";
+  $("#task-detail-reminder-summary").textContent = detailReminderSummary(readDetailReminder());
+}
+
 function renderTaskDetail(task) {
   $("#task-detail-quadrant").textContent = quadrantLabel(task.quadrant);
   $("#task-detail-title").value = task.title;
   renderNotesEditor(task.notes || "");
   const meta = [];
-  const reminder = reminderLabel(task.reminder);
-  if (reminder) meta.push(`${tr("reminderPrefix")}: ${reminder}`);
   if (task.createdAt) meta.push(`${currentLocale() === "en-US" ? "Created" : "创建于"} ${new Intl.DateTimeFormat(currentLocale(), { year: "numeric", month: "long", day: "numeric" }).format(new Date(task.createdAt))}`);
   $("#task-detail-meta").replaceChildren(...meta.map((text) => Object.assign(document.createElement("span"), { textContent: text })));
+  populateDetailReminder(task.reminder);
   $("#task-detail-check").checked = false;
   $("#task-detail-check").disabled = false;
   $("#task-detail-save-status").textContent = "";
@@ -497,11 +579,16 @@ function saveDetailEdits() {
   if (!task) return;
   const title = $("#task-detail-title").value.trim();
   const notes = notesEditorValue();
+  const reminder = readDetailReminder();
   if (!title) {
     $("#task-detail-save-status").textContent = tr("taskNameRequired");
     return;
   }
-  Object.assign(task, { title, notes, updatedAt: Date.now() });
+  const reminderError = validateDetailReminder(reminder, task);
+  $("#task-detail-reminder-error").textContent = reminderError;
+  if (reminderError) return;
+  Object.assign(task, { title, notes, reminder, updatedAt: Date.now() });
+  $("#task-detail-reminder-summary").textContent = detailReminderSummary(reminder);
   $("#task-detail-save-status").textContent = tr("autoSaving");
   clearTimeout(detailSaveTimer);
   detailSaveTimer = setTimeout(async () => {
@@ -554,6 +641,10 @@ $("#quadrant-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#long-task-close").addEventListener("click", hideForm); $("#long-task-cancel").addEventListener("click", hideForm); $("#long-reminder-kind").addEventListener("change", renderReminderFields);
 $("#long-task-form").addEventListener("submit", async (event) => { event.preventDefault(); const kind = $("#long-reminder-kind").value; const weekdays = $$("#long-reminder-weekdays input:checked").map((input) => Number(input.value)); if (kind === "once" && !$("#long-reminder-at").value) return alert("请选择单次提醒时间。"); if (kind === "once" && Date.parse($("#long-reminder-at").value) <= Date.now()) return alert("提醒时间必须晚于当前时间。"); if (kind === "weekly" && !weekdays.length) return alert("请至少选择一个星期。"); const task = { id: $("#long-task-id").value, title: $("#long-task-title").value, notes: $("#long-task-notes").value, quadrant: $("#long-task-quadrant").value, reminder: { kind, at: $("#long-reminder-at").value ? new Date($("#long-reminder-at").value).toISOString() : null, time: $("#long-reminder-clock").value, weekdays } }; await api.saveLongTask(task); hideForm(); await reload(); });
 $("#task-detail-title").addEventListener("input", saveDetailEdits);
+$("#task-detail-reminder-kind").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
+$("#task-detail-reminder-at").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
+$("#task-detail-reminder-clock").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
+$("#task-detail-reminder-weekdays").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
 $("#task-detail-notes").addEventListener("click", (event) => {
   const line = event.target.closest(".markdown-line");
   if (line) line.focus();
