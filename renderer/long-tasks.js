@@ -255,16 +255,25 @@ function startMarkdownLineEdit(line) {
   $$(".markdown-line.editing").forEach((item) => {
     if (item !== line) finishMarkdownLineEdit(item);
   });
+  const pendingCaret = Number(line.dataset.pendingCaret);
+  delete line.dataset.pendingCaret;
   line.classList.add("editing");
   line.contentEditable = "true";
   line.spellcheck = false;
   line.textContent = line.dataset.raw || "";
-  requestAnimationFrame(() => placeCaretAt(line, line.textContent.length));
+  requestAnimationFrame(() => placeCaretAt(line, Number.isFinite(pendingCaret) ? pendingCaret : line.textContent.length));
 }
 function finishMarkdownLineEdit(line) {
   if (!line?.classList.contains("editing")) return;
   line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
   renderMarkdownLine(line);
+}
+function moveMarkdownLineByKeyboard(line, direction) {
+  const target = direction > 0 ? line.nextElementSibling : line.previousElementSibling;
+  if (!target?.classList.contains("markdown-line")) return false;
+  target.dataset.pendingCaret = String(caretOffset(line));
+  target.focus();
+  return true;
 }
 function renderNotesEditor(notes) {
   const editor = $("#task-detail-notes");
@@ -730,6 +739,13 @@ $("#task-detail-notes").addEventListener("input", (event) => {
 $("#task-detail-notes").addEventListener("keydown", (event) => {
   const line = event.target.closest(".markdown-line.editing");
   if (!line) return;
+  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (moveMarkdownLineByKeyboard(line, event.key === "ArrowDown" ? 1 : -1)) {
+      event.preventDefault();
+    }
+    return;
+  }
   if (event.key === "Enter") {
     event.preventDefault();
     splitMarkdownLine(line);

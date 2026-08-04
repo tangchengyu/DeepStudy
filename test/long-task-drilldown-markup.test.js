@@ -177,6 +177,16 @@ test("documents all supported image intake workflows in both tutorial languages"
   assert.match(tutorialJs, /截图/);
   assert.match(tutorialJs, /drag.*Explorer|Explorer.*drag/i);
   assert.match(tutorialJs, /screenshot clipboard paste/i);
+  assert.doesNotMatch(tutorialJs, /Obsidian-style absolute local image paths/i);
+  assert.doesNotMatch(tutorialJs, /!\[\[C:\\本地路径\\图片\.png\]\]/);
+});
+
+test("moves markdown note editing between lines with keyboard arrows", () => {
+  assert.match(longTasksJs, /function moveMarkdownLineByKeyboard\(line, direction\)/);
+  assert.match(longTasksJs, /event\.key === "ArrowUp" \|\| event\.key === "ArrowDown"/);
+  assert.match(longTasksJs, /event\.key === "ArrowDown" \? 1 : -1/);
+  assert.match(longTasksJs, /target\.dataset\.pendingCaret = String\(caretOffset\(line\)\)/);
+  assert.match(longTasksJs, /delete line\.dataset\.pendingCaret/);
 });
 
 test("edits reminders directly from the long-task detail page", () => {

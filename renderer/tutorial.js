@@ -44,13 +44,13 @@
     {
       target: "#long-tasks-open",
       title: "长期任务的操作方式",
-      description: "长期任务左侧色块是拖拽控制区，可在象限之间移动或调整同象限顺序；点击任务卡片其他区域会进入详情编辑。右键菜单包含“复制到今日任务”和“删除”。详情页可直接编辑任务名称、提醒方式和提醒时间；Markdown 备注支持从 Explorer 拖入图片，复制图片文件后粘贴，也支持粘贴截图剪贴板图片和 ![[C:\\本地路径\\图片.png]]，导入后会保存在本机。",
+      description: "长期任务左侧色块是拖拽控制区，可在象限之间移动或调整同象限顺序；点击任务卡片其他区域会进入详情编辑。右键菜单包含“复制到今日任务”和“删除”。详情页可直接编辑任务名称、提醒方式和提醒时间；Markdown 备注支持从 Explorer 拖入图片，复制图片文件后粘贴，也支持粘贴截图剪贴板图片，导入后会保存在本机。",
       view: "gate",
     },
     {
       target: "#app-settings-open",
       title: "统一设置入口",
-      description: "设置窗口里可以切换语言、新建 API 配置、测试模型连接、调整每日任务和长期任务 AI 的偏好提示词，也能维护灵魂按摩间的好句库。",
+      description: "顶部“设置”是统一入口。进入设置面板后，左侧选择子栏目，右侧完成对应设置：常规与语言用于切换界面语言；新建 API 配置用于填写模型连接并一键测试；每日任务 AI 与长期任务 AI 用于选择已保存 API 和调整个性化提示词；灵魂按摩间用于维护好句库；使用教程可随时重新打开本引导。",
       view: "gate",
     },
     {
@@ -115,8 +115,8 @@
     { target: "#noise-control", title: "Protect Attention With Sound", description: "My White Noise supports built-in tracks, volume, playback speed, and local audio files.", view: "gate" },
     { target: "#open-stopwatch", title: "Stopwatch and Countdown", description: "Use Stopwatch for open-ended work and Countdown for bounded work. Both open in small independent windows.", view: "gate" },
     { target: "#long-tasks-open", title: "Manage Long Tasks", description: "Long Tasks use the important/urgent quadrant board. Ticking a long task completes it and syncs it to Daily Reflection; an undo button stays available for 10 seconds.", view: "gate" },
-    { target: "#long-tasks-open", title: "Long Task Operations", description: "The colored left strip is the drag handle. Drag tasks across quadrants or reorder within one quadrant. Click the rest of the card to edit details. The right-click menu includes Copy to Today and Delete. In details, edit the reminder type and time directly. Markdown notes accept images dragged from Explorer, copied image-file paste, and screenshot clipboard paste, as well as Obsidian-style absolute local image paths; imported images stay on this computer.", view: "gate" },
-    { target: "#app-settings-open", title: "One Settings Window", description: "Settings contains language, API configuration, API test, Daily AI preferences, Long Task AI preferences, the quote room, and the guide.", view: "gate" },
+    { target: "#long-tasks-open", title: "Long Task Operations", description: "The colored left strip is the drag handle. Drag tasks across quadrants or reorder within one quadrant. Click the rest of the card to edit details. The right-click menu includes Copy to Today and Delete. In details, edit the reminder type and time directly. Markdown notes accept images dragged from Explorer, copied image-file paste, and screenshot clipboard paste; imported images stay on this computer.", view: "gate" },
+    { target: "#app-settings-open", title: "One Settings Window", description: "The top Settings button is the shared entry point. Open the settings panel, choose a section on the left, and edit it on the right: General and Language changes the UI language, New API Configuration stores and tests model access, Daily AI and Long Task AI choose saved APIs and user-editable preference prompts, Quote Room manages saved quotes, and Guide reopens this walkthrough.", view: "gate" },
     { target: "#app-settings-open", title: "Configure Model API First", description: "In New API Configuration, fill in profile name, model preset, API Base URL, model name, and API Key. Use Test Once before saving. Then select that API for Daily AI and Long Task AI.", view: "gate" },
     { target: "#focus-quote-screen", title: "Clear Attention Residue", description: "Click the quote card to refresh a saved sentence. Before working, pause briefly so the last task can leave working memory.", view: "gate" },
     { target: "#enter-gate", title: "Enter Focus Space", description: "When ready, enter the workspace. The guide will preview internal features and then return you to this gate.", view: "gate" },
