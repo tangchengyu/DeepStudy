@@ -230,6 +230,12 @@
       editLongTask: "编辑长期任务",
       notes: "备注",
       quadrant: "所属象限",
+      importance: "重要性",
+      urgency: "紧急性",
+      important: "重要",
+      notImportant: "不重要",
+      urgent: "紧急",
+      notUrgent: "不紧急",
       reminderType: "提醒方式",
       noReminder: "不提醒",
       onceReminder: "单次提醒",
@@ -486,6 +492,12 @@
       editLongTask: "Edit Long Task",
       notes: "Notes",
       quadrant: "Quadrant",
+      importance: "Importance",
+      urgency: "Urgency",
+      important: "Important",
+      notImportant: "Not Important",
+      urgent: "Urgent",
+      notUrgent: "Not Urgent",
       reminderType: "Reminder",
       noReminder: "No reminder",
       onceReminder: "Once",
@@ -726,7 +738,12 @@
     setLabelText('label:has(#focus-duration-input)', "customFocusTime");
     setLabelText('label:has(#long-task-title)', "taskName");
     setLabelText('label:has(#long-task-notes)', "notes");
-    setLabelText('label:has(#long-task-quadrant)', "quadrant");
+    setLabelText('.quadrant-choice-grid fieldset:first-of-type legend', "importance");
+    setLabelText('.quadrant-choice-grid fieldset:last-of-type legend', "urgency");
+    setLabelText('label:has(input[name="long-task-importance"][value="important"])', "important");
+    setLabelText('label:has(input[name="long-task-importance"][value="not-important"])', "notImportant");
+    setLabelText('label:has(input[name="long-task-urgency"][value="urgent"])', "urgent");
+    setLabelText('label:has(input[name="long-task-urgency"][value="not-urgent"])', "notUrgent");
     setLabelText('label:has(#long-reminder-kind)', "reminderType");
     setLabelText('label:has(#long-reminder-at)', "dateAndTime");
     setLabelText('label:has(#long-reminder-clock)', "reminderTime");

@@ -5,6 +5,7 @@ const {
   buildAuditSegments,
   buildTimelineSegments,
   completePriorityItems,
+  formatApiResponsePreview,
   findSimilarTask,
   fallbackPlanItemsFromText,
   getApiModelPreset,
@@ -90,6 +91,21 @@ test("API model presets provide and match their Base URL", () => {
       "https://generativelanguage.googleapis.com/v1beta/openai/",
     )?.id,
     "gemini-2-5-flash-free",
+  );
+  assert.equal(
+    getApiModelPreset("openrouter-gpt-oss-120b-free").model,
+    "nvidia/nemotron-3-super-120b-a12b:free",
+  );
+});
+
+test("formats non-JSON API responses without leaking parser errors", () => {
+  assert.match(
+    formatApiResponsePreview("text/html", "<!doctype html><html><title>Not Found</title></html>"),
+    /网页|HTML|非 JSON/,
+  );
+  assert.doesNotMatch(
+    formatApiResponsePreview("text/html", "<!doctype html><html><title>Not Found</title></html>"),
+    /Unexpected token/,
   );
 });
 
@@ -238,6 +254,12 @@ test("detects similar AI tasks while preserving distinct tasks", () => {
   ];
   assert.equal(findSimilarTask("学习鱼皮老师教程", existing)?.id, "1");
   assert.equal(findSimilarTask("整理明天会议资料", existing), null);
+});
+
+test("does not treat different numbered study chapters as duplicate AI tasks", () => {
+  const existing = [{ id: "chapter-4", text: "学习矩阵论第 4 章" }];
+  assert.equal(findSimilarTask("学习矩阵论第 5 章", existing), null);
+  assert.equal(findSimilarTask("学习矩阵论第5章", existing), null);
 });
 
 test("timeline segments preserve their absolute positions and gaps", () => {

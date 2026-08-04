@@ -700,13 +700,30 @@ async function reload() {
 
 function showForm(task = {}) {
   $("#long-task-form-title").textContent = task.id ? tr("editLongTask") : tr("addLongTask");
-  $("#long-task-id").value = task.id || ""; $("#long-task-title").value = task.title || ""; $("#long-task-notes").value = task.notes || ""; $("#long-task-quadrant").value = task.quadrant || "important-not-urgent";
+  $("#long-task-id").value = task.id || ""; $("#long-task-title").value = task.title || ""; setFormQuadrant(task.quadrant || "important-not-urgent");
   const reminder = task.reminder || { kind: "none", time: "09:00", weekdays: [] }; $("#long-reminder-kind").value = reminder.kind || "none"; $("#long-reminder-at").value = reminder.at ? new Date(new Date(reminder.at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""; $("#long-reminder-clock").value = reminder.time || "09:00";
   $$("#long-reminder-weekdays input").forEach((input) => input.checked = (reminder.weekdays || []).includes(Number(input.value)));
   renderReminderFields(); $("#long-task-modal").hidden = false; $("#long-task-title").focus();
 }
 function hideForm() { $("#long-task-modal").hidden = true; }
 function renderReminderFields() { const kind = $("#long-reminder-kind").value; $("#long-reminder-once").hidden = kind !== "once"; $("#long-reminder-time").hidden = !["daily", "weekly"].includes(kind); $("#long-reminder-weekdays").hidden = kind !== "weekly"; }
+function selectedFormQuadrant() {
+  const importance = document.querySelector('input[name="long-task-importance"]:checked')?.value || "important";
+  const urgency = document.querySelector('input[name="long-task-urgency"]:checked')?.value || "not-urgent";
+  if (importance === "important" && urgency === "urgent") return "important-urgent";
+  if (importance === "important") return "important-not-urgent";
+  if (urgency === "urgent") return "urgent-not-important";
+  return "not-important-not-urgent";
+}
+function setFormQuadrant(quadrant) {
+  const normalized = LongTaskUtils.QUADRANTS.includes(quadrant) ? quadrant : "important-not-urgent";
+  const important = normalized === "important-urgent" || normalized === "important-not-urgent";
+  const urgent = normalized === "important-urgent" || normalized === "urgent-not-important";
+  const importanceInput = document.querySelector(`input[name="long-task-importance"][value="${important ? "important" : "not-important"}"]`);
+  const urgencyInput = document.querySelector(`input[name="long-task-urgency"][value="${urgent ? "urgent" : "not-urgent"}"]`);
+  if (importanceInput) importanceInput.checked = true;
+  if (urgencyInput) urgencyInput.checked = true;
+}
 $$('[data-open-quadrant]').forEach((button) => button.addEventListener("click", () => openQuadrant(button.dataset.openQuadrant)));
 $("#quadrant-back").addEventListener("click", navigateBack);
 $("#task-detail-back").addEventListener("click", navigateBack);
@@ -716,7 +733,7 @@ function newTaskDefaults() {
 $("#long-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#quadrant-add").addEventListener("click", () => showForm(newTaskDefaults()));
 $("#long-task-close").addEventListener("click", hideForm); $("#long-task-cancel").addEventListener("click", hideForm); $("#long-reminder-kind").addEventListener("change", renderReminderFields);
-$("#long-task-form").addEventListener("submit", async (event) => { event.preventDefault(); const kind = $("#long-reminder-kind").value; const weekdays = $$("#long-reminder-weekdays input:checked").map((input) => Number(input.value)); if (kind === "once" && !$("#long-reminder-at").value) return alert("请选择单次提醒时间。"); if (kind === "once" && Date.parse($("#long-reminder-at").value) <= Date.now()) return alert("提醒时间必须晚于当前时间。"); if (kind === "weekly" && !weekdays.length) return alert("请至少选择一个星期。"); const task = { id: $("#long-task-id").value, title: $("#long-task-title").value, notes: $("#long-task-notes").value, quadrant: $("#long-task-quadrant").value, reminder: { kind, at: $("#long-reminder-at").value ? new Date($("#long-reminder-at").value).toISOString() : null, time: $("#long-reminder-clock").value, weekdays } }; await api.saveLongTask(task); hideForm(); await reload(); });
+$("#long-task-form").addEventListener("submit", async (event) => { event.preventDefault(); const kind = $("#long-reminder-kind").value; const weekdays = $$("#long-reminder-weekdays input:checked").map((input) => Number(input.value)); if (kind === "once" && !$("#long-reminder-at").value) return alert("请选择单次提醒时间。"); if (kind === "once" && Date.parse($("#long-reminder-at").value) <= Date.now()) return alert("提醒时间必须晚于当前时间。"); if (kind === "weekly" && !weekdays.length) return alert("请至少选择一个星期。"); const task = { id: $("#long-task-id").value, title: $("#long-task-title").value, notes: "", quadrant: selectedFormQuadrant(), reminder: { kind, at: $("#long-reminder-at").value ? new Date($("#long-reminder-at").value).toISOString() : null, time: $("#long-reminder-clock").value, weekdays } }; await api.saveLongTask(task); hideForm(); await reload(); });
 $("#task-detail-title").addEventListener("input", saveDetailEdits);
 $("#task-detail-reminder-kind").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
 $("#task-detail-reminder-at").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });

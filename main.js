@@ -23,6 +23,7 @@ if (!gotTheLock) {
 }
 
 const {
+  formatApiResponsePreview,
   sanitizeChatHistory,
   upsertApiProfile,
 } = require("./renderer/planner-utils");
@@ -30,7 +31,7 @@ const { dueTasks, extractJson, fallbackAiOperationsFromText, normalizeAiOperatio
 
 const DEFAULT_PLANNER_SETTINGS = {
   mode: "api",
-  api: { baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-oss-120b:free" },
+  api: { baseUrl: "https://openrouter.ai/api/v1", model: "nvidia/nemotron-3-super-120b-a12b:free" },
 };
 const DEFAULT_DAILY_SYSTEM_PROMPT = [
   "You help turn a short chat into a practical daily plan for a desktop timer app.",
@@ -964,9 +965,15 @@ async function testApiConfiguration(input = {}) {
     });
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`API 返回 HTTP ${response.status}: ${body.slice(0, 300)}`);
+      throw new Error(`API 返回 HTTP ${response.status}: ${formatApiResponsePreview(response.headers.get("content-type"), body)}`);
     }
-    const data = await response.json();
+    const body = await response.text();
+    let data;
+    try {
+      data = JSON.parse(body);
+    } catch {
+      throw new Error(formatApiResponsePreview(response.headers.get("content-type"), body));
+    }
     const content = cleanString(extractModelContent(data, true));
     if (!content) throw new Error("API 已连接，但模型返回了空内容。");
     return { ok: true, message: "API 验证成功。" };

@@ -214,6 +214,17 @@ test("edits reminders directly from the long-task detail page", () => {
   assert.match(tutorialJs, /reminder type and time/i);
 });
 
+test("keeps the new long-task dialog focused on title and two quadrant choices", () => {
+  assert.match(html, /class="quadrant-choice-grid"/);
+  assert.match(html, /name="long-task-importance"/);
+  assert.match(html, /name="long-task-urgency"/);
+  assert.doesNotMatch(html, /<textarea id="long-task-notes"/);
+  assert.doesNotMatch(html, /<select id="long-task-quadrant"/);
+  assert.match(longTasksJs, /function selectedFormQuadrant\(\)/);
+  assert.match(longTasksJs, /function setFormQuadrant\(quadrant/);
+  assert.match(longTasksJs, /notes:\s*""/);
+});
+
 test("limits long-task drag affordance to the colored control area", () => {
   assert.match(longTasksJs, /long-task-drag-zone/);
   assert.match(longTasksJs, /card\.addEventListener\("click"/);

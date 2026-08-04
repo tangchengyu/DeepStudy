@@ -7,8 +7,8 @@
     {
       id: "openrouter-gpt-oss-120b-free",
       provider: "OpenRouter",
-      label: "GPT-OSS 120B Free",
-      model: "openai/gpt-oss-120b:free",
+      label: "NVIDIA Nemotron 3 Super 120B Free",
+      model: "nvidia/nemotron-3-super-120b-a12b:free",
       baseUrl: "https://openrouter.ai/api/v1",
     },
     {
@@ -209,6 +209,9 @@
     const a = normalizeTaskForSimilarity(left);
     const b = normalizeTaskForSimilarity(right);
     if (!a || !b) return 0;
+    const leftNumbers = numberedTaskTokens(left);
+    const rightNumbers = numberedTaskTokens(right);
+    if (leftNumbers.length && rightNumbers.length && leftNumbers.join("|") !== rightNumbers.join("|")) return 0;
     if (a === b) return 1;
     if (Math.min(a.length, b.length) >= 4 && (a.includes(b) || b.includes(a)))
       return 0.9;
@@ -216,6 +219,21 @@
     const bChars = new Set(b);
     const shared = [...aChars].filter((char) => bChars.has(char)).length;
     return shared / (aChars.size + bChars.size - shared);
+  }
+
+  function numberedTaskTokens(value) {
+    return String(value || "")
+      .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+      .match(/\d+/g) || [];
+  }
+
+  function formatApiResponsePreview(contentType = "", body = "") {
+    const text = String(body || "").replace(/\s+/g, " ").trim();
+    if (/html/i.test(contentType) || /^<!doctype html/i.test(text) || /^<html[\s>]/i.test(text)) {
+      return "服务返回了网页/HTML 内容，不是 OpenAI 兼容接口需要的 JSON。请检查 API Base URL 是否填写到 /api/v1 或兼容接口根路径，或确认该模型服务是否可用。";
+    }
+    if (!text) return "服务没有返回错误正文。";
+    return text.slice(0, 300);
   }
 
   function findSimilarTask(text, tasks, threshold = 0.58) {
@@ -441,6 +459,7 @@
     buildAuditSegments,
     buildTimelineSegments,
     completePriorityItems,
+    formatApiResponsePreview,
     findSimilarTask,
     getApiModelPreset,
     matchApiModelPreset,

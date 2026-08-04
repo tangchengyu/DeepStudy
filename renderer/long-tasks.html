@@ -104,8 +104,10 @@
       <div class="settings-heading"><div><div class="eyebrow">TASK</div><h2 id="long-task-form-title">新增长期任务</h2></div><button id="long-task-close" class="icon-btn compact" type="button" aria-label="关闭">×</button></div>
       <input id="long-task-id" type="hidden" />
       <label>任务名称<input id="long-task-title" maxlength="120" required /></label>
-      <label>备注<textarea id="long-task-notes" rows="3" maxlength="10000"></textarea></label>
-      <label>所属象限<select id="long-task-quadrant"><option value="important-urgent">重要且紧急</option><option value="important-not-urgent">重要不紧急</option><option value="urgent-not-important">不重要但紧急</option><option value="not-important-not-urgent">不重要不紧急</option></select></label>
+      <div class="quadrant-choice-grid" role="group" aria-label="所属象限">
+        <fieldset><legend>重要性</legend><label><input type="radio" name="long-task-importance" value="important" checked>重要</label><label><input type="radio" name="long-task-importance" value="not-important">不重要</label></fieldset>
+        <fieldset><legend>紧急性</legend><label><input type="radio" name="long-task-urgency" value="urgent">紧急</label><label><input type="radio" name="long-task-urgency" value="not-urgent" checked>不紧急</label></fieldset>
+      </div>
       <label>提醒方式<select id="long-reminder-kind"><option value="none">不提醒</option><option value="once">单次提醒</option><option value="daily">每天</option><option value="weekly">每周</option></select></label>
       <label id="long-reminder-once" hidden>日期和时间<input id="long-reminder-at" type="datetime-local" /></label>
       <label id="long-reminder-time" hidden>提醒时间<input id="long-reminder-clock" type="time" value="09:00" /></label>
