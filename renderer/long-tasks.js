@@ -212,11 +212,33 @@ function createMarkdownLine(raw = "") {
   line.tabIndex = 0;
   line.setAttribute("role", "textbox");
   line.setAttribute("aria-multiline", "false");
-  line.addEventListener("focus", () => startMarkdownLineEdit(line));
+  
+  // 双击进入编辑模式
+  line.addEventListener("dblclick", () => startMarkdownLineEdit(line));
+  
+  // 单击时选择但不立即编辑，允许跨行选择
+  line.addEventListener("click", (event) => {
+    // 如果已经在编辑，不做处理
+    if (line.classList.contains("editing")) return;
+    // 单击时设置焦点但不进入编辑
+    line.focus();
+  });
+  
+  // 开始输入时进入编辑模式
+  line.addEventListener("keydown", (event) => {
+    if (line.classList.contains("editing")) return;
+    // 可打印字符或退格键时进入编辑模式
+    if (event.key.length === 1 || event.key === "Backspace" || event.key === "Delete") {
+      startMarkdownLineEdit(line);
+    }
+  });
+  
+  // blur 时退出编辑
   line.addEventListener("blur", () => {
     finishMarkdownLineEdit(line);
     saveDetailEdits();
   });
+  
   renderMarkdownLine(line);
   return line;
 }

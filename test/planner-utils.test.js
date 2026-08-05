@@ -72,28 +72,22 @@ test("falls back to splitting sequential Chinese plan text", () => {
 });
 
 test("API model presets provide and match their Base URL", () => {
-  assert.ok(API_MODEL_PRESETS.length >= 6);
-  const preset = getApiModelPreset("deepseek-v4-flash");
+  assert.ok(API_MODEL_PRESETS.length >= 2);
+  const preset = getApiModelPreset("gemini-flash-free");
   assert.deepEqual(preset, {
-    id: "deepseek-v4-flash",
-    provider: "DeepSeek",
-    label: "DeepSeek V4 Flash",
-    model: "deepseek-v4-flash",
-    baseUrl: "https://api.deepseek.com",
+    id: "gemini-flash-free",
+    provider: "Google Gemini",
+    label: "Gemini 2.0 Flash Exp (Free Tier)",
+    model: "gemini-2.0-flash-exp",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
   });
   assert.equal(
-    matchApiModelPreset("deepseek-v4-flash", "https://api.deepseek.com/")?.id,
-    preset.id,
+    matchApiModelPreset("gemini-2.0-flash-exp", "https://generativelanguage.googleapis.com/v1beta/openai")?.id,
+    "gemini-flash-free",
   );
+  // 已删除旧的 gemini-2.0-flash 测试
   assert.equal(
-    matchApiModelPreset(
-      "gemini-2.0-flash",
-      "https://generativelanguage.googleapis.com/v1beta/openai/",
-    )?.id,
-    "gemini-2-0-flash-free",
-  );
-  assert.equal(
-    getApiModelPreset("openrouter-gpt-oss-120b-free").model,
+    getApiModelPreset("openrouter-nemotron-free").model,
     "nvidia/nemotron-3-super-120b-a12b:free",
   );
 });

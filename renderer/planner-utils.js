@@ -3,90 +3,20 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.PlannerUtils = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const API_MODEL_PRESETS = [
+    const API_MODEL_PRESETS = [
     {
-      id: "openrouter-gpt-oss-120b-free",
+      id: "openrouter-nemotron-free",
       provider: "OpenRouter",
       label: "NVIDIA Nemotron 3 Super 120B Free",
       model: "nvidia/nemotron-3-super-120b-a12b:free",
       baseUrl: "https://openrouter.ai/api/v1",
     },
     {
-      id: "openrouter-free-router",
-      provider: "OpenRouter",
-      label: "Free Models Router",
-      model: "openrouter/free",
-      baseUrl: "https://openrouter.ai/api/v1",
-    },
-    {
-      id: "openai-gpt-5-mini",
-      provider: "OpenAI",
-      label: "GPT-5 mini",
-      model: "gpt-5-mini",
-      baseUrl: "https://api.openai.com/v1",
-    },
-    {
-      id: "openai-gpt-5-2",
-      provider: "OpenAI",
-      label: "GPT-5.2",
-      model: "gpt-5.2",
-      baseUrl: "https://api.openai.com/v1",
-    },
-    {
-      id: "openai-gpt-4-1-mini",
-      provider: "OpenAI",
-      label: "GPT-4.1 mini",
-      model: "gpt-4.1-mini",
-      baseUrl: "https://api.openai.com/v1",
-    },
-    {
-      id: "openai-gpt-4o-mini",
-      provider: "OpenAI",
-      label: "GPT-4o mini",
-      model: "gpt-4o-mini",
-      baseUrl: "https://api.openai.com/v1",
-    },
-    {
-      id: "deepseek-v4-flash",
-      provider: "DeepSeek",
-      label: "DeepSeek V4 Flash",
-      model: "deepseek-v4-flash",
-      baseUrl: "https://api.deepseek.com",
-    },
-    {
-      id: "deepseek-v4-pro",
-      provider: "DeepSeek",
-      label: "DeepSeek V4 Pro",
-      model: "deepseek-v4-pro",
-      baseUrl: "https://api.deepseek.com",
-    },
-    {
-      id: "gemini-2-0-flash-free",
+      id: "gemini-flash-free",
       provider: "Google Gemini",
-      label: "Gemini 2.0 Flash (Free Tier)",
-      model: "gemini-2.0-flash",
+      label: "Gemini 2.0 Flash Exp (Free Tier)",
+      model: "gemini-2.0-flash-exp",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    },
-    {
-      id: "gemini-2-0-flash-lite-free",
-      provider: "Google Gemini",
-      label: "Gemini 2.0 Flash Lite (Free Tier)",
-      model: "gemini-2.0-flash-lite",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    },
-    {
-      id: "qwen-plus",
-      provider: "通义千问",
-      label: "Qwen Plus",
-      model: "qwen-plus",
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    },
-    {
-      id: "qwen-max",
-      provider: "通义千问",
-      label: "Qwen Max",
-      model: "qwen-max",
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     },
   ];
 

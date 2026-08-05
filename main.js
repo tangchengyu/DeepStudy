@@ -889,93 +889,13 @@ async function requestPlannerReply(payload) {
     const data = await response.json();
     const content = cleanString(extractModelContent(data, true));
     if (!content) {
-      throw new Error("API 返回了空内容。");
+      const debugInfo = JSON.stringify({
+        choices: data?.choices,
+        message: data?.choices?.[0]?.message,
+        finish_reason: data?.choices?.[0]?.finish_reason,
+      }, null, 2);
+      throw new Error(`API 已连接，但模型返回了空内容。请检查：\n1. API Key 是否有效\n2. 模型名称是否正确（Gemini 免费版请用 gemini-2.0-flash-exp）\n3. 是否触发了内容过滤\n\n调试信息：${debugInfo}`);
     }
-
-    return {
-      content,
-      model: cleanString(
-        data.model,
-        settings.api.model,
-      ),
-      mode: settings.mode,
-    };
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("模型请求在 120 秒后超时。");
-    }
-    throw new Error(modelNetworkError(error, settings.api.baseUrl));
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-async function requestStructuredModel(messages, signal, settingsOverride) {
-  const settings = settingsOverride || readPlannerSettings();
-  try {
-    const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
-      method: "POST",
-      headers: modelHeaders(settings),
-      signal,
-      body: JSON.stringify({
-        model: settings.api.model,
-        stream: false,
-        temperature: 0,
-        max_tokens: 700,
-        messages,
-      }),
-    });
-    if (!response.ok) throw new Error(`模型返回 HTTP ${response.status}`);
-    const data = await response.json();
-    const content = cleanString(extractModelContent(data, true));
-    if (!content) throw new Error("模型返回了空内容。");
-    return { content, metrics: data };
-  } catch (error) {
-    throw new Error(modelNetworkError(error, settings.api.baseUrl));
-  }
-}
-
-async function testApiConfiguration(input = {}) {
-  const current = readPlannerSettings();
-  const selectedProfile = current.apiProfiles.find((profile) => profile.id === cleanString(input.profileId));
-  const api = {
-    baseUrl: normalizeBaseUrl(input.baseUrl, selectedProfile?.baseUrl || current.api.baseUrl),
-    model: cleanString(input.model, selectedProfile?.model || current.api.model),
-    apiKey: cleanString(input.apiKey) || selectedProfile?.apiKey || current.api.apiKey,
-  };
-  if (!api.model || !api.apiKey) throw new Error("请填写模型名称和 API Key 后再测试。");
-  const settings = { mode: "api", api };
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
-  try {
-    const response = await net.fetch(`${api.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: modelHeaders(settings),
-      body: JSON.stringify({
-        model: api.model,
-        stream: false,
-        max_tokens: 16,
-        temperature: 0,
-        messages: [
-          { role: "system", content: "Reply with OK only." },
-          { role: "user", content: "ping" },
-        ],
-      }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`API 返回 HTTP ${response.status}: ${formatApiResponsePreview(response.headers.get("content-type"), body)}`);
-    }
-    const body = await response.text();
-    let data;
-    try {
-      data = JSON.parse(body);
-    } catch {
-      throw new Error(formatApiResponsePreview(response.headers.get("content-type"), body));
-    }
-    const content = cleanString(extractModelContent(data, true));
-    if (!content) throw new Error("API 已连接，但模型返回了空内容。");
     return { ok: true, message: "API 验证成功。" };
   } catch (error) {
     throw new Error(modelNetworkError(error, api.baseUrl));
