@@ -179,17 +179,15 @@ function bringMainWindowToFront() {
   return runWhenAppReady(() => {
     if (!mainWindow || mainWindow.isDestroyed()) createWindow();
     if (mainWindow.isMinimized()) mainWindow.restore();
+    const wasAlwaysOnTop = mainWindow.isAlwaysOnTop();
     mainWindow.show();
-    // Windows foreground-lock fix: when this window is restored while DeepStudy
-    // is NOT the foreground application (the common case when it lives in the
-    // tray and you click the desktop shortcut -> single-instance "second-instance"
-    // event, or click the tray icon), Windows refuses to grant it foreground
-    // activation. Chromium then renders a "ghost" window that is visible but does
-    // not receive mouse input, so every button looks dead. Toggling always-on-top
-    // forces Windows to re-establish real input focus.
     if (process.platform === "win32") {
-      mainWindow.setAlwaysOnTop(true);
-      mainWindow.setAlwaysOnTop(false);
+      mainWindow.setAlwaysOnTop(true, "screen-saver");
+      setTimeout(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.setAlwaysOnTop(wasAlwaysOnTop, "normal");
+        mainWindow.focus();
+      }, 120).unref?.();
     }
     mainWindow.moveTop?.();
     mainWindow.focus();
@@ -909,7 +907,7 @@ async function requestPlannerReply(payload) {
     }
     return { ok: true, message: "API 验证成功。" };
   } catch (error) {
-    throw new Error(modelNetworkError(error, api.baseUrl));
+    throw new Error(modelNetworkError(error, settings.api.baseUrl));
   } finally {
     clearTimeout(timeoutId);
   }

@@ -244,7 +244,7 @@ test("does not show an undo button for daily task completion", () => {
 });
 
 test("uses the view source for task detail back navigation and new-task defaults", () => {
-  assert.match(longTasksJs, /returnMode:\s*viewState\.mode === "quadrant" \? "quadrant" : "board"/);
+  assert.match(longTasksJs, /returnMode:\s*"quadrant"/);
   assert.match(longTasksJs, /LongTaskUtils\.detailReturnView\(viewState\)/);
   assert.match(longTasksJs, /LongTaskUtils\.newTaskDefaultsForView\(viewState\)/);
 });

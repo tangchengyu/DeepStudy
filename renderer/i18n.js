@@ -845,6 +845,7 @@
     current = ["zh-CN", "en-US"].includes(language) ? language : "zh-CN";
     localStorage.setItem(KEY, current);
     apply();
+    window.dispatchEvent(new CustomEvent("deepstudy:language-changed", { detail: { language: current } }));
     return current;
   }
 

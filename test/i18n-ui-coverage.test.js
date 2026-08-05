@@ -32,6 +32,12 @@ test("dynamic focus, rest, and habit content uses translated copy", () => {
   assert.doesNotMatch(appJs, /"controllable-interesting": \["可控 \+ 有意思"/);
 });
 
+test("language changes rerender dynamic app views", () => {
+  assert.match(i18nJs, /deepstudy:language-changed/);
+  assert.match(appJs, /addEventListener\("deepstudy:language-changed",\s*refreshLocaleSensitiveViews\)/);
+  assert.match(appJs, /return \{ addTasks, getTasks, render \}/);
+});
+
 test("white-noise popover is promoted to the root overlay layer", () => {
   assert.match(appJs, /document\.body\.append\(popover\)/);
   assert.match(appJs, /--noise-popover-max-height/);

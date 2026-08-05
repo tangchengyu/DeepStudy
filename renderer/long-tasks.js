@@ -55,7 +55,7 @@ function openTaskDetail(taskId) {
   const task = tasks.find((item) => item.id === taskId && item.status === "active");
   if (!task) return;
   hideTaskMenu();
-  viewState = { mode: "detail", quadrant: task.quadrant, taskId, returnMode: viewState.mode === "quadrant" ? "quadrant" : "board" };
+  viewState = { mode: "detail", quadrant: task.quadrant, taskId, returnMode: "quadrant" };
   render();
 }
 
