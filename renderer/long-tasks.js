@@ -132,20 +132,131 @@ function markdownLineToHTML(value) {
     if (localId) return `<figure class="markdown-image"><img data-local-image="${escapeHTML(localId)}" alt="${alt}" /></figure>`;
     return `<figure class="markdown-image"><img src="${escapeHTML(image[2])}" alt="${alt}" /></figure>`;
   }
-  const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
-  if (heading) return `<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
-  const listItem = trimmed.match(/^[-*]\s+(.+)$/);
-  if (listItem) return `<ul><li>${renderInlineMarkdown(listItem[1])}</li></ul>`;
-  const orderedItem = trimmed.match(/^(\d+)[.)]\s+(.+)$/);
-  if (orderedItem) return `<ol start="${Number(orderedItem[1])}"><li>${renderInlineMarkdown(orderedItem[2])}</li></ol>`;
-  return `<p>${renderInlineMarkdown(trimmed)}</p>`;
+  const leading = raw.match(/^[\t ]+/)?.[0] || "";
+  const leadingHTML = leading.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;").replace(/ /g, "&nbsp;");
+  const body = raw.slice(leading.length);
+  const heading = body.match(/^(#{1,3})\s+(.+)$/);
+  if (heading) return `<h${heading[1].length}>${leadingHTML}${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
+  const listItem = body.match(/^[-*]\s+(.+)$/);
+  if (listItem) return `<ul><li>${leadingHTML}${renderInlineMarkdown(listItem[1])}</li></ul>`;
+  const orderedItem = body.match(/^(\d+)[.)]\s+(.+)$/);
+  if (orderedItem) return `<ol start="${Number(orderedItem[1])}"><li>${leadingHTML}${renderInlineMarkdown(orderedItem[2])}</li></ol>`;
+  return `<p>${leadingHTML}${renderInlineMarkdown(body.trim())}</p>`;
 }
 function renderMarkdownLine(line) {
+  const raw = line.dataset.raw || "";
   line.contentEditable = "false";
   line.classList.remove("editing");
-  line.innerHTML = markdownLineToHTML(line.dataset.raw || "");
+  line.innerHTML = markdownLineToHTML(raw);
+  line.style.whiteSpace = /^\s/.test(raw) ? "pre-wrap" : "";
   hydrateMarkdownImages(line);
   importObsidianImageLine(line);
+}
+
+const markdownSelectionState = {
+  pointerDown: false,
+  dragging: false,
+  anchorLine: null,
+  anchorIndex: -1,
+  focusIndex: -1,
+  startX: 0,
+  startY: 0,
+};
+
+function markdownLineElements() {
+  return $$("#task-detail-notes .markdown-line");
+}
+
+function markdownLineIndex(line) {
+  return markdownLineElements().indexOf(line);
+}
+
+function clearMarkdownLineSelection() {
+  markdownLineElements().forEach((line) => line.classList.remove("selected"));
+  markdownSelectionState.pointerDown = false;
+  markdownSelectionState.dragging = false;
+  markdownSelectionState.anchorLine = null;
+  markdownSelectionState.anchorIndex = -1;
+  markdownSelectionState.focusIndex = -1;
+}
+
+function selectedMarkdownLines() {
+  return markdownLineElements().filter((line) => line.classList.contains("selected"));
+}
+
+function selectMarkdownLineRange(startIndex, endIndex) {
+  const lines = markdownLineElements();
+  const start = Math.min(startIndex, endIndex);
+  const end = Math.max(startIndex, endIndex);
+  lines.forEach((line, index) => {
+    line.classList.toggle("selected", index >= start && index <= end);
+  });
+  markdownSelectionState.anchorIndex = startIndex;
+  markdownSelectionState.focusIndex = endIndex;
+}
+
+function caretOffsetFromPoint(line, x, y) {
+  const doc = line.ownerDocument;
+  if (typeof doc.caretPositionFromPoint === "function") {
+    const position = doc.caretPositionFromPoint(x, y);
+    if (position?.offsetNode && line.contains(position.offsetNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(line);
+      range.setEnd(position.offsetNode, position.offset);
+      return range.toString().length;
+    }
+  }
+  if (typeof doc.caretRangeFromPoint === "function") {
+    const range = doc.caretRangeFromPoint(x, y);
+    if (range) {
+      const copy = range.cloneRange();
+      copy.selectNodeContents(line);
+      copy.setEnd(range.startContainer, range.startOffset);
+      return copy.toString().length;
+    }
+  }
+  return line.textContent.length;
+}
+
+function beginMarkdownLineSelection(line, event) {
+  markdownSelectionState.pointerDown = true;
+  markdownSelectionState.dragging = false;
+  markdownSelectionState.anchorLine = line;
+  markdownSelectionState.anchorIndex = markdownLineIndex(line);
+  markdownSelectionState.focusIndex = markdownSelectionState.anchorIndex;
+  markdownSelectionState.startX = event.clientX;
+  markdownSelectionState.startY = event.clientY;
+}
+
+function updateMarkdownLineSelection(x, y) {
+  if (!markdownSelectionState.pointerDown || !markdownSelectionState.anchorLine) return;
+  const target = noteLineAtPoint(x, y);
+  if (!target) return;
+  const targetIndex = markdownLineIndex(target);
+  const moved = Math.abs(x - markdownSelectionState.startX) > 4
+    || Math.abs(y - markdownSelectionState.startY) > 4
+    || targetIndex !== markdownSelectionState.anchorIndex;
+  if (!moved) return;
+  markdownSelectionState.dragging = true;
+  selectMarkdownLineRange(markdownSelectionState.anchorIndex, targetIndex);
+}
+
+function endMarkdownLineSelection(event) {
+  if (!markdownSelectionState.pointerDown) return;
+  const anchorLine = markdownSelectionState.anchorLine;
+  const dragging = markdownSelectionState.dragging;
+  markdownSelectionState.pointerDown = false;
+  markdownSelectionState.anchorLine = null;
+  if (dragging) {
+    const selected = selectedMarkdownLines();
+    markdownSelectionState.dragging = false;
+    if (selected.length > 1) selected[0]?.focus();
+    else clearMarkdownLineSelection();
+    return;
+  }
+  clearMarkdownLineSelection();
+  if (!anchorLine || anchorLine.classList.contains("editing")) return;
+  startMarkdownLineEdit(anchorLine, caretOffsetFromPoint(anchorLine, event.clientX, event.clientY));
 }
 
 function importObsidianImage(sourcePath) {
@@ -212,33 +323,36 @@ function createMarkdownLine(raw = "") {
   line.tabIndex = 0;
   line.setAttribute("role", "textbox");
   line.setAttribute("aria-multiline", "false");
-  
-  // 双击进入编辑模式
-  line.addEventListener("dblclick", () => startMarkdownLineEdit(line));
-  
-  // 单击时选择但不立即编辑，允许跨行选择
-  line.addEventListener("click", (event) => {
-    // 如果已经在编辑，不做处理
-    if (line.classList.contains("editing")) return;
-    // 单击时设置焦点但不进入编辑
-    line.focus();
+
+  line.addEventListener("mousedown", (event) => {
+    if (event.button !== 0 || line.classList.contains("editing")) return;
+    event.preventDefault();
+    beginMarkdownLineSelection(line, event);
   });
-  
-  // 开始输入时进入编辑模式
+  line.addEventListener("click", (event) => {
+    if (line.classList.contains("editing") || markdownSelectionState.dragging || selectedMarkdownLines().length > 1) return;
+    startMarkdownLineEdit(line, caretOffsetFromPoint(line, event.clientX, event.clientY));
+  });
+  line.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    startMarkdownLineEdit(line, line.textContent.length);
+  });
   line.addEventListener("keydown", (event) => {
     if (line.classList.contains("editing")) return;
-    // 可打印字符或退格键时进入编辑模式
+    if (event.key === "Tab" && selectedMarkdownLines().length > 0) {
+      event.preventDefault();
+      indentSelectedMarkdownLines(event.shiftKey ? -1 : 1);
+      return;
+    }
     if (event.key.length === 1 || event.key === "Backspace" || event.key === "Delete") {
       startMarkdownLineEdit(line);
     }
   });
-  
-  // blur 时退出编辑
   line.addEventListener("blur", () => {
     finishMarkdownLineEdit(line);
     saveDetailEdits();
   });
-  
+
   renderMarkdownLine(line);
   return line;
 }
@@ -272,18 +386,18 @@ function caretOffset(element) {
   range.setEnd(selection.anchorNode, selection.anchorOffset);
   return range.toString().length;
 }
-function startMarkdownLineEdit(line) {
+function startMarkdownLineEdit(line, pendingCaret) {
   if (line.classList.contains("editing")) return;
   $$(".markdown-line.editing").forEach((item) => {
     if (item !== line) finishMarkdownLineEdit(item);
   });
-  const pendingCaret = Number(line.dataset.pendingCaret);
-  delete line.dataset.pendingCaret;
+  clearMarkdownLineSelection();
   line.classList.add("editing");
   line.contentEditable = "true";
   line.spellcheck = false;
   line.textContent = line.dataset.raw || "";
-  requestAnimationFrame(() => placeCaretAt(line, Number.isFinite(pendingCaret) ? pendingCaret : line.textContent.length));
+  line.focus();
+  requestAnimationFrame(() => placeCaretAt(line, Number.isFinite(Number(pendingCaret)) ? Number(pendingCaret) : line.textContent.length));
 }
 function finishMarkdownLineEdit(line) {
   if (!line?.classList.contains("editing")) return;
@@ -293,23 +407,50 @@ function finishMarkdownLineEdit(line) {
 function moveMarkdownLineByKeyboard(line, direction) {
   const target = direction > 0 ? line.nextElementSibling : line.previousElementSibling;
   if (!target?.classList.contains("markdown-line")) return false;
-  target.dataset.pendingCaret = String(caretOffset(line));
   target.focus();
+  startMarkdownLineEdit(target, caretOffset(line));
   return true;
 }
+
+function indentMarkdownLine(line, direction) {
+  const raw = String(line.dataset.raw || line.textContent || "");
+  const next = direction > 0
+    ? `  ${raw}`
+    : raw.replace(/^(?: {1,2}|\t)/, "");
+  if (next === raw) return false;
+  line.dataset.raw = next;
+  if (line.classList.contains("editing")) {
+    line.textContent = next;
+    requestAnimationFrame(() => placeCaretAt(line, line.textContent.length));
+  }
+  else {
+    renderMarkdownLine(line);
+  }
+  return true;
+}
+
+function indentSelectedMarkdownLines(direction) {
+  const selected = selectedMarkdownLines();
+  if (!selected.length) return false;
+  selected.forEach((line) => indentMarkdownLine(line, direction));
+  saveDetailEdits();
+  return true;
+}
+
 function renderNotesEditor(notes) {
   const editor = $("#task-detail-notes");
   const lines = String(notes || "").split(/\r?\n/);
+  clearMarkdownLineSelection();
   editor.replaceChildren(...(lines.length ? lines : [""]).map(createMarkdownLine));
   hydrateMarkdownImages(editor);
 }
 function notesEditorValue() {
-  return $$("#task-detail-notes .markdown-line").map((line) => (
+  return markdownLineElements().map((line) => (
     line.classList.contains("editing") ? line.textContent : line.dataset.raw || ""
   )).join("\n");
 }
 function splitMarkdownLine(line) {
-  const text = line.textContent;
+  const text = line.textContent.replace(/\u00a0/g, " ");
   const offset = caretOffset(line);
   const before = text.slice(0, offset);
   const after = text.slice(offset);
@@ -335,12 +476,12 @@ function pasteIntoMarkdownLine(line, text) {
   const normalized = String(text || "").replace(/\r\n/g, "\n");
   if (!normalized.includes("\n")) {
     insertPlainTextAtCaret(normalized);
-    line.dataset.raw = line.textContent;
+    line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
     saveDetailEdits();
     return;
   }
   const parts = normalized.split("\n");
-  const current = line.textContent;
+  const current = line.textContent.replace(/\u00a0/g, " ");
   const offset = caretOffset(line);
   line.dataset.raw = `${current.slice(0, offset)}${parts.shift()}`;
   const tail = `${parts.pop() || ""}${current.slice(offset)}`;
@@ -761,22 +902,34 @@ $("#task-detail-reminder-kind").addEventListener("change", () => { renderDetailR
 $("#task-detail-reminder-at").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
 $("#task-detail-reminder-clock").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
 $("#task-detail-reminder-weekdays").addEventListener("change", () => { renderDetailReminderFields(); saveDetailEdits(); });
+document.addEventListener("mousemove", (event) => updateMarkdownLineSelection(event.clientX, event.clientY));
+document.addEventListener("mouseup", (event) => endMarkdownLineSelection(event));
 $("#task-detail-notes").addEventListener("click", (event) => {
   const line = event.target.closest(".markdown-line");
   if (line) line.focus();
   else if (!$("#task-detail-notes .markdown-line")) {
     const next = createMarkdownLine("");
     $("#task-detail-notes").append(next);
-    next.focus();
+    startMarkdownLineEdit(next, 0);
   }
 });
 $("#task-detail-notes").addEventListener("input", (event) => {
   const line = event.target.closest(".markdown-line.editing");
-  if (line) line.dataset.raw = line.textContent;
+  if (line) line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
   saveDetailEdits();
 });
 $("#task-detail-notes").addEventListener("keydown", (event) => {
   const line = event.target.closest(".markdown-line.editing");
+  if (event.key === "Tab") {
+    event.preventDefault();
+    if (indentSelectedMarkdownLines(event.shiftKey ? -1 : 1)) return;
+    if (line) {
+      insertPlainTextAtCaret("  ");
+      line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
+      saveDetailEdits();
+    }
+    return;
+  }
   if (!line) return;
   if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -968,15 +1121,11 @@ const LongAiSettings = (() => {
   };
   function populatePresets() {
     const select = $("#long-api-model-preset");
-    const groups = new Map();
-    PlannerUtils.API_MODEL_PRESETS.forEach((preset) => {
-      if (!groups.has(preset.provider)) groups.set(preset.provider, []);
-      groups.get(preset.provider).push(preset);
-    });
-    groups.forEach((presets, provider) => {
+    select.replaceChildren(new Option("自定义模型", "custom"));
+    PlannerUtils.API_MODEL_PRESET_GROUPS.forEach((groupConfig) => {
       const group = document.createElement("optgroup");
-      group.label = provider;
-      presets.forEach((preset) => group.append(new Option(preset.label, preset.id)));
+      group.label = groupConfig.label;
+      groupConfig.presets.forEach((preset) => group.append(new Option(preset.label, preset.id)));
       select.append(group);
     });
   }
@@ -988,9 +1137,14 @@ const LongAiSettings = (() => {
     const preset = PlannerUtils.getApiModelPreset($("#long-api-model-preset").value);
     if (!preset) return $("#long-api-model").focus();
     $("#long-api-base-url").value = preset.baseUrl;
-    $("#long-api-model").value = preset.model;
+    $("#long-api-model").value = preset.model || "";
     detachProfileIfChanged();
-    setStatus(`已选择 ${preset.provider} · ${preset.label}`, "success");
+    setStatus(
+      preset.model
+        ? `已选择 ${preset.provider} · ${preset.label}`
+        : `已选择 ${preset.provider} · 已填入最新 API Base URL`,
+      "success",
+    );
   }
   function detachProfileIfChanged() {
     if (applyingProfile || !$("#long-api-profile").value) return;
@@ -1016,23 +1170,27 @@ const LongAiSettings = (() => {
     $("#long-api-delete").disabled = !select.value;
   }
   function startNewProfile() {
-    const currentBaseUrl = $("#long-api-base-url").value;
-    const currentModel = $("#long-api-model").value;
     $("#long-api-profile").value = "";
     $("#long-api-label").value = "";
+    $("#long-api-model-preset").value = "custom";
+    $("#long-api-base-url").value = "";
+    $("#long-api-model").value = "";
     $("#long-api-key").value = "";
-    $("#long-api-base-url").value = currentBaseUrl;
-    $("#long-api-model").value = currentModel;
     $("#long-api-key-row").hidden = false;
     $("#long-api-saved-hint").hidden = true;
     $("#long-api-delete").disabled = true;
-    selectMatchingPreset();
     setStatus("正在新建 API 配置，请填写名称和 API Key。");
     $("#long-api-label").focus();
   }
   function applyProfile() {
     const profile = profiles.find((item) => item.id === $("#long-api-profile").value);
-    if (profile) {
+    if (!profile) {
+      $("#long-api-label").value = "";
+      $("#long-api-model-preset").value = "custom";
+      $("#long-api-base-url").value = "";
+      $("#long-api-model").value = "";
+      $("#long-api-key").value = "";
+    } else {
       applyingProfile = true;
       $("#long-api-label").value = profile.label;
       $("#long-api-base-url").value = profile.baseUrl;
@@ -1137,7 +1295,6 @@ const LongAiSettings = (() => {
   $("#long-api-model-preset").addEventListener("change", applyPreset);
   $("#long-api-base-url").addEventListener("input", () => { selectMatchingPreset(); detachProfileIfChanged(); });
   $("#long-api-model").addEventListener("input", () => { selectMatchingPreset(); detachProfileIfChanged(); });
-  modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   populatePresets();
   refresh().catch((error) => { $("#long-ai-config-summary").textContent = error.message; });
   return { refresh, close };

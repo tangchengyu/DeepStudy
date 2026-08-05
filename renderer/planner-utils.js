@@ -3,22 +3,88 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.PlannerUtils = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-    const API_MODEL_PRESETS = [
+    const API_MODEL_PRESET_GROUPS = [
     {
-      id: "openrouter-nemotron-free",
-      provider: "OpenRouter",
-      label: "NVIDIA Nemotron 3 Super 120B Free",
-      model: "nvidia/nemotron-3-super-120b-a12b:free",
-      baseUrl: "https://openrouter.ai/api/v1",
+      label: "推荐的免费模型",
+      presets: [
+        {
+          id: "openrouter-nemotron-free",
+          provider: "OpenRouter",
+          label: "OpenRouter · NVIDIA Nemotron 3 Super 120B Free",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          baseUrl: "https://openrouter.ai/api/v1",
+        },
+        {
+          id: "gemini-flash-free",
+          provider: "Gemini",
+          label: "Gemini · gemini-3.5-flash",
+          model: "gemini-3.5-flash",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        },
+      ],
     },
     {
-      id: "gemini-flash-free",
-      provider: "Google Gemini",
-      label: "Gemini 2.0 Flash Exp (Free Tier)",
-      model: "gemini-2.0-flash-exp",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+      label: "OpenRouter",
+      presets: [
+        {
+          id: "openrouter-base",
+          provider: "OpenRouter",
+          label: "OpenRouter",
+          model: "",
+          baseUrl: "https://openrouter.ai/api/v1",
+        },
+      ],
+    },
+    {
+      label: "OpenAI",
+      presets: [
+        {
+          id: "openai-base",
+          provider: "OpenAI",
+          label: "OpenAI",
+          model: "",
+          baseUrl: "https://api.openai.com/v1",
+        },
+      ],
+    },
+    {
+      label: "DeepSeek",
+      presets: [
+        {
+          id: "deepseek-base",
+          provider: "DeepSeek",
+          label: "DeepSeek",
+          model: "",
+          baseUrl: "https://api.deepseek.com",
+        },
+      ],
+    },
+    {
+      label: "Gemini",
+      presets: [
+        {
+          id: "gemini-base",
+          provider: "Gemini",
+          label: "Gemini",
+          model: "",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        },
+      ],
+    },
+    {
+      label: "qwen",
+      presets: [
+        {
+          id: "qwen-base",
+          provider: "qwen",
+          label: "qwen",
+          model: "",
+          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        },
+      ],
     },
   ];
+    const API_MODEL_PRESETS = API_MODEL_PRESET_GROUPS.flatMap((group) => group.presets);
 
   function getApiModelPreset(id) {
     return API_MODEL_PRESETS.find((preset) => preset.id === id) || null;
@@ -26,10 +92,20 @@
 
   function matchApiModelPreset(model, baseUrl) {
     const normalizedUrl = String(baseUrl || "").replace(/\/+$/, "");
+    const normalizedModel = String(model || "").trim();
+    if (!normalizedModel) {
+      return (
+        API_MODEL_PRESETS.find(
+          (preset) =>
+            !preset.model &&
+            preset.baseUrl === normalizedUrl,
+        ) || null
+      );
+    }
     return (
       API_MODEL_PRESETS.find(
         (preset) =>
-          preset.model === model && preset.baseUrl === normalizedUrl,
+          preset.model === normalizedModel && preset.baseUrl === normalizedUrl,
       ) || null
     );
   }
@@ -372,6 +448,7 @@
 
   return {
     API_MODEL_PRESETS,
+    API_MODEL_PRESET_GROUPS,
     buildAuditSegments,
     buildTimelineSegments,
     completePriorityItems,

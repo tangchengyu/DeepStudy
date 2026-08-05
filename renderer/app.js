@@ -644,20 +644,11 @@ const AppSettings = (() => {
 
   function populateApiPresets() {
     const select = $("#api-model-preset");
-    const groups = new Map();
-    PlannerUtils.API_MODEL_PRESETS.forEach((preset) => {
-      if (!groups.has(preset.provider)) groups.set(preset.provider, []);
-      groups.get(preset.provider).push(preset);
-    });
-    groups.forEach((presets, provider) => {
+    select.replaceChildren(new Option("自定义模型", "custom"));
+    PlannerUtils.API_MODEL_PRESET_GROUPS.forEach((groupConfig) => {
       const group = document.createElement("optgroup");
-      group.label = provider;
-      presets.forEach((preset) => {
-        const option = document.createElement("option");
-        option.value = preset.id;
-        option.textContent = preset.label;
-        group.append(option);
-      });
+      group.label = groupConfig.label;
+      groupConfig.presets.forEach((preset) => group.append(new Option(preset.label, preset.id)));
       select.append(group);
     });
   }
@@ -711,14 +702,12 @@ const AppSettings = (() => {
     return apiProfiles.find((item) => item.id === id);
   }
   function startNewApiProfile() {
-    const select = $("#api-profile-select");
-    const currentBaseUrl = $("#api-base-url").value;
-    const currentModel = $("#api-model").value;
-    select.value = "";
+    $("#api-profile-select").value = "";
     $("#api-profile-name").value = "";
+    $("#api-model-preset").value = "custom";
+    $("#api-base-url").value = "";
+    $("#api-model").value = "";
     $("#api-key").value = "";
-    $("#api-base-url").value = currentBaseUrl;
-    $("#api-model").value = currentModel;
     $("#api-profile-delete").disabled = true;
     renderCredentialState(true);
     setStatus("正在新建 API 配置，请填写名称和 API Key。", "");
@@ -728,6 +717,9 @@ const AppSettings = (() => {
     const profile = profileById($("#api-profile-select").value);
     if (!profile) {
       $("#api-profile-name").value = "";
+      $("#api-model-preset").value = "custom";
+      $("#api-base-url").value = "";
+      $("#api-model").value = "";
       renderCredentialState(true);
       $("#api-profile-delete").disabled = true;
       return;
@@ -763,9 +755,14 @@ const AppSettings = (() => {
       return;
     }
     $("#api-base-url").value = preset.baseUrl;
-    $("#api-model").value = preset.model;
+    $("#api-model").value = preset.model || "";
     detachSavedProfileIfChanged();
-    setStatus(`已选择 ${preset.provider} · ${preset.label}`, "success");
+    setStatus(
+      preset.model
+        ? `已选择 ${preset.provider} · ${preset.label}`
+        : `已选择 ${preset.provider} · 已填入最新 API Base URL`,
+      "success",
+    );
   }
 
   function setStatus(message = "", kind = "") {
@@ -1000,9 +997,6 @@ const AppSettings = (() => {
     if (event.target.id === "app-alert-modal") $("#app-alert-modal").hidden = true;
   });
   $$(".settings-nav-item").forEach((button) => button.addEventListener("click", () => selectSection(button.dataset.settingsSection)));
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) close();
-  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modal.hidden) close();
   });

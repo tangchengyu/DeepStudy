@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   API_MODEL_PRESETS,
+  API_MODEL_PRESET_GROUPS,
   buildAuditSegments,
   buildTimelineSegments,
   completePriorityItems,
@@ -72,20 +73,28 @@ test("falls back to splitting sequential Chinese plan text", () => {
 });
 
 test("API model presets provide and match their Base URL", () => {
-  assert.ok(API_MODEL_PRESETS.length >= 2);
+  assert.ok(API_MODEL_PRESET_GROUPS.length >= 6);
+  assert.ok(API_MODEL_PRESETS.length >= 6);
   const preset = getApiModelPreset("gemini-flash-free");
   assert.deepEqual(preset, {
     id: "gemini-flash-free",
-    provider: "Google Gemini",
-    label: "Gemini 2.0 Flash Exp (Free Tier)",
-    model: "gemini-2.0-flash-exp",
+    provider: "Gemini",
+    label: "Gemini · gemini-3.5-flash",
+    model: "gemini-3.5-flash",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
   });
   assert.equal(
-    matchApiModelPreset("gemini-2.0-flash-exp", "https://generativelanguage.googleapis.com/v1beta/openai")?.id,
+    matchApiModelPreset("gemini-3.5-flash", "https://generativelanguage.googleapis.com/v1beta/openai")?.id,
     "gemini-flash-free",
   );
-  // 已删除旧的 gemini-2.0-flash 测试
+  assert.equal(
+    getApiModelPreset("openai-base")?.baseUrl,
+    "https://api.openai.com/v1",
+  );
+  assert.equal(
+    getApiModelPreset("qwen-base")?.baseUrl,
+    "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  );
   assert.equal(
     getApiModelPreset("openrouter-nemotron-free").model,
     "nvidia/nemotron-3-super-120b-a12b:free",

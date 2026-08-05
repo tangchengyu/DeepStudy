@@ -100,6 +100,7 @@
 .task-detail-notes-editor.image-drop-active { border-color: var(--detail-color, var(--accent)); background: color-mix(in srgb, var(--detail-soft, var(--accent-soft)) 42%, rgba(255,255,255,.68)); box-shadow: inset 0 0 0 2px var(--detail-color, var(--accent)); }
 .markdown-line { min-height: 1.72em; padding: 2px 0; border-radius: 7px; outline: none; white-space: normal; }
 .markdown-line.editing { margin-left: -10px; padding-left: 10px; background: rgba(255,255,255,.82); box-shadow: inset 3px 0 0 var(--detail-color, var(--accent)); color: var(--text); font-family: Consolas, "Liberation Mono", monospace; font-size: 15px; white-space: pre-wrap; }
+.markdown-line.selected { background: color-mix(in srgb, var(--detail-soft, var(--accent-soft)) 68%, rgba(255,255,255,.82)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--detail-color, var(--accent)) 32%, transparent); }
 .markdown-line h1, .markdown-line h2, .markdown-line h3, .markdown-line p { margin: 0; color: var(--text); }
 .markdown-line h1 { font-size: 28px; line-height: 1.25; }
 .markdown-line h2 { font-size: 23px; line-height: 1.3; }

@@ -864,6 +864,41 @@ function buildPlannerMessages(payload = {}, settings = readPlannerSettings()) {
   ];
 }
 
+function buildChatCompletionBody(messages, settings, extraBody = {}) {
+  const body = {
+    model: settings.api.model,
+    stream: false,
+    max_tokens: 800,
+    temperature: 0.2,
+    messages,
+    ...extraBody,
+  };
+  if (/generativelanguage\.googleapis\.com/i.test(settings.api.baseUrl) || /^gemini-/i.test(settings.api.model)) {
+    body.reasoning_effort = body.reasoning_effort || "low";
+  }
+  return body;
+}
+
+function buildApiTestMessages(input = {}) {
+  const prompt = cleanString(input.message, "Reply with a single word: ok.");
+  return [
+    { role: "user", content: prompt },
+  ];
+}
+
+function resolveInputApiSettings(input = {}, scope = "planner") {
+  const current = readPlannerSettings(scope);
+  const selectedProfile = current.apiProfiles.find(
+    (profile) => profile.id === cleanString(input.profileId),
+  );
+  const api = {
+    baseUrl: normalizeBaseUrl(input.baseUrl, selectedProfile?.baseUrl || current.api.baseUrl),
+    model: cleanString(input.model, selectedProfile?.model || current.api.model),
+    apiKey: cleanString(input.apiKey) || selectedProfile?.apiKey || "",
+  };
+  return { ...current, api };
+}
+
 async function requestPlannerReply(payload) {
   const message = cleanString(payload && payload.message);
   if (!message) {
@@ -878,13 +913,7 @@ async function requestPlannerReply(payload) {
     const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
       method: "POST",
       headers: modelHeaders(settings),
-      body: JSON.stringify({
-        model: settings.api.model,
-        stream: false,
-        max_tokens: 800,
-        temperature: 0.2,
-        messages: buildPlannerMessages(payload, settings),
-      }),
+      body: JSON.stringify(buildChatCompletionBody(buildPlannerMessages(payload, settings), settings)),
       signal: controller.signal,
     });
 
@@ -903,13 +932,86 @@ async function requestPlannerReply(payload) {
         message: data?.choices?.[0]?.message,
         finish_reason: data?.choices?.[0]?.finish_reason,
       }, null, 2);
-      throw new Error(`API 已连接，但模型返回了空内容。请检查：\n1. API Key 是否有效\n2. 模型名称是否正确（Gemini 免费版请用 gemini-2.0-flash-exp）\n3. 是否触发了内容过滤\n\n调试信息：${debugInfo}`);
+      throw new Error(`API 已连接，但模型返回了空内容。请检查：\n1. API Key 是否有效\n2. 模型名称是否正确（Gemini 免费版请用 gemini-3.5-flash）\n3. 是否触发了内容过滤\n\n调试信息：${debugInfo}`);
     }
     return { ok: true, message: "API 验证成功。" };
   } catch (error) {
     throw new Error(modelNetworkError(error, settings.api.baseUrl));
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+async function testApiConfiguration(input = {}) {
+  const settings = resolveInputApiSettings(input);
+  if (!settings.api.apiKey) {
+    throw new Error("请先填写 API Key。");
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
+      method: "POST",
+      headers: modelHeaders(settings),
+      body: JSON.stringify(buildChatCompletionBody(buildApiTestMessages(input), settings, {
+        max_tokens: 16,
+        temperature: 0,
+      })),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`API 返回 HTTP ${response.status}: ${body.slice(0, 300)}`);
+    }
+    const data = await response.json();
+    const content = cleanString(extractModelContent(data, true));
+    if (!content) {
+      const debugInfo = JSON.stringify({
+        choices: data?.choices,
+        message: data?.choices?.[0]?.message,
+        finish_reason: data?.choices?.[0]?.finish_reason,
+      }, null, 2);
+      throw new Error(`API 已连接，但模型返回了空内容。请检查：\n1. API Key 是否有效\n2. Base URL 是否对应当前模型服务\n3. 模型名称是否正确（Gemini 请用 gemini-3.5-flash）\n\n调试信息：${debugInfo}`);
+    }
+    return { ok: true, message: "API 验证成功。" };
+  } catch (error) {
+    throw new Error(modelNetworkError(error, settings.api.baseUrl));
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function requestStructuredModel(messages, signal, settingsOverride) {
+  const settings = settingsOverride || readPlannerSettings();
+  const controller = signal ? null : new AbortController();
+  const timeoutId = controller ? setTimeout(() => controller.abort(), PLANNER_TIMEOUT_MS) : null;
+  try {
+    const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
+      method: "POST",
+      headers: modelHeaders(settings),
+      signal: signal || controller.signal,
+      body: JSON.stringify(buildChatCompletionBody(messages, settings, {
+        max_tokens: 700,
+        temperature: 0,
+      })),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`模型返回 HTTP ${response.status}: ${body.slice(0, 300)}`);
+    }
+    const data = await response.json();
+    const content = cleanString(extractModelContent(data, true));
+    if (!content) {
+      throw new Error("模型返回了空内容。");
+    }
+    return {
+      content,
+      model: cleanString(data?.model, settings.api.model),
+    };
+  } catch (error) {
+    throw new Error(modelNetworkError(error, settings.api.baseUrl));
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 

@@ -185,8 +185,24 @@ test("moves markdown note editing between lines with keyboard arrows", () => {
   assert.match(longTasksJs, /function moveMarkdownLineByKeyboard\(line, direction\)/);
   assert.match(longTasksJs, /event\.key === "ArrowUp" \|\| event\.key === "ArrowDown"/);
   assert.match(longTasksJs, /event\.key === "ArrowDown" \? 1 : -1/);
-  assert.match(longTasksJs, /target\.dataset\.pendingCaret = String\(caretOffset\(line\)\)/);
-  assert.match(longTasksJs, /delete line\.dataset\.pendingCaret/);
+  assert.match(longTasksJs, /startMarkdownLineEdit\(target, caretOffset\(line\)\)/);
+});
+
+test("supports single-click positioning, drag selection, and Tab indentation for note lines", () => {
+  assert.match(longTasksJs, /function caretOffsetFromPoint\(line, x, y\)/);
+  assert.match(longTasksJs, /function beginMarkdownLineSelection\(line, event\)/);
+  assert.match(longTasksJs, /function updateMarkdownLineSelection\(x, y\)/);
+  assert.match(longTasksJs, /function endMarkdownLineSelection\(event\)/);
+  assert.match(longTasksJs, /function indentSelectedMarkdownLines\(direction\)/);
+  assert.match(longTasksJs, /function indentMarkdownLine\(line, direction\)/);
+  assert.match(longTasksJs, /line\.addEventListener\("mousedown"/);
+  assert.match(longTasksJs, /line\.addEventListener\("click"/);
+  assert.match(longTasksJs, /line\.addEventListener\("dblclick"/);
+  assert.match(longTasksJs, /document\.addEventListener\("mousemove"/);
+  assert.match(longTasksJs, /document\.addEventListener\("mouseup"/);
+  assert.match(longTasksJs, /event\.key === "Tab"/);
+  assert.match(css, /\.markdown-line\.selected\s*\{/);
+  assert.match(longTasksJs, /line\.style\.whiteSpace = \/\^\\s\/\.test\(raw\) \? "pre-wrap" : "";/);
 });
 
 test("edits reminders directly from the long-task detail page", () => {
