@@ -180,6 +180,17 @@ function bringMainWindowToFront() {
     if (!mainWindow || mainWindow.isDestroyed()) createWindow();
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
+    // Windows foreground-lock fix: when this window is restored while DeepStudy
+    // is NOT the foreground application (the common case when it lives in the
+    // tray and you click the desktop shortcut -> single-instance "second-instance"
+    // event, or click the tray icon), Windows refuses to grant it foreground
+    // activation. Chromium then renders a "ghost" window that is visible but does
+    // not receive mouse input, so every button looks dead. Toggling always-on-top
+    // forces Windows to re-establish real input focus.
+    if (process.platform === "win32") {
+      mainWindow.setAlwaysOnTop(true);
+      mainWindow.setAlwaysOnTop(false);
+    }
     mainWindow.moveTop?.();
     mainWindow.focus();
     return mainWindow;
