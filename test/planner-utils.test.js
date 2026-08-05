@@ -87,10 +87,10 @@ test("API model presets provide and match their Base URL", () => {
   );
   assert.equal(
     matchApiModelPreset(
-      "gemini-2.5-flash",
+      "gemini-2.0-flash",
       "https://generativelanguage.googleapis.com/v1beta/openai/",
     )?.id,
-    "gemini-2-5-flash-free",
+    "gemini-2-0-flash-free",
   );
   assert.equal(
     getApiModelPreset("openrouter-gpt-oss-120b-free").model,
@@ -325,7 +325,7 @@ test("saved API profiles can force a new profile for the same endpoint", () => {
       id: "gemini-a",
       label: "Gemini A",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       apiKey: "key-a",
     },
   ];
@@ -334,7 +334,7 @@ test("saved API profiles can force a new profile for the same endpoint", () => {
     {
       label: "Gemini B",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       apiKey: "key-b",
       forceNew: true,
     },
