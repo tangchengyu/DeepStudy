@@ -563,6 +563,7 @@ function splitMarkdownLine(line) {
   const offset = caretOffset(line);
   pushNoteUndoSnapshot();
   const [before, after] = LongTaskUtils.splitNoteLineAtOffset(text, offset);
+  line.textContent = before;
   line.dataset.raw = before;
   finishMarkdownLineEdit(line);
   const next = createMarkdownLine(after);

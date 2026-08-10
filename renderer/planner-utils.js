@@ -484,7 +484,10 @@
     result.forEach((item) => {
       if (/^\[PRIORITY\]/i.test(item)) priorityTexts.add(cleanText(item));
     });
-    for (const fallback of ["读书", "运动"]) {
+    const fallbackItems = Array.isArray(options.fallbackPriorityItems)
+      ? options.fallbackPriorityItems
+      : [];
+    for (const fallback of fallbackItems) {
       if (priorityTexts.size >= 3) break;
       const key = cleanText(fallback);
       if (priorityTexts.has(key)) continue;

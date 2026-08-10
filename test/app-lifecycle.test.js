@@ -88,3 +88,9 @@ test("settings modals no longer close from backdrop clicks", () => {
   assert.doesNotMatch(appJs, /modal\.addEventListener\("click", \(event\) => \{\s*if \(event\.target === modal\) close\(\);\s*\}\);/s);
   assert.doesNotMatch(longTasksJs, /modal\.addEventListener\("click", \(event\) => \{ if \(event\.target === modal\) close\(\); \}\);/s);
 });
+
+test("default daily AI preference prompt owns optional reading and exercise suggestions", () => {
+  assert.match(mainJs, /DEFAULT_DAILY_USER_PROMPT[\s\S]*读书[\s\S]*运动/);
+  assert.match(appJs, /daily: "请根据我的表达习惯[\s\S]*读书[\s\S]*运动/);
+  assert.match(mainJs, /LEGACY_DAILY_USER_PROMPTS/);
+});

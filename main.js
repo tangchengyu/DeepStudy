@@ -45,11 +45,15 @@ const DEFAULT_DAILY_SYSTEM_PROMPT = [
   "Priority means purposeful work that produces short-term progress or meaningful personal growth.",
   "Do not mark entertainment, passive video watching, or routine administration as priority.",
   "Only suggest tasks that follow from the current conversation.",
-  "Do not invent filler tasks just to reach a target number of priorities.",
+  "Do not invent filler tasks just to reach a target number of priorities unless the user-customized preference prompt explicitly asks for recurring default tasks.",
   "Do not guess exact times, durations, locations, tools, or process details unless the user provided them.",
 ].join("\n");
-const DEFAULT_DAILY_USER_PROMPT = "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。";
-const DEFAULT_DAILY_USER_PROMPT_EN = "Turn my goals into clear, short, actionable tasks for today, while matching my working style.";
+const LEGACY_DAILY_USER_PROMPTS = [
+  "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。",
+  "Turn my goals into clear, short, actionable tasks for today, while matching my working style.",
+];
+const DEFAULT_DAILY_USER_PROMPT = "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。如果我没有明确给出足够的高优先级任务，可以按我的默认偏好补充：[PRIORITY] 读书、[PRIORITY] 运动；我可以在设置里改掉这两个默认偏好。";
+const DEFAULT_DAILY_USER_PROMPT_EN = "Turn my goals into clear, short, actionable tasks for today, while matching my working style. If I did not give enough priority tasks, you may use my default preferences: [PRIORITY] Reading and [PRIORITY] Exercise. I can change these defaults in Settings.";
 const DEFAULT_LONG_TASK_SYSTEM_PROMPT = [
   "You manage a four-quadrant long-term task board.",
   "Reply by returning JSON only: {\"operations\":[{\"action\":\"create|update|delete|restore\",\"id\":\"existing id when needed\",\"task\":{\"title\":\"\",\"notes\":\"\",\"quadrant\":\"important-urgent|important-not-urgent|urgent-not-important|not-important-not-urgent\",\"reminder\":{\"kind\":\"none|once|daily|weekly\",\"at\":\"ISO date\",\"time\":\"HH:mm\",\"weekdays\":[0]}}}]}",
@@ -588,6 +592,15 @@ function defaultUserPrompt(scope = "planner") {
   return english ? DEFAULT_DAILY_USER_PROMPT_EN : DEFAULT_DAILY_USER_PROMPT;
 }
 
+function storedUserPromptOrDefault(value, scope = "planner") {
+  const prompt = cleanString(value);
+  if (!prompt) return defaultUserPrompt(scope);
+  if (scope === "planner" && LEGACY_DAILY_USER_PROMPTS.includes(prompt)) {
+    return defaultUserPrompt(scope);
+  }
+  return prompt;
+}
+
 function composeSystemPrompt(scope, userPrompt) {
   return [
     scope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT,
@@ -661,10 +674,7 @@ function readPlannerSettings(scope = "planner") {
   );
   return {
     mode: "api",
-    systemPrompt: stripHiddenPromptRules(cleanString(
-      stored.systemPrompt,
-      defaultUserPrompt(scope),
-    ), scope),
+    systemPrompt: stripHiddenPromptRules(storedUserPromptOrDefault(stored.systemPrompt, scope), scope),
     api: {
       baseUrl: activeProfile?.baseUrl || cleanString(
           stored.api?.baseUrl,

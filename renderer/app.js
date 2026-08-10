@@ -633,11 +633,11 @@ const AppSettings = (() => {
   let preferences = { language: "zh-CN" };
   const defaultPrompts = {
     "zh-CN": {
-      daily: "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。",
+      daily: "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。如果我没有明确给出足够的高优先级任务，可以按我的默认偏好补充：[PRIORITY] 读书、[PRIORITY] 运动；我可以在设置里改掉这两个默认偏好。",
       long: "请帮我维护长期任务，任务名称和备注保持简洁，优先尊重我明确给出的信息。",
     },
     "en-US": {
-      daily: "Turn my goals into clear, short, actionable tasks for today, while matching my working style.",
+      daily: "Turn my goals into clear, short, actionable tasks for today, while matching my working style. If I did not give enough priority tasks, you may use my default preferences: [PRIORITY] Reading and [PRIORITY] Exercise. I can change these defaults in Settings.",
       long: "Help me maintain long-term tasks with concise titles and notes, and prioritize information I explicitly provide.",
     },
   };

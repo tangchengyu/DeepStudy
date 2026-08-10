@@ -113,7 +113,7 @@ test("formats non-JSON API responses without leaking parser errors", () => {
   );
 });
 
-test("fills priority gaps only when explicitly enabled for the first daily chat", () => {
+test("does not fill priority gaps with hardcoded tasks", () => {
   const reply = [
     "PLAN_ITEMS:",
     "- [PRIORITY] 完成课程学习",
@@ -125,9 +125,18 @@ test("fills priority gaps only when explicitly enabled for the first daily chat"
     [
       "[PRIORITY] 完成课程学习",
       "整理桌面",
-      "[PRIORITY] 读书",
-      "[PRIORITY] 运动",
     ],
+  );
+});
+
+test("fills priority gaps only from explicit preference items", () => {
+  const items = ["[PRIORITY] 完成课程学习", "整理桌面"];
+  assert.deepEqual(
+    completePriorityItems(items, {
+      fillPriorityGaps: true,
+      fallbackPriorityItems: ["写论文", "散步"],
+    }),
+    ["[PRIORITY] 完成课程学习", "整理桌面", "[PRIORITY] 写论文", "[PRIORITY] 散步"],
   );
 });
 

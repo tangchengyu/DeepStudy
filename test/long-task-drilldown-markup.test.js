@@ -207,6 +207,11 @@ test("supports single-click positioning, drag selection, and Tab indentation for
   assert.match(css, /\.markdown-line\s*\{[^}]*var\(--note-line-indent/s);
 });
 
+test("Enter splitting commits only the text before the caret to the current note line", () => {
+  assert.match(longTasksJs, /const \[before, after\] = LongTaskUtils\.splitNoteLineAtOffset\(text, offset\)/);
+  assert.match(longTasksJs, /line\.textContent = before;\s*line\.dataset\.raw = before;\s*finishMarkdownLineEdit\(line\);/s);
+});
+
 test("completed long tasks stay in reflection when daily tasks resync", () => {
   assert.match(appJs, /let completedLongReflectionTasks = \[\]/);
   assert.match(appJs, /completedLongReflectionTasks = completedLongReflectionTasks\.filter\(\(item\) => item\.id !== sourceId\)/);
