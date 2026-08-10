@@ -62,7 +62,7 @@
     {
       target: "#sync-account-open",
       title: "账号同步与多端数据",
-      description: "打开账号同步后，先确认同步服务地址，再通过人机验证完成注册或登录。注册成功后恢复码只显示一次，请先离线保存；首次使用同步时先预览首次导入，再确认写入。之后日常只需立即同步，遇到多端冲突时再查看冲突，必要时可用备份编号恢复。",
+      description: "打开账号同步后，先确认同步服务地址，再通过人机验证完成注册或登录。注册成功后恢复码只显示一次，请先离线保存；每台新设备都先做“首次同步”：预览会告诉你本机旧数据、账号已有数据、将上传到账号和将写回本机的数量，确认后才进入同步管理。之后日常只需立即同步，遇到多端冲突时再查看冲突，必要时可用备份编号恢复。每日计划、长期任务、专注记录、分心记录、时间审计、每日反思和灵魂按摩间里的好句子都会纳入同步。",
       view: "gate",
     },
     {
@@ -124,7 +124,7 @@
     { target: "#long-tasks-open", title: "Long Task Operations", description: "The colored left strip is the drag handle. Drag tasks across quadrants or reorder within one quadrant. Click the rest of the card to edit details. The right-click menu includes Copy to Today and Delete. In details, edit the reminder type and time directly. Markdown notes accept images dragged from Explorer, copied image-file paste, and screenshot clipboard paste; imported images stay on this computer.", view: "gate" },
     { target: "#app-settings-open", title: "One Settings Window", description: "The top Settings button is the shared entry point. Open the settings panel, choose a section on the left, and edit it on the right: General and Language changes the UI language, New API Configuration stores and tests model access, Daily AI and Long Task AI choose saved APIs and user-editable preference prompts, Quote Room manages saved quotes, and Guide reopens this walkthrough.", view: "gate" },
     { target: "#app-settings-open", title: "Configure Model API First", description: "In New API Configuration, fill in profile name, model preset, API Base URL, model name, and API Key. Use Test Once before saving. Then select that API for Daily AI and Long Task AI.", view: "gate" },
-    { target: "#sync-account-open", title: "Account Sync Across Devices", description: "Open Account Sync, confirm the gateway, then complete the human verification before registering or signing in. Save the recovery code offline because it appears once. On first sync, preview the import before confirming it. Later, use Sync Now for normal updates, review conflicts only when devices diverge, and restore from a backup ID when you need to roll back.", view: "gate" },
+    { target: "#sync-account-open", title: "Account Sync Across Devices", description: "Open Account Sync, confirm the gateway, then complete human verification before registering or signing in. Save the one-time recovery code offline. Every new device starts with First Sync: preview shows local legacy data, account data, uploads, and local writeback before anything changes. After confirming, daily use moves to Sync Now; review conflicts only when devices diverge and restore from a backup ID when you need to roll back. Daily tasks, long tasks, focus records, distractions, time audit, reflection, and Quote Room sentences are included.", view: "gate" },
     { target: "#focus-quote-screen", title: "Clear Attention Residue", description: "Click the quote card to refresh a saved sentence. Before working, pause briefly so the last task can leave working memory.", view: "gate" },
     { target: "#enter-gate", title: "Enter Focus Space", description: "When ready, enter the workspace. The guide will preview internal features and then return you to this gate.", view: "gate" },
     { target: ".mode-tabs", title: "Three Clear Modes", description: "Focus Mode is for single-task work, Rest Mode is for recovery, and Habit Building is for audit and reflection.", view: "focus" },

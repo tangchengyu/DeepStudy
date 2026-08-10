@@ -679,7 +679,7 @@
         </div>
         <div class="sync-stepper" aria-label="账号同步步骤">
           <span>1 连接账号</span>
-          <span>2 首次导入</span>
+          <span>2 首次同步</span>
           <span>3 同步管理</span>
         </div>
         <section id="sync-wizard-auth" class="sync-wizard-section">
@@ -725,11 +725,11 @@
           <label><input id="sync-recovery-saved" type="checkbox" /> 我已离线保存恢复码</label>
         </div>
         <section id="sync-wizard-import" class="sync-data-section sync-wizard-section" hidden>
-          <h3>首次导入旧数据</h3>
-          <p>先预览，不会修改本地或云端；确认时会重新检查数据，并在真正写回前创建可恢复备份。</p>
+          <h3>首次同步本机数据</h3>
+          <p>先预览，不会修改本机或账号；确认时会重新检查、上传需要合并的数据，再从账号读回并写回本机校验。新设备本机没有旧数据时，这一步会把账号数据下载到本机。</p>
           <div class="sync-actions">
-            <button id="sync-import-preview" class="secondary-btn" type="button">预览首次导入</button>
-            <button id="sync-import-confirm" class="primary-btn" type="button" disabled>确认并导入</button>
+            <button id="sync-import-preview" class="secondary-btn" type="button">预览首次同步</button>
+            <button id="sync-import-confirm" class="primary-btn" type="button" disabled>确认并同步</button>
           </div>
           <div id="sync-preview-result" class="sync-preview-result"></div>
         </section>

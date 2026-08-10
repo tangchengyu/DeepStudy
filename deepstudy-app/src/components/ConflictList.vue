@@ -88,6 +88,9 @@ function recordDetails(record: SyncRecordEnvelope | null) {
     case 'reflection':
       values.push(readable(payload.content ?? payload.title), readable(payload.date), readable(payload.notes ?? payload.note))
       break
+    case 'soul_quote':
+      values.push(readable(payload.text ?? payload.content ?? payload.title), readable(payload.source), readable(payload.createdAt))
+      break
   }
   return [...new Set(values.filter((value): value is string => Boolean(value)))]
 }

@@ -170,7 +170,7 @@ test("device registration can be retried without repeating authentication", asyn
   assert.equal(result.device.platform, "windows");
 });
 
-test("manual backup recovery restores all six exact LocalStorage values", async () => {
+test("manual backup recovery restores every exact LocalStorage value including soul quotes", async () => {
   const values = new Map();
   const storage = {
     setItem: (key, value) => values.set(key, value),

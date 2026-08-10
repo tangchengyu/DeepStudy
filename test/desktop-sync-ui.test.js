@@ -65,6 +65,16 @@ test("desktop account panel explains password rules and reuses one browser verif
   assert.doesNotMatch(script, /for \(const \[id, actionName\] of \[\["sync-sign-in", "sign-in"\]/);
 });
 
+test("desktop first sync explains upload, download, writeback, and hides advanced sync until enrollment completes", () => {
+  assert.match(html, /首次同步本机数据/);
+  assert.match(script, /本机旧数据/);
+  assert.match(script, /将上传到账号/);
+  assert.match(script, /将写回本机/);
+  assert.match(script, /manageSection\.hidden = !local\.enrollmentComplete/);
+  assert.match(script, /请先完成首次同步本机数据/);
+  assert.match(script, /confirmImport\.textContent = previewConfirmLabel/);
+});
+
 test("desktop Turnstile challenge has enough modal width and cannot be clipped by the host layout", () => {
   assert.match(html, /id="sync-turnstile-open"/);
   assert.match(html, />打开浏览器验证</);
@@ -77,7 +87,8 @@ test("desktop Turnstile challenge has enough modal width and cannot be clipped b
 test("tutorial explains account sync safety, first import, conflicts, and backup recovery", () => {
   assert.match(tutorialScript, /账号同步/);
   assert.match(tutorialScript, /人机验证/);
-  assert.match(tutorialScript, /首次导入/);
+  assert.match(tutorialScript, /首次同步/);
+  assert.match(tutorialScript, /灵魂按摩间/);
   assert.match(tutorialScript, /冲突/);
   assert.match(tutorialScript, /备份/);
 });

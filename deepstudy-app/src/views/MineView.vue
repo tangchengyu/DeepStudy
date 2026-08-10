@@ -34,6 +34,8 @@ const account = accountCoordinator.state
 const syncState = mobileSyncService.state
 const signedIn = computed(() => account.status === 'signed-in' || account.status === 'offline-session')
 const displayName = computed(() => account.user?.username || account.user?.name || 'DeepStudy 用户')
+const firstSyncComplete = computed(() => importStatus.value === 'committed' || importStatus.value === 'skipped')
+const firstSyncRequired = computed(() => signedIn.value && !firstSyncComplete.value)
 const syncLabel = computed(() => ({
   idle: syncState.lastSyncAt ? '已同步' : '等待首次同步',
   offline: '离线，修改会保留',
@@ -52,6 +54,24 @@ const hasLocalImportChoices = computed(() => Boolean(
   localImportPreview.value
     && (localImportPreview.value.importable.length || localImportPreview.value.conflicts.length),
 ))
+const firstSyncConfirmLabel = computed(() => {
+  if (!localImportPreview.value) return '确认首次同步'
+  if (hasLocalImportChoices.value) return '确认并合并到账号'
+  return '下载账号数据到本机'
+})
+const firstSyncPreviewText = computed(() => {
+  if (!localImportPreview.value) {
+    return '先预览，不会修改本机或账号；确认后才会上传本机旧数据，并把账号数据写回本机。'
+  }
+  const preview = localImportPreview.value
+  return [
+    `本机旧数据 ${preview.total} 条`,
+    `将上传到账号 ${preview.importable.length} 条`,
+    `已在账号中存在 ${preview.duplicates.length} 条`,
+    `需要稍后手动比较 ${preview.conflicts.length} 条`,
+    '确认后会立即同步，把账号数据下载并写回本机。',
+  ].join('；')
+})
 
 function formatTime(value: number | null) {
   return value ? new Intl.DateTimeFormat('zh-CN', {
@@ -111,17 +131,15 @@ async function loadDashboard() {
   ])
   deviceId.value = resolvedDeviceId
   importStatus.value = savedImportStatus || '未开始'
-  localImportPreview.value = signedIn.value ? await syncRepository.previewLocalQuarantineImport() : null
+  localImportPreview.value = null
   conflicts.value = await syncRepository.listConflicts()
   await loadGatewayConfig()
 }
 
 async function refreshLocalImportPreview() {
   localImportPreview.value = signedIn.value ? await syncRepository.previewLocalQuarantineImport() : null
-  if (localImportPreview.value?.importable.length) {
-    importStatus.value = 'previewed'
-    await syncRepository.setMetadata('importStatus', 'previewed')
-  }
+  importStatus.value = 'previewed'
+  await syncRepository.setMetadata('importStatus', 'previewed')
 }
 
 async function saveGateway() {
@@ -159,31 +177,51 @@ function openAuth() {
 
 async function afterSignIn() {
   authVisible.value = false
-  await refreshLocalImportPreview()
-  if (localImportPreview.value?.importable.length) {
-    actionMessage.value = '发现旧本机数据，请先确认是否导入到当前账号。'
+  localImportPreview.value = null
+  importStatus.value = await syncRepository.getMetadata('importStatus') || '未开始'
+  if (firstSyncComplete.value) {
+    mobileSyncService.start()
+    actionMessage.value = '登录成功，已进入日常同步管理。'
+    await mobileSyncService.syncNow()
+    conflicts.value = await syncRepository.listConflicts()
     return
   }
-  mobileSyncService.start()
-  actionMessage.value = '登录成功，本机数据保持不变并开始同步'
-  await mobileSyncService.syncNow()
-  conflicts.value = await syncRepository.listConflicts()
+  actionMessage.value = '登录成功。请先预览并确认首次同步，本机数据会在确认前保持不变。'
 }
 
-async function importLocalData() {
+async function previewFirstSync() {
+  if (!signedIn.value) return
+  actionMessage.value = null
+  try {
+    await refreshLocalImportPreview()
+    actionMessage.value = '预览完成，本机和账号数据尚未改动。'
+  } catch (error) {
+    importStatus.value = 'blocked'
+    actionMessage.value = friendlyError(error)
+  }
+}
+
+async function confirmFirstSync() {
   if (importingLocalData.value) return
   importingLocalData.value = true
   actionMessage.value = null
   try {
+    if (!localImportPreview.value) await refreshLocalImportPreview()
     await syncRepository.setMetadata('importStatus', 'applying')
     importStatus.value = 'applying'
-    const result = await syncRepository.importLocalQuarantineRecords()
-    await refreshLocalImportPreview()
+    const result = hasLocalImportChoices.value
+      ? await syncRepository.importLocalQuarantineRecords()
+      : { imported: 0, conflicts: localImportPreview.value?.conflicts ?? [] }
     importStatus.value = 'committed'
+    await syncRepository.setMetadata('importStatus', 'committed')
+    localImportPreview.value = null
     mobileSyncService.start()
     await mobileSyncService.syncNow()
     conflicts.value = await syncRepository.listConflicts()
-    actionMessage.value = `已导入 ${result.imported} 条旧本机数据并开始同步。`
+    const conflictSuffix = Array.isArray(result.conflicts) && result.conflicts.length
+      ? `；${result.conflicts.length} 条差异可在同步管理中查看冲突`
+      : ''
+    actionMessage.value = `首次同步完成：已上传 ${result.imported} 条本机旧数据，并已把账号数据写回本机${conflictSuffix}。`
   } catch (error) {
     importStatus.value = 'blocked'
     actionMessage.value = friendlyError(error)
@@ -200,7 +238,7 @@ async function skipLocalImport() {
   try {
     await mobileSyncService.syncNow()
     conflicts.value = await syncRepository.listConflicts()
-    actionMessage.value = '已跳过旧本机数据导入，并开始同步当前账号数据。'
+    actionMessage.value = '已跳过本机旧数据上传，并开始下载当前账号数据。'
   } catch (error) {
     actionMessage.value = friendlyError(error)
   }
@@ -356,7 +394,7 @@ watch(() => syncState.conflicts, () => {
         <strong>{{ syncState.conflicts }}</strong>
       </article>
       <article>
-        <span>旧数据导入</span>
+        <span>首次同步</span>
         <strong>{{ importStatusLabel }}</strong>
       </article>
       </section>
@@ -367,27 +405,26 @@ watch(() => syncState.conflicts, () => {
       <div><span>连接状态</span><strong>{{ syncState.online ? '在线' : '离线' }}</strong></div>
       </section>
 
-      <section v-if="hasLocalImportChoices && localImportPreview" class="import-card surface-card" aria-label="旧本机数据导入">
+      <section v-if="firstSyncRequired" class="import-card surface-card" aria-label="首次同步本机数据">
       <div>
-        <h2>导入旧本机数据</h2>
-        <p>
-          发现 {{ localImportPreview.importable.length }} 条可导入数据；
-          {{ localImportPreview.duplicates.length }} 条已在账号中存在；
-          {{ localImportPreview.conflicts.length }} 条需要稍后手动比较。
-        </p>
+        <h2>首次同步本机数据</h2>
+        <p>{{ firstSyncPreviewText }}</p>
       </div>
       <div class="import-actions">
-        <button type="button" :disabled="importingLocalData" @click="importLocalData">
-          {{ importingLocalData ? '导入中…' : '导入到当前账号' }}
+        <button type="button" :disabled="importingLocalData" @click="previewFirstSync">
+          预览首次同步
         </button>
-        <button type="button" class="secondary-button" :disabled="importingLocalData" @click="skipLocalImport">
-          暂不导入并同步
+        <button type="button" :disabled="importingLocalData || !localImportPreview" @click="confirmFirstSync">
+          {{ importingLocalData ? '处理中…' : firstSyncConfirmLabel }}
+        </button>
+        <button v-if="hasLocalImportChoices" type="button" class="secondary-button" :disabled="importingLocalData" @click="skipLocalImport">
+          不上传本机旧数据，仅同步账号
         </button>
       </div>
       </section>
 
       <ConflictList
-        v-if="conflicts.length"
+        v-if="firstSyncComplete && conflicts.length"
         :conflicts="conflicts"
         :busy-id="resolvingConflictId"
         @resolve="resolveConflict"
@@ -409,9 +446,15 @@ watch(() => syncState.conflicts, () => {
       <button v-if="!signedIn" type="button" @click="openAuth">
         <span>登录或注册</span><small>用户名与密码</small>
       </button>
-      <template v-else>
+      <template v-else-if="firstSyncComplete">
         <button type="button" :disabled="syncState.phase === 'syncing'" @click="manualSync">
           <span>立即同步</span><small>{{ syncState.pending }} 项待上传</small>
+        </button>
+        <button type="button" @click="signOut"><span>退出账号</span><small>保留本机数据</small></button>
+      </template>
+      <template v-else>
+        <button type="button" disabled>
+          <span>先完成首次同步</span><small>完成后显示立即同步和冲突管理</small>
         </button>
         <button type="button" @click="signOut"><span>退出账号</span><small>保留本机数据</small></button>
       </template>

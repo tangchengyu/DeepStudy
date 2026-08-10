@@ -10,6 +10,7 @@
     timeAudit: "mytimer.timeAudit.v1",
     distraction: "mytimer.distractionList.v1",
     reflection: "mytimer.dailyReflection.v1",
+    soulQuote: "deepstudy.soulQuotes.v1",
   });
 
   const ARRAY_STORES = Object.freeze([
@@ -18,6 +19,7 @@
     { key: LEGACY_STORAGE_KEYS.timeAudit, entityType: "time_audit" },
     { key: LEGACY_STORAGE_KEYS.distraction, entityType: "distraction" },
     { key: LEGACY_STORAGE_KEYS.reflection, entityType: "reflection" },
+    { key: LEGACY_STORAGE_KEYS.soulQuote, entityType: "soul_quote" },
   ]);
 
   class LegacySnapshotError extends Error {

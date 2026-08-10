@@ -39,6 +39,7 @@ test('record validation accepts every supported entity type', () => {
     'time_audit',
     'distraction',
     'reflection',
+    'soul_quote',
   ]);
 
   for (const entityType of SUPPORTED_ENTITY_TYPES) {

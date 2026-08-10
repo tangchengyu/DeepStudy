@@ -108,6 +108,16 @@ test("pulled records are backed up before writes, verified, and leave original k
       serverUpdatedAt: 21,
       deviceId: "phone-1",
     },
+    {
+      entityType: "soul_quote",
+      entityId: "quote-remote",
+      payload: { id: "quote-remote", text: "把注意力带回来", source: "灵魂按摩间" },
+      deleted: false,
+      revision: 1,
+      clientUpdatedAt: 24,
+      serverUpdatedAt: 25,
+      deviceId: "phone-1",
+    },
   ];
 
   const result = await applyPulledSnapshot({
@@ -127,13 +137,15 @@ test("pulled records are backed up before writes, verified, and leave original k
 
   assert.equal(result.backupId, "backup-1");
   assert.equal(events[0], "backup");
-  assert.equal(storage.writes.length, 6);
+  assert.equal(storage.writes.length, 7);
   assert.deepEqual(currentLongTasks[0], records[0].payload);
   const reflections = JSON.parse(storage.getItem(LEGACY_STORAGE_KEYS.reflection));
   assert.deepEqual(reflections.find((item) => item.id === "reflection-local"), {
     id: "reflection-local", content: "local", unknown: 7,
   });
   assert.deepEqual(reflections.find((item) => item.id === "reflection-remote"), records[1].payload);
+  const quotes = JSON.parse(storage.getItem(LEGACY_STORAGE_KEYS.soulQuote));
+  assert.deepEqual(quotes.find((item) => item.id === "quote-remote"), records[2].payload);
 });
 
 test("failed readback restores all LocalStorage values and the durable backup", async () => {

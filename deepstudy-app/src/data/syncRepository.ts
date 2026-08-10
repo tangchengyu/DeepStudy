@@ -8,6 +8,7 @@ export const supportedEntityTypes = [
   'time_audit',
   'distraction',
   'reflection',
+  'soul_quote',
 ] as const
 
 export type SyncEntityType = (typeof supportedEntityTypes)[number]

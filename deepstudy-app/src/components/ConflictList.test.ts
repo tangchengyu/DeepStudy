@@ -51,6 +51,7 @@ describe('ConflictList', () => {
       ['time_audit', { category: '学习', durationMinutes: 35 }],
       ['distraction', { content: '想刷手机', occurredAt: '10:30' }],
       ['reflection', { content: '今天保持专注', date: '2026-07-23' }],
+      ['soul_quote', { text: '把注意力带回来', source: '灵魂按摩间' }],
     ] as const
     const conflicts = payloads.map(([entityType, payload], index) => ({
       id: `conflict-${index}`, mutationId: null, recordKey: `${entityType}:item-${index}`,
@@ -66,7 +67,7 @@ describe('ConflictList', () => {
 
     for (const expected of [
       '今日论文', '长期写作', '章节备注', '论文', '25 分钟', '休息', '开始',
-      '学习', '35 分钟', '想刷手机', '今天保持专注', 'unknownNested', 'safe',
+      '学习', '35 分钟', '想刷手机', '今天保持专注', '把注意力带回来', '灵魂按摩间', 'unknownNested', 'safe',
     ]) expect(wrapper.text()).toContain(expected)
   })
 })

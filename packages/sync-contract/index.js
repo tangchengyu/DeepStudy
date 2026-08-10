@@ -6,6 +6,7 @@ export const SUPPORTED_ENTITY_TYPES = Object.freeze([
   'time_audit',
   'distraction',
   'reflection',
+  'soul_quote',
 ]);
 
 const SUPPORTED_ENTITY_TYPE_SET = new Set(SUPPORTED_ENTITY_TYPES);

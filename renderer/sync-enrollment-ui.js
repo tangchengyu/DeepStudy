@@ -45,13 +45,13 @@
       if (event?.phase === "commit") {
         const done = Math.max(0, Number(event.nextIndex) || 0);
         const total = Math.max(done, Number(event.totalItems) || 0);
-        setStatus(`正在导入旧数据：已提交 ${done}/${total} 条，请保持窗口打开。`);
+        setStatus(`正在上传本机旧数据到账号：已提交 ${done}/${total} 条，请保持窗口打开。`);
       } else if (event?.phase === "pull") {
-        setStatus(`正在核对云端数据：已读取 ${Math.max(0, Number(event.nextIndex) || 0)} 条。`);
+        setStatus(`正在从账号读回校验：已读取 ${Math.max(0, Number(event.nextIndex) || 0)} 条。`);
       } else if (event?.phase === "apply") {
-        setStatus(`正在写入本地数据：已应用 ${Math.max(0, Number(event.nextIndex) || 0)} 条。`);
+        setStatus(`正在写入本机并创建备份：已应用 ${Math.max(0, Number(event.nextIndex) || 0)} 条。`);
       } else if (event?.phase === "finish") {
-        setStatus("首次导入已完成，正在刷新同步状态。");
+        setStatus("首次同步已完成，正在进入日常同步管理。");
       }
     },
   });
@@ -286,18 +286,23 @@
     }
     authSection.hidden = true;
     importSection.hidden = Boolean(local.enrollmentComplete);
-    manageSection.hidden = false;
+    manageSection.hidden = !local.enrollmentComplete;
     sessionBadge.textContent = "已登录";
     let session;
     try {
       session = await controller.session();
-      setStatus(`已登录${session.user?.username ? `：${session.user.username}` : ""}。${storageNote}`);
+      const nextStep = local.enrollmentComplete ? "" : "请先完成首次同步本机数据。";
+      setStatus(`已登录${session.user?.username ? `：${session.user.username}` : ""}。${nextStep}${storageNote}`);
     } catch (error) {
       setStatus(error?.message || String(error), true);
       timerSection.hidden = true;
       return;
     }
     try {
+      if (!local.enrollmentComplete) {
+        timerSection.hidden = true;
+        return;
+      }
       const timerState = await reconcileTimer(local);
       const timer = timerState.timer;
       timerSection.hidden = timerState.kind !== "other-device";
@@ -313,8 +318,24 @@
 
   function renderPreview(preview) {
     const counts = preview?.counts || {};
-    previewResult.textContent = `本地 ${counts.local || 0} 条；新增 ${counts.additions || 0} 条；重复 ${counts.duplicates || 0} 条；分叉保留 ${counts.conflicts || 0} 条。`;
+    const local = Math.max(0, Number(counts.local) || 0);
+    const cloud = Math.max(0, Number(counts.cloud) || 0);
+    const additions = Math.max(0, Number(counts.additions) || 0);
+    const conflicts = Math.max(0, Number(counts.conflicts) || 0);
+    const duplicates = Math.max(0, Number(counts.duplicates) || 0);
+    const merged = Math.max(0, Number(counts.merged) || 0);
+    const upload = additions + conflicts;
+    const writeback = merged || Math.max(local, cloud);
+    previewResult.textContent = `本机旧数据 ${local} 条；账号已有 ${cloud} 条；将上传到账号 ${upload} 条；将写回本机 ${writeback} 条；重复 ${duplicates} 条；需要手动比较 ${conflicts} 条。`;
+    confirmImport.textContent = previewConfirmLabel({ local, cloud, upload, writeback });
     confirmImport.disabled = false;
+  }
+
+  function previewConfirmLabel({ local, cloud, upload }) {
+    if (local === 0 && cloud > 0) return "下载账号数据到本机";
+    if (cloud === 0 && upload > 0) return "确认并合并到账号";
+    if (local > 0 && cloud > 0) return "确认合并并同步";
+    return "确认并完成首次同步";
   }
 
   function conflictButton(label, className, onClick) {
@@ -419,7 +440,8 @@
       byId("sync-password").value = "";
       resetTurnstileToken();
       await refreshStatus();
-      continuousSync.start();
+      const state = await controller.status();
+      if (state.signedIn && state.enrollmentComplete) continuousSync.start();
       deviceRetry.hidden = !result.deviceRegistrationWarning;
       if (result.deviceRegistrationWarning) setStatus(`${result.deviceRegistrationWarning}；请点击“重试设备登记”。`, true);
     }
@@ -433,7 +455,8 @@
       byId("sync-password").value = "";
       resetTurnstileToken();
       await refreshStatus();
-      continuousSync.start();
+      const state = await controller.status();
+      if (state.signedIn && state.enrollmentComplete) continuousSync.start();
       deviceRetry.hidden = !result.deviceRegistrationWarning;
       if (result.deviceRegistrationWarning) setStatus(`${result.deviceRegistrationWarning}；请点击“重试设备登记”。`, true);
     }
@@ -474,12 +497,12 @@
     if (result?.recoveryCode) showRecoveryCode(result.recoveryCode);
   });
   byId("sync-import-preview").addEventListener("click", async (event) => {
-    const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.previewFirstImport()), "预览完成，本地数据尚未写入云端。");
+    const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.previewFirstImport()), "预览完成，本机和账号数据尚未改动。");
     if (result) renderPreview(result);
   });
   confirmImport.addEventListener("click", async (event) => {
-    const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.commitFirstImport()), "首次导入、云端读回和本地校验均已完成。", {
-      processingText: "正在开始首次导入：会分批提交旧数据，请保持窗口打开。",
+    const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.commitFirstImport()), "首次同步、账号读回和本机校验均已完成。", {
+      processingText: "正在开始首次同步：会分批提交本机旧数据、读回账号数据并写回本机，请保持窗口打开。",
     });
     if (result) {
       confirmImport.disabled = true;
