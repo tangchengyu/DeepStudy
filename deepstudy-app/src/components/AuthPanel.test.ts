@@ -13,9 +13,14 @@ describe('AuthPanel', () => {
       global: { stubs: { TurnstileChallenge: TurnstileStub } },
     })
 
+    expect(wrapper.text()).toContain('安全验证')
+    expect(wrapper.text()).toContain('完成验证后才能继续登录、注册或找回密码')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+
     await wrapper.get('input[autocomplete="username"]').setValue('alice')
     await wrapper.get('input[autocomplete="current-password"]').setValue('long-enough-password')
     await wrapper.get('[data-testid="challenge"]').trigger('click')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('sign-in')?.[0]).toEqual([{

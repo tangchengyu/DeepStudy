@@ -32,7 +32,7 @@ const route = useRoute()
 .bottom-nav {
   bottom: 0;
   left: 0;
-  padding: 0 0 max(0.5rem, env(safe-area-inset-bottom));
+  padding: 0;
   pointer-events: none;
   position: fixed;
   right: 0;
@@ -51,7 +51,8 @@ const route = useRoute()
   margin: 0 auto;
   max-width: 48rem;
   min-height: 4.55rem;
-  padding: 0.38rem 0.35rem 0.3rem;
+  padding: 0.38rem 0.35rem 0;
+  padding-bottom: calc(0.3rem + env(safe-area-inset-bottom));
   pointer-events: auto;
 }
 

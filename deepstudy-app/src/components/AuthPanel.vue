@@ -191,15 +191,21 @@ function submit() {
         >
       </label>
 
-      <TurnstileChallenge
-        :key="`${mode}-${challengeSequence}`"
-        :site-key="siteKey"
-        :action="mode"
-        @token="turnstileToken = $event"
-        @error="localError = $event"
-      />
+      <section class="security-check" aria-label="安全验证">
+        <div>
+          <strong>安全验证</strong>
+          <p>完成验证后才能继续登录、注册或找回密码。</p>
+        </div>
+        <TurnstileChallenge
+          :key="`${mode}-${challengeSequence}`"
+          :site-key="siteKey"
+          :action="mode"
+          @token="turnstileToken = $event"
+          @error="localError = $event"
+        />
+      </section>
       <p v-if="localError || error" class="form-error" role="alert">{{ localError || error }}</p>
-      <button class="submit-button" type="submit" :disabled="busy">
+      <button class="submit-button" type="submit" :disabled="busy || !turnstileToken">
         {{ busy ? '请稍候…' : title }}
       </button>
     </form>
@@ -308,6 +314,27 @@ input {
 input:focus {
   border-color: var(--accent);
   outline: 3px solid color-mix(in srgb, var(--focus-ring) 30%, transparent);
+}
+
+.security-check {
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 0.95rem;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.8rem;
+}
+
+.security-check strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.security-check p {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0.2rem 0 0;
 }
 
 .form-error {

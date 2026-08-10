@@ -3,6 +3,7 @@ import { defineComponent } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
 import BottomNavigation from './BottomNavigation.vue'
+import bottomNavigationSource from './BottomNavigation.vue?raw'
 
 const EmptyView = defineComponent({ template: '<main />' })
 
@@ -29,5 +30,11 @@ describe('bottom navigation', () => {
     expect(items[1].attributes('aria-current')).toBe('page')
     expect(items[2].classes()).toContain('bottom-nav__item--focus')
     expect(wrapper.findAll('svg')).toHaveLength(5)
+  })
+
+  it('anchors the navigation surface to the physical screen bottom', () => {
+    expect(bottomNavigationSource).not.toContain('padding: 0 0 max(0.5rem, env(safe-area-inset-bottom));')
+    expect(bottomNavigationSource).toContain('bottom: 0;')
+    expect(bottomNavigationSource).toContain('padding-bottom: calc(0.3rem + env(safe-area-inset-bottom));')
   })
 })

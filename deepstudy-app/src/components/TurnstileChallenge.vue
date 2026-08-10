@@ -58,16 +58,21 @@ onBeforeUnmount(() => cleanup?.())
 
 <style scoped>
 .turnstile-field {
-  min-height: 4.1rem;
-  overflow: hidden;
+  align-items: center;
+  display: grid;
+  min-height: 4.6rem;
+  overflow: visible;
   width: 100%;
 }
 
 .turnstile-field__host {
+  min-height: 4.1rem;
+  overflow: visible;
   width: 100%;
 }
 
 small {
   color: var(--text-muted);
+  font-size: 0.78rem;
 }
 </style>
