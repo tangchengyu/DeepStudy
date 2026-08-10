@@ -178,7 +178,9 @@ function markdownLineIndex(line) {
 }
 
 function clearMarkdownLineSelection() {
-  markdownLineElements().forEach((line) => line.classList.remove("selected"));
+  markdownLineElements().forEach((line) => line.classList.remove("selected", "partial-selected"));
+  const selection = window.getSelection?.();
+  if (selection && !document.activeElement?.closest?.("#task-detail-notes")) selection.removeAllRanges();
   markdownSelectionState.pointerDown = false;
   markdownSelectionState.dragging = false;
   markdownSelectionState.anchorLine = null;
@@ -275,12 +277,16 @@ function selectMarkdownLineRange(startIndex, endIndex, focusOffset = 0) {
   const lines = markdownLineElements();
   const start = Math.min(startIndex, endIndex);
   const end = Math.max(startIndex, endIndex);
-  lines.forEach((line, index) => {
-    line.classList.toggle("selected", index >= start && index <= end);
-  });
   markdownSelectionState.anchorIndex = startIndex;
   markdownSelectionState.focusIndex = endIndex;
   markdownSelectionState.focusOffset = focusOffset;
+  const range = markdownTextSelectionRange();
+  lines.forEach((line, index) => {
+    const selected = index >= start && index <= end;
+    line.classList.toggle("selected", selected);
+    line.classList.toggle("partial-selected", selected && !isMarkdownLineFullySelected(line, index, range));
+  });
+  syncNativeMarkdownSelection();
 }
 
 function caretOffsetFromPoint(line, x, y) {
@@ -320,9 +326,67 @@ function displayOffsetToRawOffset(raw, displayOffset) {
   return Math.min(source.length, leading.length + offset);
 }
 
+function rawOffsetToDisplayOffset(raw, rawOffset) {
+  const source = String(raw || "");
+  const offset = Math.min(source.length, Math.max(0, Number(rawOffset) || 0));
+  const leading = source.match(/^[\t ]+/)?.[0] || "";
+  const body = source.slice(leading.length);
+  const heading = body.match(/^(#{1,3})\s+/);
+  const unordered = body.match(/^[-*]\s+/);
+  const ordered = body.match(/^\d+[.)]\s+/);
+  const hiddenLength = leading.length + (heading?.[0].length || unordered?.[0].length || ordered?.[0].length || 0);
+  return Math.max(0, Math.min(source.length - hiddenLength, offset - hiddenLength));
+}
+
 function rawCaretOffsetFromPoint(line, x, y) {
   if (line.classList.contains("editing")) return caretOffsetFromPoint(line, x, y);
   return displayOffsetToRawOffset(line.dataset.raw || "", caretOffsetFromPoint(line, x, y));
+}
+
+function textPositionAtOffset(root, offset) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let remaining = Math.max(0, Number(offset) || 0);
+  let node = walker.nextNode();
+  let lastText = null;
+  while (node) {
+    lastText = node;
+    if (remaining <= node.textContent.length) return { node, offset: remaining };
+    remaining -= node.textContent.length;
+    node = walker.nextNode();
+  }
+  if (lastText) return { node: lastText, offset: lastText.textContent.length };
+  return { node: root, offset: root.childNodes.length };
+}
+
+function displaySelectionOffset(line, rawOffset) {
+  if (line.classList.contains("editing")) return Math.min(line.textContent.length, Math.max(0, Number(rawOffset) || 0));
+  return rawOffsetToDisplayOffset(line.dataset.raw || "", rawOffset);
+}
+
+function syncNativeMarkdownSelection() {
+  const range = markdownTextSelectionRange();
+  const lines = markdownLineElements();
+  const startLine = lines[range?.startLine];
+  const endLine = lines[range?.endLine];
+  if (!range || !startLine || !endLine) return false;
+  const selection = window.getSelection();
+  const domRange = document.createRange();
+  const start = textPositionAtOffset(startLine, displaySelectionOffset(startLine, range.startOffset));
+  const end = textPositionAtOffset(endLine, displaySelectionOffset(endLine, range.endOffset));
+  domRange.setStart(start.node, start.offset);
+  domRange.setEnd(end.node, end.offset);
+  selection.removeAllRanges();
+  if (!domRange.collapsed) window.getSelection().addRange(domRange);
+  return !domRange.collapsed;
+}
+
+function isMarkdownLineFullySelected(line, index, range) {
+  if (!range || index < range.startLine || index > range.endLine) return false;
+  const raw = line.classList.contains("editing") ? line.textContent : line.dataset.raw || "";
+  if (range.startLine === range.endLine) return range.startOffset <= 0 && range.endOffset >= raw.length;
+  if (index === range.startLine) return range.startOffset <= 0;
+  if (index === range.endLine) return range.endOffset >= raw.length;
+  return true;
 }
 
 function beginMarkdownLineSelection(line, event) {
@@ -361,7 +425,12 @@ function endMarkdownLineSelection(event) {
     const selected = selectedMarkdownLines();
     const range = markdownTextSelectionRange();
     markdownSelectionState.dragging = false;
-    if (selected.length && range && (range.startLine !== range.endLine || range.startOffset !== range.endOffset)) selected[0]?.focus();
+    if (selected.length && range && (range.startLine !== range.endLine || range.startOffset !== range.endOffset)) {
+      finishAllMarkdownLineEdits();
+      syncNativeMarkdownSelection();
+      selected[0]?.focus();
+      requestAnimationFrame(syncNativeMarkdownSelection);
+    }
     else clearMarkdownLineSelection();
     return;
   }

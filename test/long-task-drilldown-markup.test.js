@@ -213,6 +213,16 @@ test("starts cross-line note drag selection from the active editing line", () =>
   assert.match(longTasksJs, /if \(line\.classList\.contains\("editing"\)\) return caretOffsetFromPoint\(line, x, y\)/);
 });
 
+test("renders partial note selections at text precision instead of whole-row highlight", () => {
+  assert.match(longTasksJs, /function rawOffsetToDisplayOffset\(raw, rawOffset\)/);
+  assert.match(longTasksJs, /function syncNativeMarkdownSelection\(\)/);
+  assert.match(longTasksJs, /function isMarkdownLineFullySelected\(line, index, range\)/);
+  assert.match(longTasksJs, /line\.classList\.toggle\("partial-selected", selected && !isMarkdownLineFullySelected\(line, index, range\)\)/);
+  assert.match(longTasksJs, /window\.getSelection\(\)\.addRange\(domRange\)/);
+  assert.match(longTasksJs, /finishAllMarkdownLineEdits\(\);\s*syncNativeMarkdownSelection\(\);/s);
+  assert.match(css, /\.markdown-line\.selected\.partial-selected\s*\{/);
+});
+
 test("Enter splitting commits only the text before the caret to the current note line", () => {
   assert.match(longTasksJs, /const \[before, after\] = LongTaskUtils\.splitNoteLineAtOffset\(text, offset\)/);
   assert.match(longTasksJs, /line\.textContent = before;\s*line\.dataset\.raw = before;\s*finishMarkdownLineEdit\(line\);/s);
