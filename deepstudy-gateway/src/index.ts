@@ -96,8 +96,9 @@ function desktopTurnstilePage(input: { siteKey: string; action: string; callback
       main { width: min(420px, calc(100vw - 32px)); padding: 28px; border: 1px solid #d6e4d8; border-radius: 18px; background: #fffdf9; box-shadow: 0 18px 52px rgba(50, 68, 59, 0.14); text-align: center; }
       h1 { margin: 0 0 10px; font-size: 24px; }
       p { margin: 0 0 18px; color: #6d8578; line-height: 1.7; }
-      #turnstile { min-height: 78px; display: flex; justify-content: center; align-items: center; }
+      #turnstile-widget { min-height: 78px; display: flex; justify-content: center; align-items: center; }
       #status { margin-top: 14px; font-weight: 700; }
+      button { margin-top: 14px; min-height: 42px; padding: 0 18px; border: 1px solid #d6e4d8; border-radius: 10px; background: #fffdf9; color: #568f7c; font: inherit; font-weight: 800; cursor: pointer; }
       .error { color: #c57779; }
     </style>
   </head>
@@ -105,44 +106,87 @@ function desktopTurnstilePage(input: { siteKey: string; action: string; callback
     <main>
       <h1>DeepStudy 安全验证</h1>
       <p>请在浏览器中完成人机验证。完成后会自动回到 DeepStudy。</p>
-      <div id="turnstile"></div>
+      <div
+        id="turnstile-widget"
+        class="cf-turnstile"
+        data-sitekey="${escapeHtml(input.siteKey)}"
+        data-action="${escapeHtml(input.action)}"
+        data-theme="light"
+        data-callback="onTurnstileSuccess"
+        data-expired-callback="onTurnstileExpired"
+        data-error-callback="onTurnstileError"
+      ></div>
       <p id="status">正在加载验证组件…</p>
+      <button id="reload" type="button" hidden>重新加载验证</button>
     </main>
     <script>
       const config = ${config};
       const status = document.getElementById("status");
+      const reload = document.getElementById("reload");
+      const startedAt = Date.now();
+      reload.addEventListener("click", () => location.reload());
       function finish(key, value) {
         const callback = new URL(config.callback);
         callback.searchParams.set("state", config.state);
         callback.searchParams.set(key, value);
         location.replace(callback.toString());
       }
+      function showLoadFailure() {
+        status.textContent = "验证组件加载超时。请检查网络是否能访问 challenges.cloudflare.com，或点击重新加载验证。";
+        status.className = "error";
+        reload.hidden = false;
+      }
+      window.onTurnstileSuccess = (token) => {
+        status.textContent = "验证完成，正在返回 DeepStudy…";
+        finish("token", token || "");
+      };
+      window.onTurnstileExpired = () => {
+        status.textContent = "验证已过期，请重新加载验证。";
+        status.className = "error";
+        reload.hidden = false;
+      };
+      window.onTurnstileError = () => {
+        status.textContent = "验证失败，请回到 DeepStudy 重新打开浏览器验证。";
+        status.className = "error";
+        finish("error", "人机验证失败，请重试。");
+      };
       function renderTurnstile() {
-        if (!window.turnstile) {
+        if (!window.turnstile || typeof window.turnstile.render !== "function") {
+          if (Date.now() - startedAt > 15000) {
+            showLoadFailure();
+            return;
+          }
           setTimeout(renderTurnstile, 120);
           return;
         }
-        window.turnstile.render("#turnstile", {
-          sitekey: config.siteKey,
-          action: config.action,
-          theme: "light",
-          callback: (token) => {
-            status.textContent = "验证完成，正在返回 DeepStudy…";
-            finish("token", token || "");
-          },
-          "expired-callback": () => {
-            status.textContent = "验证已过期，请重新完成验证。";
-            status.className = "error";
-          },
-          "error-callback": () => {
-            status.textContent = "验证失败，请回到 DeepStudy 重新打开浏览器验证。";
-            status.className = "error";
-            finish("error", "人机验证失败，请重试。");
-          }
-        });
-        status.textContent = "请完成验证。";
+        try {
+          window.turnstile.render("#turnstile-widget", {
+            sitekey: config.siteKey,
+            action: config.action,
+            theme: "light",
+            callback: window.onTurnstileSuccess,
+            "expired-callback": window.onTurnstileExpired,
+            "error-callback": window.onTurnstileError
+          });
+          status.textContent = "请完成验证。";
+        } catch (error) {
+          status.textContent = error && error.message ? error.message : "验证组件初始化失败，请重新加载验证。";
+          status.className = "error";
+          reload.hidden = false;
+        }
+      }
+      function waitForWidgetResult() {
+        if (document.querySelector("#turnstile-widget iframe") || document.querySelector("input[name='cf-turnstile-response']")) {
+          if (status.textContent === "正在加载验证组件…") status.textContent = "请完成验证。";
+        }
+        if (Date.now() - startedAt > 15000) {
+          if (status.textContent === "正在加载验证组件…") showLoadFailure();
+          return;
+        }
+        setTimeout(waitForWidgetResult, 120);
       }
       renderTurnstile();
+      waitForWidgetResult();
     </script>
   </body>
 </html>`;
@@ -162,6 +206,7 @@ app.get("/v1/turnstile/desktop", (c) => {
     callback,
     state: escapeHtml(state)
   }), 200, {
+    "cache-control": "no-store",
     "content-security-policy": "default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"
   });
 });

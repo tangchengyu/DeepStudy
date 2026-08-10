@@ -92,12 +92,19 @@ describe("gateway", () => {
   it("serves the desktop browser Turnstile page only for loopback callbacks", async () => {
     const ok = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=sign-in&state=state-1&callback=http%3A%2F%2F127.0.0.1%3A49152%2Fcallback");
     expect(ok.status).toBe(200);
+    expect(ok.headers.get("cache-control")).toBe("no-store");
     const html = await ok.text();
     expect(html).toContain("https://challenges.cloudflare.com/turnstile/v0/api.js");
     expect(html).toContain(env.TURNSTILE_SITE_KEY);
     expect(html).toContain("http://127.0.0.1:49152/callback");
     expect(html).toContain("state-1");
     expect(html).toContain("sign-in");
+    expect(html).toContain('class="cf-turnstile"');
+    expect(html).toContain('id="turnstile-widget"');
+    expect(html).toContain('data-callback="onTurnstileSuccess"');
+    expect(html).toContain('turnstile.render("#turnstile-widget"');
+    expect(html).not.toContain('id="turnstile"');
+    expect(html).toContain("验证组件加载超时");
 
     const badCallback = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=sign-in&state=state-1&callback=https%3A%2F%2Fattacker.example%2Fcallback");
     expect(badCallback.status).toBe(400);
