@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:"
+      content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; media-src 'self' blob:"
     />
     <title>deepstudy</title>
     <link rel="stylesheet" href="styles.css" />
@@ -677,46 +677,71 @@
           </div>
           <button id="sync-close" class="icon-btn compact" type="button" aria-label="关闭账号同步">×</button>
         </div>
-        <div class="sync-grid">
-          <label>同步服务地址<input id="sync-gateway-url" type="url" spellcheck="false" placeholder="https://deepstudy-gateway.jackbreese585.workers.dev" /></label>
-          <label>用户名<input id="sync-username" autocomplete="username" maxlength="30" /></label>
-          <label>密码<input id="sync-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" /></label>
-          <label>人机验证令牌<input id="sync-turnstile-token" autocomplete="off" spellcheck="false" /></label>
+        <div class="sync-stepper" aria-label="账号同步步骤">
+          <span>1 连接账号</span>
+          <span>2 首次导入</span>
+          <span>3 同步管理</span>
         </div>
-        <p class="sync-hint">试点阶段由部署环境提供一次性验证令牌；不会保存密码或验证令牌。</p>
-            <div class="sync-actions">
-              <button id="sync-register" class="primary-btn" type="button">注册</button>
-              <button id="sync-sign-in" class="primary-btn" type="button">登录</button>
-              <button id="sync-sign-out" class="secondary-btn" type="button">退出账号</button>
-              <button id="sync-device-retry" class="secondary-btn" type="button" hidden>重试设备登记</button>
+        <section id="sync-wizard-auth" class="sync-wizard-section">
+          <div class="sync-section-heading">
+            <div>
+              <strong>连接账号</strong>
+              <p>登录或注册后，DeepStudy 会把本机数据安全同步到你的账号。</p>
             </div>
-        <details class="sync-recovery">
-          <summary>使用恢复码重设密码</summary>
-          <div class="sync-grid">
-            <label>恢复码<input id="sync-recovery-input" autocomplete="off" spellcheck="false" /></label>
-            <label>新密码<input id="sync-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" /></label>
+            <span id="sync-session-badge" class="sync-badge">尚未登录</span>
           </div>
-          <button id="sync-recover" class="secondary-btn" type="button">重设密码并轮换恢复码</button>
-        </details>
+          <div class="sync-grid">
+            <label>同步服务地址<input id="sync-gateway-url" type="url" spellcheck="false" placeholder="https://deepstudy-gateway.jackbreese585.workers.dev" /></label>
+            <label>用户名<input id="sync-username" autocomplete="username" maxlength="30" /></label>
+            <label>密码<input id="sync-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" /></label>
+          </div>
+          <div class="sync-turnstile-panel">
+            <div>
+              <strong>安全验证</strong>
+              <p id="sync-turnstile-status">正在读取同步服务安全配置…</p>
+            </div>
+            <div id="sync-turnstile-host" class="sync-turnstile-host" aria-live="polite"></div>
+          </div>
+          <div class="sync-actions sync-primary-actions">
+            <button id="sync-sign-in" class="primary-btn" type="button">登录</button>
+            <button id="sync-register" class="secondary-btn" type="button">注册新账号</button>
+          </div>
+          <details class="sync-recovery">
+            <summary>使用恢复码重设密码</summary>
+            <div class="sync-grid">
+              <label>恢复码<input id="sync-recovery-input" autocomplete="off" spellcheck="false" /></label>
+              <label>新密码<input id="sync-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" /></label>
+            </div>
+            <button id="sync-recover" class="secondary-btn" type="button">重设密码并轮换恢复码</button>
+          </details>
+        </section>
         <div id="sync-recovery-code-wrap" class="sync-recovery-code" hidden>
           <strong>新的恢复码（只显示这一次，请立即离线保存）</strong>
           <code id="sync-recovery-code"></code>
           <label><input id="sync-recovery-saved" type="checkbox" /> 我已离线保存恢复码</label>
         </div>
-        <section class="sync-data-section">
-          <h3>旧数据与同步</h3>
+        <section id="sync-wizard-import" class="sync-data-section sync-wizard-section" hidden>
+          <h3>首次导入旧数据</h3>
           <p>先预览，不会修改本地或云端；确认时会重新检查数据，并在真正写回前创建可恢复备份。</p>
           <div class="sync-actions">
             <button id="sync-import-preview" class="secondary-btn" type="button">预览首次导入</button>
             <button id="sync-import-confirm" class="primary-btn" type="button" disabled>确认并导入</button>
-            <button id="sync-pull" class="secondary-btn" type="button">拉取并应用</button>
+          </div>
+          <div id="sync-preview-result" class="sync-preview-result"></div>
+        </section>
+        <section id="sync-wizard-manage" class="sync-data-section sync-wizard-section" hidden>
+          <h3>同步状态与高级恢复</h3>
+          <p>日常使用只需要立即同步；冲突和备份恢复只在多端数据不一致或需要回滚时使用。</p>
+          <div class="sync-actions">
+            <button id="sync-pull" class="primary-btn" type="button">立即同步</button>
             <button id="sync-conflicts" class="secondary-btn" type="button">查看冲突</button>
+            <button id="sync-device-retry" class="secondary-btn" type="button" hidden>重试设备登记</button>
+            <button id="sync-sign-out" class="secondary-btn" type="button">退出账号</button>
           </div>
           <div class="sync-backup-restore">
             <label>备份编号<input id="sync-backup-id" autocomplete="off" spellcheck="false" placeholder="粘贴同步完成时显示的备份编号" /></label>
             <button id="sync-backup-restore" class="secondary-btn" type="button">恢复该备份</button>
           </div>
-          <div id="sync-preview-result" class="sync-preview-result"></div>
           <div id="sync-conflict-list" class="sync-conflict-list"></div>
         </section>
         <section id="sync-timer-section" class="sync-data-section" hidden>
@@ -739,6 +764,7 @@
     <script src="legacy-sync.js"></script>
     <script src="sync-enrollment.js"></script>
     <script src="timer-sync-runtime.js"></script>
+    <script src="desktop-turnstile.js"></script>
     <script src="i18n.js"></script>
     <script src="app.js"></script>
     <script src="continuous-sync.js"></script>

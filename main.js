@@ -1216,6 +1216,7 @@ ipcMain.handle("long-tasks:move-to-daily-plan", (_event, payload = {}) => {
 });
 ipcMain.handle("reminders:acknowledge", acknowledgeReminders);
 
+ipcMain.handle("sync:config", (_event, input) => desktopSyncService.config(input));
 ipcMain.handle("sync:auth-register", (_event, input) => desktopSyncService.register(input));
 ipcMain.handle("sync:auth-sign-in", (_event, input) => desktopSyncService.signIn(input));
 ipcMain.handle("sync:auth-recover", (_event, input) => desktopSyncService.recover(input));

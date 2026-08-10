@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   addCustomNoise: (payload) => ipcRenderer.invoke("noise:add", payload),
   readCustomNoise: (id) => ipcRenderer.invoke("noise:read", id),
   deleteCustomNoise: (id) => ipcRenderer.invoke("noise:delete", id),
+  syncConfig: (input) => ipcRenderer.invoke("sync:config", input),
   syncRegister: (input) => ipcRenderer.invoke("sync:auth-register", input),
   syncSignIn: (input) => ipcRenderer.invoke("sync:auth-sign-in", input),
   syncRecover: (input) => ipcRenderer.invoke("sync:auth-recover", input),

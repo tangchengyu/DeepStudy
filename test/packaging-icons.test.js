@@ -12,6 +12,11 @@ function pngDimensions(filePath) {
   return [data.readUInt32BE(16), data.readUInt32BE(20)];
 }
 
+test("master desktop package uses the next public master version", () => {
+  assert.equal(pkg.version, "1.2.31");
+  assert.doesNotMatch(pkg.version, /local/i);
+});
+
 test("packaging uses the DeepStudy clock icon on macOS and Windows", () => {
   assert.equal(pkg.build.mac.icon, "build/deepstudy.icns");
   assert.equal(pkg.build.win.icon, "build/deepstudy.ico");

@@ -9,6 +9,7 @@ const preload = fs.readFileSync(path.join(root, "preload.js"), "utf8");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 const channels = [
+  "sync:config",
   "sync:auth-register",
   "sync:auth-sign-in",
   "sync:auth-recover",

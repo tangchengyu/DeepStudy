@@ -586,6 +586,17 @@ function createDesktopSyncService({
   }
 
   return {
+    async config(input = {}) {
+      const gatewayUrl = normalizeGatewayUrl(input.gatewayUrl || stateStore.read().gatewayUrl);
+      const { payload } = await request("/v1/config", {
+        authenticated: false,
+        gatewayUrl,
+      });
+      return {
+        turnstileSiteKey: String(payload.turnstileSiteKey || ""),
+        minimumPasswordLength: Math.max(0, Number(payload.minimumPasswordLength) || 0),
+      };
+    },
     register(input = {}) { return serializeAuthTransition(() => enroll("/v1/auth/register", input)); },
     signIn(input = {}) { return serializeAuthTransition(() => enroll("/v1/auth/sign-in", input)); },
     recover(input = {}) { return serializeAuthTransition(async () => {

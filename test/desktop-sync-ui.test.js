@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.join(renderer, "index.html"), "utf8");
 const script = fs.readFileSync(path.join(renderer, "sync-enrollment-ui.js"), "utf8");
 const appScript = fs.readFileSync(path.join(renderer, "app.js"), "utf8");
 const timerScript = fs.readFileSync(path.join(renderer, "timer-sync-runtime.js"), "utf8");
+const tutorialScript = fs.readFileSync(path.join(renderer, "tutorial.js"), "utf8");
 const allRendererScripts = fs.readdirSync(renderer)
   .filter((name) => name.endsWith(".js"))
   .map((name) => fs.readFileSync(path.join(renderer, name), "utf8"))
@@ -20,11 +21,16 @@ test("desktop account panel includes enrollment, recovery, preview, conflicts, a
     "sync-recovery-saved",
     "sync-recover", "sync-import-preview", "sync-import-confirm",
     "sync-pull", "sync-conflicts", "sync-takeover",
+    "sync-wizard-auth", "sync-wizard-import", "sync-wizard-manage",
+    "sync-turnstile-host", "sync-turnstile-status",
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
   assert.match(html, />接管并继续</);
   assert.match(html, /id="sync-password"[^>]*autocomplete="current-password"/);
   assert.match(html, /id="sync-new-password"[^>]*autocomplete="new-password"/);
+  assert.doesNotMatch(html, /sync-turnstile-token/);
+  assert.doesNotMatch(html, /人机验证令牌/);
   assert.ok(html.indexOf('src="legacy-sync.js"') < html.indexOf('src="sync-enrollment.js"'));
+  assert.ok(html.indexOf('src="desktop-turnstile.js"') < html.indexOf('src="sync-enrollment-ui.js"'));
   assert.ok(html.indexOf('src="sync-enrollment.js"') < html.indexOf('src="sync-enrollment-ui.js"'));
 });
 
@@ -33,6 +39,24 @@ test("sync UI renders server text safely and never clears all legacy LocalStorag
   assert.match(script, /status\.textContent\s*=/);
   assert.doesNotMatch(script, /innerHTML\s*=/);
   assert.doesNotMatch(allRendererScripts, /localStorage\.clear\s*\(/);
+});
+
+test("desktop account panel uses Turnstile config before auth and does not close from backdrop clicks", () => {
+  assert.match(html, /challenges\.cloudflare\.com/);
+  assert.match(script, /syncConfig/);
+  assert.match(script, /turnstileToken/);
+  assert.match(script, /同步服务未配置安全验证/);
+  assert.match(script, /resetTurnstileChallenge/);
+  assert.doesNotMatch(script, /sync-turnstile-token/);
+  assert.doesNotMatch(script, /event\.target === modal[\s\S]*modal\.hidden = true/);
+});
+
+test("tutorial explains account sync safety, first import, conflicts, and backup recovery", () => {
+  assert.match(tutorialScript, /账号同步/);
+  assert.match(tutorialScript, /人机验证/);
+  assert.match(tutorialScript, /首次导入/);
+  assert.match(tutorialScript, /冲突/);
+  assert.match(tutorialScript, /备份/);
 });
 
 test("successful timer takeover hydrates and continues the matching local timer engine", () => {

@@ -329,6 +329,34 @@ test("gateway enrollment keeps bearer tokens behind the main-process interface",
   assert.equal(state.cursor, 0);
 });
 
+test("gateway config is fetched before auth without exposing bearer credentials", async () => {
+  const { createDesktopSyncService } = require(MODULE_PATH);
+  const requests = [];
+  const service = createDesktopSyncService({
+    fetch: async (url, init = {}) => {
+      requests.push({ url, init });
+      return Response.json({ turnstileSiteKey: "site-key-123", minimumPasswordLength: 12 });
+    },
+    credentialStore: {
+      loadToken: () => "stored-token",
+      saveToken: () => ({ persistence: "memory-only", warning: "" }),
+      clearToken() {},
+      securityStatus: () => ({ persistence: "memory-only", warning: "" }),
+    },
+    stateStore: {
+      read: () => ({ gatewayUrl: "https://gateway.example", deviceId: "desktop-config-device", username: "" }),
+      update() {},
+    },
+  });
+
+  const config = await service.config({ gatewayUrl: "https://gateway.example/" });
+
+  assert.deepEqual(config, { turnstileSiteKey: "site-key-123", minimumPasswordLength: 12 });
+  assert.match(requests[0].url, /^https:\/\/gateway\.example\/v1\/config$/);
+  assert.equal(requests[0].init.headers.Authorization, undefined);
+  assert.equal(requests[0].init.headers["X-Device-Id"], "desktop-config-device");
+});
+
 test("gateway client requires an explicit takeover flag and uses the conflict-resolution contract", async () => {
   const { createDesktopSyncService } = require(MODULE_PATH);
   const requests = [];

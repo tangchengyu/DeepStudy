@@ -7,9 +7,74 @@
 }
 
 .sync-card {
-  width: min(760px, calc(100vw - 32px));
+  width: min(780px, calc(100vw - 32px));
   max-height: min(860px, calc(100vh - 32px));
   overflow: auto;
+}
+
+.sync-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.sync-stepper span {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sync-wizard-section {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255, 253, 249, 0.72);
+}
+
+.sync-section-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sync-section-heading strong,
+.sync-turnstile-panel strong {
+  font-size: 16px;
+}
+
+.sync-section-heading p,
+.sync-turnstile-panel p {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sync-turnstile-panel p.error {
+  color: var(--red-hover);
+  font-weight: 700;
+}
+
+.sync-badge {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .sync-grid {
@@ -54,6 +119,34 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+
+.sync-primary-actions {
+  align-items: center;
+}
+
+.sync-primary-actions .primary-btn {
+  min-width: 160px;
+}
+
+.sync-turnstile-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(260px, auto);
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.sync-turnstile-host {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
 }
 
 .sync-recovery,
@@ -123,6 +216,16 @@
 
 @media (max-width: 700px) {
   .sync-grid { grid-template-columns: 1fr; }
+  .sync-stepper { grid-template-columns: 1fr; }
+  .sync-section-heading {
+    flex-direction: column;
+  }
+  .sync-turnstile-panel {
+    grid-template-columns: 1fr;
+  }
+  .sync-turnstile-host {
+    justify-content: flex-start;
+  }
 }
 :root {
   --bg: #f3f7f2;
