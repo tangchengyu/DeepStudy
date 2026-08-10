@@ -453,7 +453,7 @@ watch(() => syncState.conflicts, () => {
 
 .profile-avatar {
   align-items: center;
-  background: #ebe8ff;
+  background: var(--accent-soft, rgb(112 173 153 / 16%));
   border-radius: 1rem;
   color: var(--accent);
   display: inline-flex;
@@ -578,7 +578,7 @@ watch(() => syncState.conflicts, () => {
 }
 
 .gateway-row input {
-  background: #fafbfe;
+  background: var(--surface-soft);
   border: 1px solid var(--border-soft);
   border-radius: 0.75rem;
   min-height: 2.9rem;
@@ -646,7 +646,7 @@ watch(() => syncState.conflicts, () => {
 }
 
 .action-message {
-  background: #eeecff;
+  background: var(--accent-soft, rgb(112 173 153 / 16%));
   border-radius: 0.85rem;
   color: var(--accent-strong);
   font-size: 0.8rem;

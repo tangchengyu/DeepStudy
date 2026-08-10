@@ -1,18 +1,21 @@
 :root {
-  color: #182136;
+  color: #30433b;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --accent: #6255d9;
-  --accent-strong: #4f43c0;
-  --background: #f4f6fb;
-  --border-soft: #e5e8f0;
-  --focus-ring: #9389ef;
-  --surface: #fff;
-  --surface-muted: #f0f2f8;
-  --text-main: #182136;
-  --text-muted: #667085;
+  --accent: #70ad99;
+  --accent-strong: #568f7c;
+  --accent-soft: rgb(112 173 153 / 16%);
+  --background: #f3f7f2;
+  --border-soft: #d6e4d8;
+  --focus-ring: #70ad99;
+  --plan: #d9b86f;
+  --surface: #fffdf9;
+  --surface-muted: #edf5ee;
+  --surface-soft: #f7faf5;
+  --text-main: #30433b;
+  --text-muted: #6d8578;
 }
 
 * {
@@ -72,7 +75,7 @@ button {
 
 .screen-heading h1 {
   font-size: clamp(1.9rem, 8vw, 2.4rem);
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   margin: 0;
 }
 
@@ -86,7 +89,8 @@ button {
 .surface-card {
   background: var(--surface);
   border: 1px solid var(--border-soft);
-  border-radius: 1.35rem;
+  border-radius: 1.15rem;
+  box-shadow: 0 0.75rem 2rem rgb(44 62 56 / 7%);
   padding: 1.15rem;
 }
 

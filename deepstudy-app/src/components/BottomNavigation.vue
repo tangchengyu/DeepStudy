@@ -44,8 +44,8 @@ const route = useRoute()
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   border: 1px solid var(--border-soft);
   border-bottom: 0;
-  border-radius: 1.4rem 1.4rem 0 0;
-  box-shadow: 0 -0.55rem 1.8rem rgb(20 29 50 / 9%);
+  border-radius: 1.15rem 1.15rem 0 0;
+  box-shadow: 0 -0.55rem 1.8rem rgb(44 62 56 / 10%);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0 auto;
@@ -98,10 +98,10 @@ const route = useRoute()
 }
 
 .bottom-nav__item--focus .bottom-nav__icon {
-  background: var(--accent);
+  background: linear-gradient(180deg, #7db7a4, var(--accent));
   border: 0.3rem solid var(--background);
   border-radius: 999px;
-  box-shadow: 0 0.55rem 1.1rem rgb(86 72 220 / 25%);
+  box-shadow: 0 0.55rem 1.1rem rgb(86 143 124 / 24%);
   color: #fff;
   height: 3.25rem;
   width: 3.25rem;

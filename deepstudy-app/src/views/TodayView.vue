@@ -194,7 +194,7 @@ async function removeTask(task: DailyTask) {
 }
 
 .sync-state {
-  background: #f2efff;
+  background: var(--accent-soft, rgb(112 173 153 / 16%));
   border-radius: 0.8rem;
   color: var(--accent-strong);
   font-size: 0.82rem;

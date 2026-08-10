@@ -46,6 +46,8 @@ describe('Habit reflection and audit view', () => {
   })
 
   it('loads multiline today reflection and saves through a labelled editor', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 23, 9, 0, 0))
     const repository = repositoryWith()
     const wrapper = mount(HabitView, {
       global: { provide: { [reflectionRepositoryKey as symbol]: repository } },
@@ -98,6 +100,8 @@ describe('Habit reflection and audit view', () => {
   })
 
   it('clears the today editor when its manual reflection is deleted from history', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 23, 9, 0, 0))
     const repository = repositoryWith()
     const wrapper = mount(HabitView, {
       global: { provide: { [reflectionRepositoryKey as symbol]: repository } },

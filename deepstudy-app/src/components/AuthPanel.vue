@@ -210,7 +210,7 @@ function submit() {
 .auth-sheet {
   background: var(--surface);
   border-radius: 1.55rem 1.55rem 0 0;
-  box-shadow: 0 -1rem 3rem rgb(31 38 63 / 18%);
+  box-shadow: 0 -1rem 3rem rgb(44 62 56 / 18%);
   margin: auto auto 0;
   max-height: calc(100dvh - env(safe-area-inset-top));
   max-width: 40rem;
@@ -295,7 +295,7 @@ label {
 }
 
 input {
-  background: #fafbfe;
+  background: var(--surface-soft);
   border: 1px solid var(--border-soft);
   border-radius: 0.9rem;
   color: var(--text-main);

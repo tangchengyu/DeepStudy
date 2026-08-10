@@ -72,7 +72,7 @@ async function copyCode(code: string) {
 .recovery-panel {
   background: var(--surface);
   border-radius: 1.55rem;
-  box-shadow: 0 1.2rem 3rem rgb(31 38 63 / 20%);
+  box-shadow: 0 1.2rem 3rem rgb(44 62 56 / 18%);
   margin: auto;
   max-width: 29rem;
   padding: 1.4rem;
@@ -105,8 +105,8 @@ p {
 
 .recovery-code {
   align-items: center;
-  background: #f1efff;
-  border: 1px solid #dcd7ff;
+  background: var(--accent-soft, rgb(112 173 153 / 16%));
+  border: 1px solid var(--border-soft);
   border-radius: 1rem;
   color: var(--accent-strong);
   display: flex;

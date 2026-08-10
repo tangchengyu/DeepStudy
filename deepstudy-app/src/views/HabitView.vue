@@ -320,7 +320,7 @@ h2 {
 
 .date-chip,
 .entry-kind {
-  background: #eeecff;
+  background: var(--accent-soft, rgb(112 173 153 / 16%));
   border-radius: 999px;
   color: var(--accent-strong);
   flex: 0 0 auto;
@@ -341,7 +341,7 @@ label {
 }
 
 textarea {
-  background: #fafbfe;
+  background: var(--surface-soft);
   border: 1px solid #d7dbe7;
   border-radius: 1rem;
   color: var(--text-main);
@@ -448,14 +448,14 @@ button:disabled {
 }
 
 .audit-row i {
-  background: #5b67dd;
+  background: var(--accent);
   border-radius: 50%;
   height: 0.5rem;
   width: 0.5rem;
 }
 
-.audit-row.maintenance i { background: #dc9b35; }
-.audit-row.rest i { background: #2b9b78; }
+.audit-row.maintenance i { background: var(--plan); }
+.audit-row.rest i { background: #7caf91; }
 .audit-row.distraction i { background: #cf5b6a; }
 
 .history-list {
