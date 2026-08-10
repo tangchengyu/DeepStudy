@@ -321,7 +321,7 @@ function displayOffsetToRawOffset(raw, displayOffset) {
 }
 
 function rawCaretOffsetFromPoint(line, x, y) {
-  if (line.classList.contains("editing")) return caretOffset(line);
+  if (line.classList.contains("editing")) return caretOffsetFromPoint(line, x, y);
   return displayOffsetToRawOffset(line.dataset.raw || "", caretOffsetFromPoint(line, x, y));
 }
 
@@ -436,8 +436,8 @@ function createMarkdownLine(raw = "") {
   line.setAttribute("aria-multiline", "false");
 
   line.addEventListener("mousedown", (event) => {
-    if (event.button !== 0 || line.classList.contains("editing")) return;
-    event.preventDefault();
+    if (event.button !== 0) return;
+    if (!line.classList.contains("editing")) event.preventDefault();
     beginMarkdownLineSelection(line, event);
   });
   line.addEventListener("click", (event) => {

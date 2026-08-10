@@ -207,6 +207,12 @@ test("supports single-click positioning, drag selection, and Tab indentation for
   assert.match(css, /\.markdown-line\s*\{[^}]*var\(--note-line-indent/s);
 });
 
+test("starts cross-line note drag selection from the active editing line", () => {
+  assert.doesNotMatch(longTasksJs, /event\.button !== 0 \|\| line\.classList\.contains\("editing"\)/);
+  assert.match(longTasksJs, /if \(!line\.classList\.contains\("editing"\)\) event\.preventDefault\(\)/);
+  assert.match(longTasksJs, /if \(line\.classList\.contains\("editing"\)\) return caretOffsetFromPoint\(line, x, y\)/);
+});
+
 test("Enter splitting commits only the text before the caret to the current note line", () => {
   assert.match(longTasksJs, /const \[before, after\] = LongTaskUtils\.splitNoteLineAtOffset\(text, offset\)/);
   assert.match(longTasksJs, /line\.textContent = before;\s*line\.dataset\.raw = before;\s*finishMarkdownLineEdit\(line\);/s);
