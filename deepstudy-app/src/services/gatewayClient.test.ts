@@ -94,6 +94,30 @@ describe('gateway client', () => {
     expect(tokenStorage.read).toHaveBeenCalledWith('https://new.example.test')
   })
 
+  it('times out gateway requests so mobile sync cannot remain busy forever', async () => {
+    let aborted = false
+    const client = createGatewayClient({
+      getBaseUrl: () => 'https://gateway.example.test',
+      requestTimeoutMs: 5,
+      tokenStorage: {
+        read: vi.fn(async () => 'secure-token'),
+        save: vi.fn(async () => undefined),
+        clear: vi.fn(async () => undefined),
+      },
+      fetchFn: vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          aborted = true
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        })
+      })),
+    })
+
+    await expect(client.pull('android-device-timeout', '0', 1)).rejects.toMatchObject({
+      code: 'NETWORK_TIMEOUT',
+    })
+    expect(aborted).toBe(true)
+  })
+
   it('fails registration closed when the gateway omits the one-time recovery code', async () => {
     const tokenStorage = {
       read: vi.fn(async () => null),

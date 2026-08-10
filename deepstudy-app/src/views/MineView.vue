@@ -71,6 +71,7 @@ function friendlyError(error: unknown) {
       TURNSTILE_REJECTED: '安全验证已过期，请重新验证',
       RATE_LIMITED: '尝试次数过多，请稍后再试',
       UNAUTHENTICATED: '登录已失效，请重新登录',
+      NETWORK_TIMEOUT: '同步服务响应超时，请检查网络后重试',
     } as Record<string, string>)[error.code] || `请求失败：${error.code}`
   }
   if (error instanceof Error && error.message === 'OFFLINE') return '当前离线，冲突与待上传数据仍保留在本机'

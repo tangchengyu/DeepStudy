@@ -95,6 +95,7 @@ interface GatewayClientOptions {
   getBaseUrl: () => string
   tokenStorage: SessionTokenStorage
   fetchFn?: typeof fetch
+  requestTimeoutMs?: number
 }
 
 interface RequestOptions {
@@ -126,6 +127,7 @@ function mutationForWire(mutation: PendingMutation) {
 
 export function createGatewayClient(options: GatewayClientOptions) {
   const fetchFn = options.fetchFn ?? fetch
+  const requestTimeoutMs = Math.max(1_000, Number(options.requestTimeoutMs) || 60_000)
 
   async function request<T>(path: string, requestOptions: RequestOptions = {}): Promise<T> {
     const baseUrl = normalizedBaseUrl(options.getBaseUrl())
@@ -138,11 +140,24 @@ export function createGatewayClient(options: GatewayClientOptions) {
     }
     if (requestOptions.deviceId) headers.set('x-device-id', requestOptions.deviceId)
 
-    const response = await fetchFn(`${baseUrl}${path}`, {
-      method: requestOptions.method ?? 'GET',
-      headers,
-      body: requestOptions.body ? JSON.stringify(requestOptions.body) : undefined,
-    })
+    const controller = typeof AbortController === 'function' ? new AbortController() : null
+    const timeout = controller ? window.setTimeout(() => controller.abort(), requestTimeoutMs) : null
+    let response: Response
+    try {
+      response = await fetchFn(`${baseUrl}${path}`, {
+        method: requestOptions.method ?? 'GET',
+        headers,
+        body: requestOptions.body ? JSON.stringify(requestOptions.body) : undefined,
+        signal: controller?.signal,
+      })
+    } catch (error) {
+      if (controller?.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        throw new GatewayError(0, 'NETWORK_TIMEOUT', null)
+      }
+      throw error
+    } finally {
+      if (timeout) window.clearTimeout(timeout)
+    }
     const responseType = response.headers.get('content-type') ?? ''
     const payload: unknown = responseType.includes('application/json')
       ? await response.json()
