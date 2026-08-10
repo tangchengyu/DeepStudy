@@ -54,6 +54,17 @@ test("desktop account panel uses Turnstile config before auth and does not close
   assert.doesNotMatch(script, /event\.target === modal[\s\S]*modal\.hidden = true/);
 });
 
+test("desktop account panel explains password rules and reuses one browser verification per launch", () => {
+  assert.match(html, /id="sync-password-rule"/);
+  assert.match(html, /10-128 个字符/);
+  assert.match(html, /每次打开 DeepStudy 只需要完成一次/);
+  assert.match(script, /ACCOUNT_TURNSTILE_ACTION\s*=\s*"account-sync"/);
+  assert.match(script, /formatSyncError/);
+  assert.match(script, /INVALID_PASSWORD/);
+  assert.match(script, /shouldResetTurnstileAfterAuthError/);
+  assert.doesNotMatch(script, /for \(const \[id, actionName\] of \[\["sync-sign-in", "sign-in"\]/);
+});
+
 test("desktop Turnstile challenge has enough modal width and cannot be clipped by the host layout", () => {
   assert.match(html, /id="sync-turnstile-open"/);
   assert.match(html, />打开浏览器验证</);

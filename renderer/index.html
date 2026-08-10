@@ -695,10 +695,11 @@
             <label>用户名<input id="sync-username" autocomplete="username" maxlength="30" /></label>
             <label>密码<input id="sync-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" /></label>
           </div>
+          <p id="sync-password-rule" class="sync-form-note">密码需要 10-128 个字符；可以使用字母、数字、符号或中文。</p>
           <div class="sync-turnstile-panel">
             <div>
               <strong>安全验证</strong>
-              <p id="sync-turnstile-status">正在读取同步服务安全配置…</p>
+              <p id="sync-turnstile-status">正在读取同步服务安全配置…每次打开 DeepStudy 只需要完成一次，后续登录、注册和恢复密码会共用这次验证。</p>
             </div>
             <div id="sync-turnstile-host" class="sync-turnstile-host" aria-live="polite">
               <button id="sync-turnstile-open" class="secondary-btn" type="button">打开浏览器验证</button>
@@ -714,6 +715,7 @@
               <label>恢复码<input id="sync-recovery-input" autocomplete="off" spellcheck="false" /></label>
               <label>新密码<input id="sync-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" /></label>
             </div>
+            <p id="sync-new-password-rule" class="sync-form-note">新密码需要 10-128 个字符。</p>
             <button id="sync-recover" class="secondary-btn" type="button">重设密码并轮换恢复码</button>
           </details>
         </section>

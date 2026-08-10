@@ -108,10 +108,15 @@
 }
 
 .sync-hint,
+.sync-form-note,
 .sync-data-section p {
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.55;
+}
+
+.sync-form-note {
+  margin-top: 8px;
 }
 
 .sync-actions {

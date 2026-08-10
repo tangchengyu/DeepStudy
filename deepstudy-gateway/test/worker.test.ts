@@ -89,8 +89,27 @@ describe("gateway", () => {
     }
   });
 
+  it("accepts the desktop account-sync Turnstile action for account auth", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({
+      success: true,
+      action: "account-sync",
+      hostname: "account.deepstudy.example"
+    }));
+    const productionEnv = {
+      ...env,
+      ENVIRONMENT: "production",
+      TURNSTILE_ALLOWED_HOSTNAMES: "account.deepstudy.example"
+    } as Env;
+    try {
+      await expect(verifyTurnstile(productionEnv, "token-1", undefined, ["register", "account-sync"]))
+        .resolves.toEqual({ ok: true });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("serves the desktop browser Turnstile page only for loopback callbacks", async () => {
-    const ok = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=sign-in&state=state-1&callback=http%3A%2F%2F127.0.0.1%3A49152%2Fcallback");
+    const ok = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=account-sync&state=state-1&callback=http%3A%2F%2F127.0.0.1%3A49152%2Fcallback");
     expect(ok.status).toBe(200);
     expect(ok.headers.get("cache-control")).toBe("no-store");
     const html = await ok.text();
@@ -98,7 +117,7 @@ describe("gateway", () => {
     expect(html).toContain(env.TURNSTILE_SITE_KEY);
     expect(html).toContain("http://127.0.0.1:49152/callback");
     expect(html).toContain("state-1");
-    expect(html).toContain("sign-in");
+    expect(html).toContain("account-sync");
     expect(html).toContain('class="cf-turnstile"');
     expect(html).toContain('id="turnstile-widget"');
     expect(html).toContain('data-callback="onTurnstileSuccess"');

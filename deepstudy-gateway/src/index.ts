@@ -61,7 +61,10 @@ app.get("/v1/config", (c) => c.json({
   minimumPasswordLength: 10
 }));
 
-const DESKTOP_TURNSTILE_ACTIONS = new Set(["sign-in", "register", "recover", "regenerate-recovery"]);
+const DESKTOP_TURNSTILE_ACTIONS = new Set(["account-sync", "sign-in", "register", "recover", "regenerate-recovery"]);
+const REGISTER_TURNSTILE_ACTIONS = ["register", "account-sync"];
+const SIGN_IN_TURNSTILE_ACTIONS = ["sign-in", "account-sync"];
+const RECOVER_TURNSTILE_ACTIONS = ["recover", "account-sync"];
 const LOOPBACK_CALLBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 function escapeHtml(value: string) {
@@ -269,7 +272,7 @@ app.post("/v1/auth/register", async (c) => {
   if (!await consumeAccountActionLimit(c.env.DB, "register", ip, 5, 60_000)) {
     return c.json({ error: "RATE_LIMITED" }, 429);
   }
-  const turnstile = await verifyTurnstile(c.env, body.turnstileToken, clientIp(c), "register");
+  const turnstile = await verifyTurnstile(c.env, body.turnstileToken, clientIp(c), REGISTER_TURNSTILE_ACTIONS);
   if (!turnstile.ok) return c.json({ error: "TURNSTILE_REJECTED", message: turnstile.reason }, 403);
 
   let firebaseUser;
@@ -309,15 +312,14 @@ app.post("/v1/auth/sign-in", async (c) => {
   if (!await consumeAccountActionLimit(c.env.DB, "sign-in", ip, 10, 60_000)) {
     return c.json({ error: "RATE_LIMITED" }, 429);
   }
-  const turnstile = await verifyTurnstile(c.env, body.turnstileToken, clientIp(c), "sign-in");
-  if (!turnstile.ok) return c.json({ error: "TURNSTILE_REJECTED", message: turnstile.reason }, 403);
-
   let firebaseUser;
   try {
     firebaseUser = await firebaseSignIn(c.env, username, password);
   } catch (error) {
     return firebaseErrorResponse(c, error);
   }
+  const turnstile = await verifyTurnstile(c.env, body.turnstileToken, clientIp(c), SIGN_IN_TURNSTILE_ACTIONS);
+  if (!turnstile.ok) return c.json({ error: "TURNSTILE_REJECTED", message: turnstile.reason }, 403);
   const user = await upsertFirebaseUser(c.env, {
     id: firebaseUser.localId,
     username,
@@ -339,9 +341,6 @@ app.post("/v1/auth/recover", async (c) => {
   if (!await consumeAccountActionLimit(c.env.DB, "recover", ip, 5, 300_000)) {
     return c.json({ error: "RATE_LIMITED" }, 429);
   }
-  const turnstile = await verifyTurnstile(c.env, body.turnstileToken, clientIp(c), "recover");
-  if (!turnstile.ok) return c.json({ error: "TURNSTILE_REJECTED", message: turnstile.reason }, 403);
-
   const credential = await c.env.DB.prepare(`
     SELECT r.user_id, r.code_hash, r.generation, u.email
     FROM recovery_credentials r
@@ -352,6 +351,8 @@ app.post("/v1/auth/recover", async (c) => {
   if (!credential || !constantTimeEqualHex(credential.code_hash, suppliedHash)) {
     return c.json({ error: "INVALID_RECOVERY_CODE" }, 401);
   }
+  const turnstile = await verifyTurnstile(c.env, body.turnstileToken, clientIp(c), RECOVER_TURNSTILE_ACTIONS);
+  if (!turnstile.ok) return c.json({ error: "TURNSTILE_REJECTED", message: turnstile.reason }, 403);
 
   const nextGeneration = credential.generation + 1;
   const nextCode = await deriveRecoveryCode(

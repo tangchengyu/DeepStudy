@@ -130,7 +130,7 @@ const PORTABLE_ICON_PATH = process.env.PORTABLE_EXECUTABLE_FILE
 const DIST_ICON_PATH = path.join(__dirname, "dist", "deepstudy.ico");
 const APP_ICON_PATH = path.join(__dirname, "build", "deepstudy.ico");
 const TURNSTILE_VERIFY_TIMEOUT_MS = 120000;
-const TURNSTILE_ACTIONS = new Set(["sign-in", "register", "recover", "regenerate-recovery"]);
+const TURNSTILE_ACTIONS = new Set(["account-sync", "sign-in", "register", "recover", "regenerate-recovery"]);
 
 let mainWindow;
 let longTasksWindow;
