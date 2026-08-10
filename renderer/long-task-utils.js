@@ -9,6 +9,106 @@
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
   }
 
+  function parseObsidianImagePath(value) {
+    const match = String(value || "").trim().match(/^!\[\[([a-z]:[\\/][^\]\r\n]+)\]\]$/i);
+    if (!match || !/\.(?:png|jpe?g|gif|webp|bmp)$/i.test(match[1])) return null;
+    return match[1];
+  }
+
+  function imageInsertionLines(text, offset, imageMarkdownLines) {
+    const source = String(text || "");
+    const position = Math.min(source.length, Math.max(0, Number(offset) || 0));
+    const before = source.slice(0, position);
+    const after = source.slice(position);
+    return [before, ...imageMarkdownLines, after].filter((line) => line !== "");
+  }
+
+  function clampOffset(text, offset) {
+    const source = String(text || "");
+    return Math.min(source.length, Math.max(0, Number(offset) || 0));
+  }
+
+  function splitNoteLineAtOffset(text, offset) {
+    const source = String(text || "");
+    const position = clampOffset(source, offset);
+    return [source.slice(0, position), source.slice(position)];
+  }
+
+  function normalizeNoteSelection(lines, selection = {}) {
+    const source = Array.isArray(lines) && lines.length ? lines.map((line) => String(line || "")) : [""];
+    const maxLine = source.length - 1;
+    const point = (line, offset) => {
+      const index = Math.min(maxLine, Math.max(0, Number(line) || 0));
+      return { line: index, offset: clampOffset(source[index], offset) };
+    };
+    const start = point(selection.startLine, selection.startOffset);
+    const end = point(selection.endLine, selection.endOffset);
+    if (start.line > end.line || (start.line === end.line && start.offset > end.offset)) {
+      return { lines: source, start: end, end: start };
+    }
+    return { lines: source, start, end };
+  }
+
+  function replaceNoteSelection(lines, selection, replacement = "") {
+    const normalized = normalizeNoteSelection(lines, selection);
+    const source = normalized.lines;
+    const insertLines = String(replacement || "").replace(/\r\n/g, "\n").split("\n");
+    const prefix = source[normalized.start.line].slice(0, normalized.start.offset);
+    const suffix = source[normalized.end.line].slice(normalized.end.offset);
+    const nextLines = [
+      ...source.slice(0, normalized.start.line),
+      ...insertLines,
+      ...source.slice(normalized.end.line + 1),
+    ];
+    const insertStart = normalized.start.line;
+    const insertEnd = insertStart + insertLines.length - 1;
+    nextLines[insertStart] = prefix + nextLines[insertStart];
+    nextLines[insertEnd] = nextLines[insertEnd] + suffix;
+    return {
+      lines: nextLines.length ? nextLines : [""],
+      caret: {
+        line: insertEnd,
+        offset: insertLines.length === 1
+          ? prefix.length + insertLines[0].length
+          : insertLines[insertLines.length - 1].length,
+      },
+    };
+  }
+
+  function indentNoteLines(lines, startLine, endLine, direction = 1) {
+    const source = Array.isArray(lines) && lines.length ? lines.map((line) => String(line || "")) : [""];
+    const start = Math.min(Math.max(0, Number(startLine) || 0), source.length - 1);
+    const end = Math.min(Math.max(0, Number(endLine) || 0), source.length - 1);
+    const from = Math.min(start, end);
+    const to = Math.max(start, end);
+    return source.map((line, index) => {
+      if (index < from || index > to) return line;
+      return direction > 0 ? `  ${line}` : line.replace(/^(?: {1,2}|\t)/, "");
+    });
+  }
+
+  function mergeNoteLineBackward(lines, lineIndex) {
+    const source = Array.isArray(lines) && lines.length ? lines.map((line) => String(line || "")) : [""];
+    const index = Math.min(Math.max(0, Number(lineIndex) || 0), source.length - 1);
+    if (index <= 0) {
+      return {
+        lines: source,
+        caret: { line: 0, offset: clampOffset(source[0], 0) },
+      };
+    }
+    const previous = source[index - 1];
+    const current = source[index];
+    const next = [
+      ...source.slice(0, index - 1),
+      `${previous}${current}`,
+      ...source.slice(index + 1),
+    ];
+    return {
+      lines: next,
+      caret: { line: index - 1, offset: previous.length },
+    };
+  }
+
   function normalizeReminder(value = {}) {
     const kind = ["once", "daily", "weekly"].includes(value.kind) ? value.kind : "none";
     const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time || "") ? value.time : "09:00";
@@ -23,7 +123,7 @@
     return {
       id: cleanText(value.id, 80) || `lt-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      notes: String(value.notes || "").trim().slice(0, 1000),
+      notes: String(value.notes || "").slice(0, 2_000_000),
       quadrant: QUADRANTS.includes(value.quadrant) ? value.quadrant : "important-not-urgent",
       status: ["completed", "planned"].includes(value.status) ? value.status : "active",
       reminder: normalizeReminder(value.reminder),
@@ -66,9 +166,33 @@
 
   function extractJson(content) {
     const source = String(content || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
-    const start = Math.min(...[source.indexOf("{"), source.indexOf("[")].filter((index) => index >= 0));
+    const starts = [source.indexOf("{"), source.indexOf("[")].filter((index) => index >= 0);
+    const start = Math.min(...starts);
     if (!Number.isFinite(start)) throw new Error("模型没有返回结构化结果。");
-    return JSON.parse(source.slice(start));
+    const closing = source[start] === "{" ? "}" : "]";
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < source.length; index += 1) {
+      const char = source[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = inString;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (char === source[start]) depth += 1;
+      if (char === closing) depth -= 1;
+      if (depth === 0) return JSON.parse(source.slice(start, index + 1));
+    }
+    throw new Error("模型返回的 JSON 不完整。");
   }
 
   function normalizeAiOperations(content, existingTasks = []) {
@@ -170,12 +294,23 @@
       .sort((a, b) => (Number(a.order) - Number(b.order)) || (Number(a.createdAt) - Number(b.createdAt)));
   }
 
+  function detailReturnView(view = {}) {
+    const quadrant = QUADRANTS.includes(view.quadrant) ? view.quadrant : null;
+    if (view.returnMode === "quadrant" && quadrant) return { mode: "quadrant", quadrant, taskId: null };
+    return { mode: "board", quadrant: null, taskId: null };
+  }
+
+  function newTaskDefaultsForView(view = {}) {
+    return view.mode === "quadrant" && QUADRANTS.includes(view.quadrant) ? { quadrant: view.quadrant } : {};
+  }
+
   function resolveLongTaskView(view = {}, tasks = []) {
     const quadrant = QUADRANTS.includes(view.quadrant) ? view.quadrant : null;
     if (view.mode === "detail" && quadrant && view.taskId) {
       const task = (Array.isArray(tasks) ? tasks : []).find((item) => item?.id === view.taskId && item.status === "active");
-      if (task) return { mode: "detail", quadrant: task.quadrant, taskId: task.id, task };
-      return { mode: "quadrant", quadrant, taskId: null, task: null };
+      const returnMode = view.returnMode === "board" ? "board" : "quadrant";
+      if (task) return { mode: "detail", quadrant: task.quadrant, taskId: task.id, returnMode, task };
+      return { ...detailReturnView({ quadrant, returnMode }), task: null };
     }
     if (view.mode === "quadrant" && quadrant) {
       return { mode: "quadrant", quadrant, taskId: null, task: null };
@@ -183,5 +318,5 @@
     return { mode: "board", quadrant: null, taskId: null, task: null };
   }
 
-  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, dueTasks, extractJson, fallbackAiOperationsFromText, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, resolveLongTaskView };
+  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, imageInsertionLines, indentNoteLines, mergeNoteLineBackward, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, replaceNoteSelection, resolveLongTaskView, splitNoteLineAtOffset };
 });

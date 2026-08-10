@@ -3,106 +3,88 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.PlannerUtils = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const API_MODEL_PRESETS = [
+    const API_MODEL_PRESET_GROUPS = [
     {
-      id: "openrouter-gpt-oss-120b-free",
-      provider: "OpenRouter",
-      label: "GPT-OSS 120B Free",
-      model: "openai/gpt-oss-120b:free",
-      baseUrl: "https://openrouter.ai/api/v1",
+      label: "推荐的免费模型",
+      presets: [
+        {
+          id: "openrouter-nemotron-free",
+          provider: "OpenRouter",
+          label: "OpenRouter · NVIDIA Nemotron 3 Super 120B Free",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          baseUrl: "https://openrouter.ai/api/v1",
+        },
+        {
+          id: "gemini-flash-free",
+          provider: "Gemini",
+          label: "Gemini · gemini-3.5-flash",
+          model: "gemini-3.5-flash",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        },
+      ],
     },
     {
-      id: "openrouter-free-router",
-      provider: "OpenRouter",
-      label: "Free Models Router",
-      model: "openrouter/free",
-      baseUrl: "https://openrouter.ai/api/v1",
+      label: "OpenRouter",
+      presets: [
+        {
+          id: "openrouter-base",
+          provider: "OpenRouter",
+          label: "OpenRouter",
+          model: "",
+          baseUrl: "https://openrouter.ai/api/v1",
+        },
+      ],
     },
     {
-      id: "openai-gpt-5-mini",
-      provider: "OpenAI",
-      label: "GPT-5 mini",
-      model: "gpt-5-mini",
-      baseUrl: "https://api.openai.com/v1",
+      label: "OpenAI",
+      presets: [
+        {
+          id: "openai-base",
+          provider: "OpenAI",
+          label: "OpenAI",
+          model: "",
+          baseUrl: "https://api.openai.com/v1",
+        },
+      ],
     },
     {
-      id: "openai-gpt-5-2",
-      provider: "OpenAI",
-      label: "GPT-5.2",
-      model: "gpt-5.2",
-      baseUrl: "https://api.openai.com/v1",
+      label: "DeepSeek",
+      presets: [
+        {
+          id: "deepseek-base",
+          provider: "DeepSeek",
+          label: "DeepSeek",
+          model: "",
+          baseUrl: "https://api.deepseek.com",
+        },
+      ],
     },
     {
-      id: "openai-gpt-4-1-mini",
-      provider: "OpenAI",
-      label: "GPT-4.1 mini",
-      model: "gpt-4.1-mini",
-      baseUrl: "https://api.openai.com/v1",
+      label: "Gemini",
+      presets: [
+        {
+          id: "gemini-base",
+          provider: "Gemini",
+          label: "Gemini",
+          model: "",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        },
+      ],
     },
     {
-      id: "openai-gpt-4o-mini",
-      provider: "OpenAI",
-      label: "GPT-4o mini",
-      model: "gpt-4o-mini",
-      baseUrl: "https://api.openai.com/v1",
-    },
-    {
-      id: "deepseek-v4-flash",
-      provider: "DeepSeek",
-      label: "DeepSeek V4 Flash",
-      model: "deepseek-v4-flash",
-      baseUrl: "https://api.deepseek.com",
-    },
-    {
-      id: "deepseek-v4-pro",
-      provider: "DeepSeek",
-      label: "DeepSeek V4 Pro",
-      model: "deepseek-v4-pro",
-      baseUrl: "https://api.deepseek.com",
-    },
-    {
-      id: "gemini-2-5-flash-free",
-      provider: "Google Gemini",
-      label: "Gemini 2.5 Flash Free",
-      model: "gemini-2.5-flash",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    },
-    {
-      id: "gemini-2-5-pro",
-      provider: "Google Gemini",
-      label: "Gemini 2.5 Pro",
-      model: "gemini-2.5-pro",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    },
-    {
-      id: "gemini-3-5-flash",
-      provider: "Google Gemini",
-      label: "Gemini 3.5 Flash",
-      model: "gemini-3.5-flash",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    },
-    {
-      id: "gemini-3-1-pro",
-      provider: "Google Gemini",
-      label: "Gemini 3.1 Pro",
-      model: "gemini-3.1-pro",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    },
-    {
-      id: "qwen-plus",
-      provider: "通义千问",
-      label: "Qwen Plus",
-      model: "qwen-plus",
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    },
-    {
-      id: "qwen-max",
-      provider: "通义千问",
-      label: "Qwen Max",
-      model: "qwen-max",
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      label: "qwen",
+      presets: [
+        {
+          id: "qwen-base",
+          provider: "qwen",
+          label: "qwen",
+          model: "",
+          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        },
+      ],
     },
   ];
+    const API_MODEL_PRESETS = API_MODEL_PRESET_GROUPS.flatMap((group) => group.presets);
 
   function getApiModelPreset(id) {
     return API_MODEL_PRESETS.find((preset) => preset.id === id) || null;
@@ -110,10 +92,20 @@
 
   function matchApiModelPreset(model, baseUrl) {
     const normalizedUrl = String(baseUrl || "").replace(/\/+$/, "");
+    const normalizedModel = String(model || "").trim();
+    if (!normalizedModel) {
+      return (
+        API_MODEL_PRESETS.find(
+          (preset) =>
+            !preset.model &&
+            preset.baseUrl === normalizedUrl,
+        ) || null
+      );
+    }
     return (
       API_MODEL_PRESETS.find(
         (preset) =>
-          preset.model === model && preset.baseUrl === normalizedUrl,
+          preset.model === normalizedModel && preset.baseUrl === normalizedUrl,
       ) || null
     );
   }
@@ -209,6 +201,9 @@
     const a = normalizeTaskForSimilarity(left);
     const b = normalizeTaskForSimilarity(right);
     if (!a || !b) return 0;
+    const leftNumbers = numberedTaskTokens(left);
+    const rightNumbers = numberedTaskTokens(right);
+    if (leftNumbers.length && rightNumbers.length && leftNumbers.join("|") !== rightNumbers.join("|")) return 0;
     if (a === b) return 1;
     if (Math.min(a.length, b.length) >= 4 && (a.includes(b) || b.includes(a)))
       return 0.9;
@@ -216,6 +211,21 @@
     const bChars = new Set(b);
     const shared = [...aChars].filter((char) => bChars.has(char)).length;
     return shared / (aChars.size + bChars.size - shared);
+  }
+
+  function numberedTaskTokens(value) {
+    return String(value || "")
+      .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+      .match(/\d+/g) || [];
+  }
+
+  function formatApiResponsePreview(contentType = "", body = "") {
+    const text = String(body || "").replace(/\s+/g, " ").trim();
+    if (/html/i.test(contentType) || /^<!doctype html/i.test(text) || /^<html[\s>]/i.test(text)) {
+      return "服务返回了网页/HTML 内容，不是 OpenAI 兼容接口需要的 JSON。请检查 API Base URL 是否填写到 /api/v1 或兼容接口根路径，或确认该模型服务是否可用。";
+    }
+    if (!text) return "服务没有返回错误正文。";
+    return text.slice(0, 300);
   }
 
   function findSimilarTask(text, tasks, threshold = 0.58) {
@@ -287,6 +297,56 @@
     return retained;
   }
 
+  function completedTaskTexts(tasks) {
+    const knownTexts = new Set();
+    const ordered = [];
+    (Array.isArray(tasks) ? tasks : [])
+      .filter((task) => task.done && task.id && task.text)
+      .sort(
+        (left, right) =>
+          Number(left.completedAt || left.createdAt || 0) -
+          Number(right.completedAt || right.createdAt || 0),
+      )
+      .forEach((task) => {
+        const clean = String(task.text || "").trim();
+        if (!clean || knownTexts.has(clean)) return;
+        knownTexts.add(clean);
+        ordered.push(clean);
+      });
+    return ordered;
+  }
+
+  function syncCompletedTasksIntoReflection(
+    entries,
+    tasks,
+    date,
+    now = Date.now(),
+    idFactory = () => `${now}-${Math.random().toString(36).slice(2, 8)}`,
+  ) {
+    const result = (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry.date !== date || !entry.kind?.startsWith("completed-task"))
+      .map((entry) => ({ ...entry }));
+    const manual = result.find((entry) => entry.date === date && !entry.kind?.startsWith("completed-task"));
+    const completed = completedTaskTexts(tasks);
+    const content = mergeCompletedTasksIntoReflection(manual?.content || "", completed);
+    if (!content) return manual ? result.filter((entry) => entry !== manual) : result;
+    if (manual) {
+      const previousContent = manual.content;
+      manual.content = content;
+      manual.kind = manual.kind || "manual";
+      manual.updatedAt = content === previousContent ? Number(manual.updatedAt || now) : now;
+      return result;
+    }
+    result.push({
+      id: idFactory(),
+      date,
+      content,
+      kind: "manual",
+      updatedAt: now,
+    });
+    return result;
+  }
+
   function upsertApiProfile(profiles, input, idFactory) {
     const result = (Array.isArray(profiles) ? profiles : []).map((profile) => ({
       ...profile,
@@ -311,15 +371,17 @@
 
   function parsePlanItems(content) {
     const source = String(content || "");
+    const jsonItems = parsePlanItemsFromJson(source);
+    if (jsonItems.length) return jsonItems;
     const marker = source.match(
       /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?PLAN_ITEMS\s*[:：]?(?:\*\*)?\s*\n([\s\S]*)$/i,
     );
+    const lines = source.split("\n");
     const candidate = marker
       ? marker[1]
-      : source
-          .split("\n")
-          .filter((line) => /\[PRIORITY\]/i.test(line))
-          .join("\n");
+      : lines.some((line) => /\[PRIORITY\]/i.test(line))
+        ? lines.filter((line) => /\[PRIORITY\]/i.test(line)).join("\n")
+        : lines.filter((line) => /^\s*(?:[-*•]|\d+[.)])\s+/.test(line)).join("\n");
     const items = candidate
       .split("\n")
       .map((line) => line.trim())
@@ -332,6 +394,37 @@
       .filter(isMeaningfulPlanItem);
 
     return items;
+  }
+
+  function parsePlanItemsFromJson(content) {
+    const source = String(content || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+    const candidates = [];
+    const firstObject = source.indexOf("{");
+    const firstArray = source.indexOf("[");
+    [firstObject, firstArray]
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)
+      .forEach((start) => {
+        const endChar = source[start] === "{" ? "}" : "]";
+        const end = source.lastIndexOf(endChar);
+        if (end > start) candidates.push(source.slice(start, end + 1));
+      });
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(candidate);
+        const rawItems = Array.isArray(parsed)
+          ? parsed
+          : parsed.plan_items || parsed.planItems || parsed.tasks || parsed.items;
+        if (!Array.isArray(rawItems)) continue;
+        return rawItems
+          .map((item) => typeof item === "string" ? item : item?.text || item?.title || item?.task)
+          .map((item) => String(item || "").trim())
+          .filter(isMeaningfulPlanItem);
+      } catch {
+        // Try the next candidate.
+      }
+    }
+    return [];
   }
 
   function isMeaningfulPlanItem(item) {
@@ -391,7 +484,10 @@
     result.forEach((item) => {
       if (/^\[PRIORITY\]/i.test(item)) priorityTexts.add(cleanText(item));
     });
-    for (const fallback of ["读书", "运动"]) {
+    const fallbackItems = Array.isArray(options.fallbackPriorityItems)
+      ? options.fallbackPriorityItems
+      : [];
+    for (const fallback of fallbackItems) {
       if (priorityTexts.size >= 3) break;
       const key = cleanText(fallback);
       if (priorityTexts.has(key)) continue;
@@ -405,9 +501,11 @@
 
   return {
     API_MODEL_PRESETS,
+    API_MODEL_PRESET_GROUPS,
     buildAuditSegments,
     buildTimelineSegments,
     completePriorityItems,
+    formatApiResponsePreview,
     findSimilarTask,
     getApiModelPreset,
     matchApiModelPreset,
@@ -416,6 +514,7 @@
     parsePlanItems,
     sanitizeChatHistory,
     syncCompletedTaskEntries,
+    syncCompletedTasksIntoReflection,
     upsertApiProfile,
   };
 });

@@ -92,7 +92,7 @@ public class LongTaskService {
 
     @Transactional
     public Map<String, Object> aiChat(Map<String, Object> payload) {
-        // Placeholder for AI integration - would call actual LLM service
+        // Placeholder for model integration - would call the configured model service.
         String taskId = (String) payload.get("taskId");
         String operation = (String) payload.get("operation");
         String prompt = (String) payload.get("prompt");
@@ -100,7 +100,7 @@ public class LongTaskService {
         // In a real implementation, this would:
         // 1. Load the task context
         // 2. Construct an AI prompt with task details
-        // 3. Call LLM API (OpenAI compatible) via configured profile
+        // 3. Call the OpenAI-compatible model API via configured profile.
         // 4. Parse response and return structured suggestions
 
         return java.util.Map.of(

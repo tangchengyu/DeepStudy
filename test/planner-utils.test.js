@@ -2,9 +2,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   API_MODEL_PRESETS,
+  API_MODEL_PRESET_GROUPS,
   buildAuditSegments,
   buildTimelineSegments,
   completePriorityItems,
+  formatApiResponsePreview,
   findSimilarTask,
   fallbackPlanItemsFromText,
   getApiModelPreset,
@@ -13,6 +15,7 @@ const {
   parsePlanItems,
   sanitizeChatHistory,
   syncCompletedTaskEntries,
+  syncCompletedTasksIntoReflection,
   upsertApiProfile,
 } = require("../renderer/planner-utils");
 
@@ -56,6 +59,13 @@ test("extracts all tasks when the model uses a markdown PLAN_ITEMS heading", () 
   ]);
 });
 
+test("extracts daily tasks from common JSON-shaped model output", () => {
+  assert.deepEqual(
+    parsePlanItems('{"plan_items":["[PRIORITY] 写论文 45 分钟","整理资料 20 分钟"]}'),
+    ["[PRIORITY] 写论文 45 分钟", "整理资料 20 分钟"],
+  );
+});
+
 test("falls back to splitting sequential Chinese plan text", () => {
   assert.deepEqual(
     fallbackPlanItemsFromText("我今天先去健身，然后把微信这么长时间的聊天记录过完，然后再去看个阿公阿婆，再打个乒乓球"),
@@ -64,29 +74,46 @@ test("falls back to splitting sequential Chinese plan text", () => {
 });
 
 test("API model presets provide and match their Base URL", () => {
+  assert.ok(API_MODEL_PRESET_GROUPS.length >= 6);
   assert.ok(API_MODEL_PRESETS.length >= 6);
-  const preset = getApiModelPreset("deepseek-v4-flash");
+  const preset = getApiModelPreset("gemini-flash-free");
   assert.deepEqual(preset, {
-    id: "deepseek-v4-flash",
-    provider: "DeepSeek",
-    label: "DeepSeek V4 Flash",
-    model: "deepseek-v4-flash",
-    baseUrl: "https://api.deepseek.com",
+    id: "gemini-flash-free",
+    provider: "Gemini",
+    label: "Gemini · gemini-3.5-flash",
+    model: "gemini-3.5-flash",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
   });
   assert.equal(
-    matchApiModelPreset("deepseek-v4-flash", "https://api.deepseek.com/")?.id,
-    preset.id,
+    matchApiModelPreset("gemini-3.5-flash", "https://generativelanguage.googleapis.com/v1beta/openai")?.id,
+    "gemini-flash-free",
   );
   assert.equal(
-    matchApiModelPreset(
-      "gemini-2.5-flash",
-      "https://generativelanguage.googleapis.com/v1beta/openai/",
-    )?.id,
-    "gemini-2-5-flash-free",
+    getApiModelPreset("openai-base")?.baseUrl,
+    "https://api.openai.com/v1",
+  );
+  assert.equal(
+    getApiModelPreset("qwen-base")?.baseUrl,
+    "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  );
+  assert.equal(
+    getApiModelPreset("openrouter-nemotron-free").model,
+    "nvidia/nemotron-3-super-120b-a12b:free",
   );
 });
 
-test("fills priority gaps only when explicitly enabled for the first daily chat", () => {
+test("formats non-JSON API responses without leaking parser errors", () => {
+  assert.match(
+    formatApiResponsePreview("text/html", "<!doctype html><html><title>Not Found</title></html>"),
+    /网页|HTML|非 JSON/,
+  );
+  assert.doesNotMatch(
+    formatApiResponsePreview("text/html", "<!doctype html><html><title>Not Found</title></html>"),
+    /Unexpected token/,
+  );
+});
+
+test("does not fill priority gaps with hardcoded tasks", () => {
   const reply = [
     "PLAN_ITEMS:",
     "- [PRIORITY] 完成课程学习",
@@ -98,9 +125,18 @@ test("fills priority gaps only when explicitly enabled for the first daily chat"
     [
       "[PRIORITY] 完成课程学习",
       "整理桌面",
-      "[PRIORITY] 读书",
-      "[PRIORITY] 运动",
     ],
+  );
+});
+
+test("fills priority gaps only from explicit preference items", () => {
+  const items = ["[PRIORITY] 完成课程学习", "整理桌面"];
+  assert.deepEqual(
+    completePriorityItems(items, {
+      fillPriorityGaps: true,
+      fallbackPriorityItems: ["写论文", "散步"],
+    }),
+    ["[PRIORITY] 完成课程学习", "整理桌面", "[PRIORITY] 写论文", "[PRIORITY] 散步"],
   );
 });
 
@@ -224,6 +260,39 @@ test("uses completion timestamps instead of plan order for a new daily summary",
   assert.equal(result[0].content, "已完成：后创建但先完成\n已完成：先创建但后完成");
 });
 
+test("completed daily tasks write into today's manual reflection note", () => {
+  const result = syncCompletedTasksIntoReflection([
+    {
+      id: "manual-1",
+      date: "2026-06-22",
+      content: "手写反思",
+      kind: "manual",
+      updatedAt: 1,
+    },
+    {
+      id: "summary-1",
+      date: "2026-06-22",
+      content: "已完成：旧任务",
+      kind: "completed-task-summary",
+      updatedAt: 2,
+    },
+  ], [
+    { id: "b", text: "后创建但先完成", done: true, createdAt: 2, completedAt: 10 },
+    { id: "a", text: "先创建但后完成", done: true, createdAt: 1, completedAt: 20 },
+  ], "2026-06-22", 30, () => "manual-2");
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, "manual-1");
+  assert.equal(result[0].kind, "manual");
+  assert.equal(result[0].content, [
+    "手写反思",
+    "",
+    "【今日已完成任务（自动同步）】",
+    "- 后创建但先完成",
+    "- 先创建但后完成",
+    "【自动同步结束】",
+  ].join("\n"));
+});
+
 test("detects similar AI tasks while preserving distinct tasks", () => {
   const existing = [
     { id: "1", text: "完成鱼皮老师教程的学习内容" },
@@ -231,6 +300,12 @@ test("detects similar AI tasks while preserving distinct tasks", () => {
   ];
   assert.equal(findSimilarTask("学习鱼皮老师教程", existing)?.id, "1");
   assert.equal(findSimilarTask("整理明天会议资料", existing), null);
+});
+
+test("does not treat different numbered study chapters as duplicate AI tasks", () => {
+  const existing = [{ id: "chapter-4", text: "学习矩阵论第 4 章" }];
+  assert.equal(findSimilarTask("学习矩阵论第 5 章", existing), null);
+  assert.equal(findSimilarTask("学习矩阵论第5章", existing), null);
 });
 
 test("timeline segments preserve their absolute positions and gaps", () => {
@@ -296,7 +371,7 @@ test("saved API profiles can force a new profile for the same endpoint", () => {
       id: "gemini-a",
       label: "Gemini A",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       apiKey: "key-a",
     },
   ];
@@ -305,7 +380,7 @@ test("saved API profiles can force a new profile for the same endpoint", () => {
     {
       label: "Gemini B",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       apiKey: "key-b",
       forceNew: true,
     },

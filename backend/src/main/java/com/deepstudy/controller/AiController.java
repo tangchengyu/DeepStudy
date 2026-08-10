@@ -47,13 +47,13 @@ public class AiController {
 
     @PostMapping("/planner")
     public ApiResponse<Map<String, Object>> plannerChat(@RequestBody Map<String, Object> payload) {
-        // Placeholder: real implementation would call the LLM endpoint configured in the profile
+        // Placeholder: real implementation would call the configured model endpoint.
         try {
             String message = (String) payload.getOrDefault("message", "");
             List<Map<String, Object>> history = (List<Map<String, Object>>) payload.get("history");
             List<Map<String, Object>> tasks = (List<Map<String, Object>>) payload.get("tasks");
 
-            // TODO: Call actual LLM
+            // TODO: Call actual model service.
             Map<String, Object> result = new java.util.HashMap<>();
             result.put("reply", "已收到你的规划请求。基于你当前的" + (tasks == null ? 0 : tasks.size())
                     + "个长期任务，建议先从重要且紧急的事项开始，并为核心目标设定明确的下一步行动。");

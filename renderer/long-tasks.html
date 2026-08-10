@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:" />
   <title>长期任务备忘录</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="long-tasks.css" />
@@ -40,10 +40,23 @@
       </header>
       <article class="task-detail-card">
         <label class="task-detail-complete"><input id="task-detail-check" type="checkbox"><span>标记为完成</span></label>
-        <h1 id="task-detail-title"></h1>
+        <label class="task-detail-title-field"><span>任务名称</span><input id="task-detail-title" maxlength="120" /></label>
         <div id="task-detail-meta" class="task-detail-meta"></div>
-        <div id="task-detail-notes" class="task-detail-notes"></div>
-        <div class="task-detail-actions"><button id="task-detail-edit" class="primary-btn" type="button">编辑任务</button></div>
+        <details id="task-detail-reminder" class="task-detail-reminder">
+          <summary><span class="task-detail-reminder-title">提醒设置</span><span id="task-detail-reminder-summary">不提醒</span></summary>
+          <div class="task-detail-reminder-body">
+            <label><span>提醒方式</span><select id="task-detail-reminder-kind"><option value="none">不提醒</option><option value="once">单次提醒</option><option value="daily">每天</option><option value="weekly">每周</option></select></label>
+            <label id="task-detail-reminder-once" hidden><span>日期和时间</span><input id="task-detail-reminder-at" type="datetime-local" /></label>
+            <label id="task-detail-reminder-time" hidden><span>提醒时间</span><input id="task-detail-reminder-clock" type="time" value="09:00" /></label>
+            <fieldset id="task-detail-reminder-weekdays" hidden><legend>重复星期</legend><div class="weekday-options"><label><input type="checkbox" value="1">一</label><label><input type="checkbox" value="2">二</label><label><input type="checkbox" value="3">三</label><label><input type="checkbox" value="4">四</label><label><input type="checkbox" value="5">五</label><label><input type="checkbox" value="6">六</label><label><input type="checkbox" value="0">日</label></div></fieldset>
+            <div id="task-detail-reminder-error" class="task-detail-reminder-error" role="status"></div>
+          </div>
+        </details>
+        <div class="task-detail-notes-field">
+          <span>支持 Markdown 格式渲染</span>
+          <div id="task-detail-notes" class="task-detail-notes-editor" role="textbox" aria-multiline="true" aria-label="长期任务备注，支持 Markdown 格式渲染"></div>
+        </div>
+        <div id="task-detail-save-status" class="task-detail-save-status" role="status"></div>
       </article>
     </section>
   </main>
@@ -77,6 +90,8 @@
         <label>API Base URL<input id="long-api-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" /></label>
         <label>模型名称<input id="long-api-model" spellcheck="false" placeholder="例如 deepseek-chat" /></label>
         <label id="long-api-key-row">API Key<input id="long-api-key" type="password" autocomplete="off" placeholder="输入 API Key" /></label>
+        <label class="system-prompt-field">长期任务偏好提示词<textarea id="long-system-prompt" rows="9" spellcheck="false"></textarea></label>
+        <p class="settings-help">这里只填写你的工作风格和偏好。四象限、输出格式和提醒规则由 DeepStudy 内部固定维护，避免误改后任务创建失败。</p>
         <p id="long-api-saved-hint" class="settings-help" hidden>已保存安全凭据，可直接使用。</p>
       </div>
       <div id="long-ai-settings-status" class="settings-status" role="status"></div>
@@ -89,8 +104,10 @@
       <div class="settings-heading"><div><div class="eyebrow">TASK</div><h2 id="long-task-form-title">新增长期任务</h2></div><button id="long-task-close" class="icon-btn compact" type="button" aria-label="关闭">×</button></div>
       <input id="long-task-id" type="hidden" />
       <label>任务名称<input id="long-task-title" maxlength="120" required /></label>
-      <label>备注<textarea id="long-task-notes" rows="3" maxlength="1000"></textarea></label>
-      <label>所属象限<select id="long-task-quadrant"><option value="important-urgent">重要且紧急</option><option value="important-not-urgent">重要不紧急</option><option value="urgent-not-important">不重要但紧急</option><option value="not-important-not-urgent">不重要不紧急</option></select></label>
+      <div class="quadrant-choice-grid" role="group" aria-label="所属象限">
+        <fieldset><legend>重要性</legend><label><input type="radio" name="long-task-importance" value="important" checked>重要</label><label><input type="radio" name="long-task-importance" value="not-important">不重要</label></fieldset>
+        <fieldset><legend>紧急性</legend><label><input type="radio" name="long-task-urgency" value="urgent">紧急</label><label><input type="radio" name="long-task-urgency" value="not-urgent" checked>不紧急</label></fieldset>
+      </div>
       <label>提醒方式<select id="long-reminder-kind"><option value="none">不提醒</option><option value="once">单次提醒</option><option value="daily">每天</option><option value="weekly">每周</option></select></label>
       <label id="long-reminder-once" hidden>日期和时间<input id="long-reminder-at" type="datetime-local" /></label>
       <label id="long-reminder-time" hidden>提醒时间<input id="long-reminder-clock" type="time" value="09:00" /></label>
@@ -100,6 +117,7 @@
   </div>
   <script src="planner-utils.js"></script>
   <script src="long-task-utils.js"></script>
+  <script src="i18n.js"></script>
   <script src="long-tasks.js"></script>
 </body>
 </html>

@@ -31,6 +31,22 @@ function todayKey(date = new Date()) {
   const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return d.toISOString().slice(0, 10);
 }
+function tr(key, replacements = {}) {
+  let value = window.DeepStudyI18n?.t?.(key) || key;
+  Object.entries(replacements).forEach(([name, replacement]) => {
+    value = value.replaceAll(`{${name}}`, String(replacement));
+  });
+  return value;
+}
+function currentLocale() {
+  return window.DeepStudyI18n?.language?.() || "zh-CN";
+}
+function refreshLocaleSensitiveViews() {
+  DailyPlan.render();
+  TimeAudit.render();
+  DistractionList.render();
+  $("#work-type-toggle")?.dispatchEvent(new Event("change"));
+}
 function formatClock(ms, hundredths = false) {
   const n = Math.max(0, ms);
   const total = Math.floor(n / 1000);
@@ -44,6 +60,10 @@ function formatClock(ms, hundredths = false) {
 }
 function formatMinutes(ms) {
   const minutes = Math.round(ms / 60000);
+  if (currentLocale() === "en-US") {
+    if (minutes < 60) return `${minutes} min`;
+    return `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
+  }
   if (minutes < 60) return `${minutes} 分钟`;
   return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`;
 }
@@ -57,6 +77,7 @@ function isTyping(event) {
     event.target?.isContentEditable
   );
 }
+let activeMode = "focus";
 const PlannerBridge = ElectronBridge.createElectronBridge(window.electronAPI);
 
 function alarm() {
@@ -178,12 +199,20 @@ const TimeAudit = (() => {
     const sums = aggregate(entries);
     const used = Object.values(sums).reduce((a, b) => a + b, 0);
     const remaining = Math.max(0, baseline - used);
-    const labels = [
-      ["core", "核心工作"],
-      ["maintenance", "维持工作"],
-      ["rest", "主动休息"],
-      ["distraction", "分心"],
-    ];
+    const labels = currentLocale() === "en-US"
+      ? [
+        ["core", "Core Work"],
+        ["maintenance", "Maintenance"],
+        ["rest", "Active Rest"],
+        ["distraction", "Distraction"],
+      ]
+      : [
+        ["core", "核心工作"],
+        ["maintenance", "维持工作"],
+        ["rest", "主动休息"],
+        ["distraction", "分心"],
+      ];
+    const dateLocale = currentLocale();
     const segments = PlannerUtils.buildTimelineSegments(
       entries,
       bounds.start,
@@ -191,7 +220,7 @@ const TimeAudit = (() => {
     )
       .map(
         (segment) =>
-          `<div class="audit-segment ${segment.category}" style="left:${segment.leftPercentage}%;width:${segment.widthPercentage}%" title="${new Intl.DateTimeFormat("zh-CN", { month: days === 1 ? undefined : "numeric", day: days === 1 ? undefined : "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(segment.start))}–${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(segment.end))} · ${formatMinutes(segment.durationMs)}"></div>`,
+          `<div class="audit-segment ${segment.category}" style="left:${segment.leftPercentage}%;width:${segment.widthPercentage}%" title="${new Intl.DateTimeFormat(dateLocale, { month: days === 1 ? undefined : "numeric", day: days === 1 ? undefined : "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(segment.start))}–${new Intl.DateTimeFormat(dateLocale, { hour: "2-digit", minute: "2-digit" }).format(new Date(segment.end))} · ${formatMinutes(segment.durationMs)}"></div>`,
       )
       .join("");
     const tickCount = days === 1 ? 4 : 7;
@@ -200,7 +229,7 @@ const TimeAudit = (() => {
       const label =
         days === 1
           ? `${String(index * 6).padStart(2, "0")}:00`
-          : new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(new Date(time));
+          : new Intl.DateTimeFormat(dateLocale, { month: "numeric", day: "numeric" }).format(new Date(time));
       return `<span style="left:${(index / tickCount) * 100}%">${label}</span>`;
     }).join("");
     const legend =
@@ -210,18 +239,18 @@ const TimeAudit = (() => {
             `<div class="legend-item"><i class="legend-dot audit-segment ${key}"></i>${label}<br><strong>${formatMinutes(sums[key])}</strong></div>`,
         )
         .join("") +
-      `<div class="legend-item"><i class="legend-dot"></i>剩余<br><strong>${formatMinutes(remaining)}</strong></div>`;
-    return `<div class="audit-block"><div class="audit-heading"><strong>${title}</strong><span>已记录 ${formatMinutes(used)}</span></div><div class="audit-track" aria-label="实际时间线">${segments}</div><div class="audit-ruler">${ticks}</div><div class="audit-legend">${legend}</div></div>`;
+      `<div class="legend-item"><i class="legend-dot"></i>${currentLocale() === "en-US" ? "Remaining" : "剩余"}<br><strong>${formatMinutes(remaining)}</strong></div>`;
+    return `<div class="audit-block"><div class="audit-heading"><strong>${title}</strong><span>${currentLocale() === "en-US" ? "Recorded" : "已记录"} ${formatMinutes(used)}</span></div><div class="audit-track" aria-label="${currentLocale() === "en-US" ? "Actual timeline" : "实际时间线"}">${segments}</div><div class="audit-ruler">${ticks}</div><div class="audit-legend">${legend}</div></div>`;
   }
   function render() {
     const root = $("#time-audit");
     if (root)
       root.innerHTML =
-        block("今日 · 24 小时", 1, 86400000) +
-        block("近 7 天 · 168 小时", 7, 604800000);
+        block(currentLocale() === "en-US" ? "Today · 24 Hours" : "今日 · 24 小时", 1, 86400000) +
+        block(currentLocale() === "en-US" ? "Last 7 Days · 168 Hours" : "近 7 天 · 168 小时", 7, 604800000);
     const status = $("#audit-refresh-status");
     if (status)
-      status.textContent = `每 10 分钟刷新 · ${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date())}`;
+      status.textContent = `${currentLocale() === "en-US" ? "Refreshes every 10 min" : "每 10 分钟刷新"} · ${new Intl.DateTimeFormat(currentLocale(), { hour: "2-digit", minute: "2-digit" }).format(new Date())}`;
   }
   return { add, render };
 })();
@@ -341,7 +370,7 @@ const DailyPlan = (() => {
     render();
   }
   function render() {
-    $("#plan-date").textContent = new Intl.DateTimeFormat("zh-CN", {
+    $("#plan-date").textContent = new Intl.DateTimeFormat(currentLocale(), {
       month: "long",
       day: "numeric",
       weekday: "long",
@@ -373,7 +402,7 @@ const DailyPlan = (() => {
         });
         const handle = document.createElement("span");
         handle.className = "task-drag-handle";
-        handle.title = "拖动排序";
+        handle.title = tr("dragSort");
         const label = document.createElement("label");
         label.className = "plan-check";
         const check = document.createElement("input");
@@ -419,7 +448,7 @@ const DailyPlan = (() => {
     contextMenu.replaceChildren();
     const priority = document.createElement("button");
     priority.type = "button";
-    priority.textContent = task.priority ? "取消优先任务" : "加入优先任务";
+    priority.textContent = task.priority ? tr("removePriority") : tr("addPriority");
     priority.addEventListener("click", () => {
       togglePriority(task.id);
       hideTaskMenu();
@@ -592,33 +621,53 @@ const DailyPlan = (() => {
   });
   window.electronAPI?.syncDailyPlan({ date: state.date, tasks: state.tasks }).catch(() => {});
   render();
-  return { addTasks, getTasks };
+  return { addTasks, getTasks, render };
 })();
 
-const PlannerSettings = (() => {
+const AppSettings = (() => {
   const modal = $("#planner-settings-modal");
   const status = $("#planner-settings-status");
   let apiProfiles = [];
-  let applyingProfile = false;
+  let dailyConfig = null;
+  let longConfig = null;
+  let preferences = { language: "zh-CN" };
+  const defaultPrompts = {
+    "zh-CN": {
+      daily: "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。如果我没有明确给出足够的高优先级任务，可以按我的默认偏好补充：[PRIORITY] 读书、[PRIORITY] 运动；我可以在设置里改掉这两个默认偏好。",
+      long: "请帮我维护长期任务，任务名称和备注保持简洁，优先尊重我明确给出的信息。",
+    },
+    "en-US": {
+      daily: "Turn my goals into clear, short, actionable tasks for today, while matching my working style. If I did not give enough priority tasks, you may use my default preferences: [PRIORITY] Reading and [PRIORITY] Exercise. I can change these defaults in Settings.",
+      long: "Help me maintain long-term tasks with concise titles and notes, and prioritize information I explicitly provide.",
+    },
+  };
 
   function populateApiPresets() {
     const select = $("#api-model-preset");
-    const groups = new Map();
-    PlannerUtils.API_MODEL_PRESETS.forEach((preset) => {
-      if (!groups.has(preset.provider)) groups.set(preset.provider, []);
-      groups.get(preset.provider).push(preset);
-    });
-    groups.forEach((presets, provider) => {
+    select.replaceChildren(new Option("自定义模型", "custom"));
+    PlannerUtils.API_MODEL_PRESET_GROUPS.forEach((groupConfig) => {
       const group = document.createElement("optgroup");
-      group.label = provider;
-      presets.forEach((preset) => {
-        const option = document.createElement("option");
-        option.value = preset.id;
-        option.textContent = preset.label;
-        group.append(option);
-      });
+      group.label = groupConfig.label;
+      groupConfig.presets.forEach((preset) => group.append(new Option(preset.label, preset.id)));
       select.append(group);
     });
+  }
+  function sectionTitle(section) {
+    return ({
+      general: "常规与语言",
+      api: "新建 API 配置",
+      "daily-ai": "每日任务 AI",
+      "long-ai": "长期任务 AI",
+      soul: "灵魂按摩间",
+      help: "使用教程",
+    })[section] || "常规与语言";
+  }
+  function selectSection(section = "general") {
+    const target = $(".settings-section[data-section=\"" + section + "\"]") ? section : "general";
+    $$(".settings-nav-item").forEach((button) => button.classList.toggle("active", button.dataset.settingsSection === target));
+    $$(".settings-section").forEach((panel) => panel.classList.toggle("active", panel.dataset.section === target));
+    status.textContent = "";
+    $("#planner-settings-title").textContent = sectionTitle(target);
   }
   function selectMatchingApiPreset() {
     const preset = PlannerUtils.matchApiModelPreset(
@@ -633,36 +682,44 @@ const PlannerSettings = (() => {
     $("#api-key-entry").hidden = hasSavedProfile && !showKeyInput;
     if (!showKeyInput) $("#api-key").value = "";
   }
-  function populateSavedProfiles(config) {
-    apiProfiles = config.apiProfiles || [];
-    const select = $("#api-profile-select");
-    select.replaceChildren(new Option("新建 API 配置", ""));
+  function populateProfileSelect(select, activeId = "", firstLabel = "选择已保存 API") {
+    select.replaceChildren(new Option(firstLabel, ""));
     apiProfiles.forEach((profile) =>
       select.append(new Option(profile.label, profile.id)),
     );
-    select.value = config.activeApiProfileId || "";
-    $("#api-profile-delete").disabled = !select.value;
+    select.value = activeId || "";
+  }
+  function populateSavedProfiles() {
+    const merged = new Map();
+    [...(dailyConfig?.apiProfiles || []), ...(longConfig?.apiProfiles || [])].forEach((profile) => merged.set(profile.id, profile));
+    apiProfiles = [...merged.values()];
+    populateProfileSelect($("#api-profile-select"), dailyConfig?.activeApiProfileId || "", "新建 API 配置");
+    populateProfileSelect($("#daily-ai-profile-select"), dailyConfig?.activeApiProfileId || "");
+    populateProfileSelect($("#long-ai-profile-select-main"), longConfig?.activeApiProfileId || "");
+    $("#api-profile-delete").disabled = !$("#api-profile-select").value;
+  }
+  function profileById(id) {
+    return apiProfiles.find((item) => item.id === id);
   }
   function startNewApiProfile() {
-    const select = $("#api-profile-select");
-    const currentBaseUrl = $("#api-base-url").value;
-    const currentModel = $("#api-model").value;
-    select.value = "";
+    $("#api-profile-select").value = "";
     $("#api-profile-name").value = "";
+    $("#api-model-preset").value = "custom";
+    $("#api-base-url").value = "";
+    $("#api-model").value = "";
     $("#api-key").value = "";
-    $("#api-base-url").value = currentBaseUrl;
-    $("#api-model").value = currentModel;
     $("#api-profile-delete").disabled = true;
     renderCredentialState(true);
     setStatus("正在新建 API 配置，请填写名称和 API Key。", "");
     $("#api-profile-name").focus();
   }
   function applySavedProfile() {
-    const profile = apiProfiles.find(
-      (item) => item.id === $("#api-profile-select").value,
-    );
+    const profile = profileById($("#api-profile-select").value);
     if (!profile) {
       $("#api-profile-name").value = "";
+      $("#api-model-preset").value = "custom";
+      $("#api-base-url").value = "";
+      $("#api-model").value = "";
       renderCredentialState(true);
       $("#api-profile-delete").disabled = true;
       return;
@@ -676,10 +733,8 @@ const PlannerSettings = (() => {
     setStatus(`已选择"${profile.label}"，可直接保存并使用。`, "success");
   }
   function detachSavedProfileIfChanged() {
-    if (applyingProfile || !$("#api-profile-select").value) return;
-    const profile = apiProfiles.find(
-      (item) => item.id === $("#api-profile-select").value,
-    );
+    if (!$("#api-profile-select").value) return;
+    const profile = profileById($("#api-profile-select").value);
     if (
       profile &&
       (profile.baseUrl !== $("#api-base-url").value.trim().replace(/\/+$/, "") ||
@@ -700,20 +755,19 @@ const PlannerSettings = (() => {
       return;
     }
     $("#api-base-url").value = preset.baseUrl;
-    $("#api-model").value = preset.model;
+    $("#api-model").value = preset.model || "";
     detachSavedProfileIfChanged();
-    setStatus(`已选择 ${preset.provider} · ${preset.label}`, "success");
+    setStatus(
+      preset.model
+        ? `已选择 ${preset.provider} · ${preset.label}`
+        : `已选择 ${preset.provider} · 已填入最新 API Base URL`,
+      "success",
+    );
   }
 
-  function selectedMode() {
-    return "api";
-  }
   function setStatus(message = "", kind = "") {
     status.textContent = message;
     status.className = `settings-status${kind ? ` ${kind}` : ""}`;
-  }
-  function renderMode() {
-    $("#api-settings").hidden = false;
   }
   function renderSummary(config) {
     $("#planner-config").textContent = `${config.api.model || "未配置"} · API 运行`;
@@ -723,22 +777,34 @@ const PlannerSettings = (() => {
     renderSummary(config);
     return config;
   }
-  async function open() {
+  async function refreshAll() {
+    preferences = await PlannerBridge.getAppPreferences();
+    dailyConfig = await PlannerBridge.getPlannerConfig();
+    longConfig = await PlannerBridge.getLongTaskAiConfig();
+    renderSummary(dailyConfig);
+    populateSavedProfiles();
+    $("#app-language-select").value = preferences.language || "zh-CN";
+    $("#planner-system-prompt").value = dailyConfig.systemPrompt || "";
+    $("#long-system-prompt-main").value = longConfig.systemPrompt || "";
+    if (dailyConfig.activeApiProfileId) {
+      $("#api-profile-select").value = dailyConfig.activeApiProfileId;
+      applySavedProfile();
+    } else {
+      $("#api-base-url").value = dailyConfig.api.baseUrl;
+      $("#api-model").value = dailyConfig.api.model;
+      selectMatchingApiPreset();
+      renderCredentialState(true);
+    }
+    return dailyConfig;
+  }
+  async function open(section = "general") {
     modal.hidden = false;
     setStatus("正在读取配置…");
     try {
-      const config = await refreshSummary();
-      populateSavedProfiles(config);
-      if (config.activeApiProfileId) applySavedProfile();
-      else {
-        $("#api-base-url").value = config.api.baseUrl;
-        $("#api-model").value = config.api.model;
-        selectMatchingApiPreset();
-        renderCredentialState(true);
-      }
-      renderMode();
-      if (!config.activeApiProfileId) setStatus("");
-      $("#api-model-preset").focus();
+      await refreshAll();
+      setStatus("");
+      selectSection(section);
+      $(".settings-nav-item.active")?.focus();
     } catch (error) {
       setStatus(error.message, "error");
     }
@@ -747,16 +813,27 @@ const PlannerSettings = (() => {
     modal.hidden = true;
     requestAnimationFrame(() => {
       const plannerInput = $("#planner-chat").hidden ? null : $("#planner-input");
-      (plannerInput || $("#planner-settings-open")).focus();
+      (plannerInput || $("#app-settings-open")).focus();
     });
   }
-  async function save() {
+  function configForSelectedProfile(profileId, fallbackConfig) {
+    const profile = profileById(profileId) || profileById(fallbackConfig?.activeApiProfileId);
+    return {
+      profileId: profile?.id || "",
+      label: profile?.label || fallbackConfig?.api?.model || "",
+      baseUrl: profile?.baseUrl || fallbackConfig?.api?.baseUrl || "",
+      model: profile?.model || fallbackConfig?.api?.model || "",
+      apiKey: "",
+      forceNewProfile: false,
+    };
+  }
+  async function saveApiConfig() {
     const button = $("#planner-settings-save");
     button.disabled = true;
     setStatus("正在保存…");
     try {
       const config = await PlannerBridge.savePlannerConfig({
-        mode: selectedMode(),
+        mode: "api",
         api: {
           profileId: $("#api-profile-select").value,
           label: $("#api-profile-name").value,
@@ -765,28 +842,93 @@ const PlannerSettings = (() => {
           apiKey: $("#api-key").value,
           forceNewProfile: !$("#api-profile-select").value,
         },
+        systemPrompt: dailyConfig?.systemPrompt || "",
       });
+      dailyConfig = config;
+      longConfig = await PlannerBridge.getLongTaskAiConfig();
       renderSummary(config);
-      setStatus("配置已保存，下一次对话将使用新模型。", "success");
-      setTimeout(close, 450);
+      populateSavedProfiles();
+      setStatus("API 配置已保存。", "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
       button.disabled = false;
     }
   }
+  async function saveDailyAiConfig() {
+    $("#daily-ai-save").disabled = true;
+    setStatus("正在保存每日任务 AI 设置…");
+    try {
+      dailyConfig = await PlannerBridge.savePlannerConfig({
+        mode: "api",
+        api: configForSelectedProfile($("#daily-ai-profile-select").value, dailyConfig),
+        systemPrompt: $("#planner-system-prompt").value,
+      });
+      renderSummary(dailyConfig);
+      populateSavedProfiles();
+      setStatus("每日任务 AI 设置已保存。", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      $("#daily-ai-save").disabled = false;
+    }
+  }
+  async function saveLongAiConfig() {
+    $("#long-ai-save-main").disabled = true;
+    setStatus("正在保存长期任务 AI 设置…");
+    try {
+      longConfig = await PlannerBridge.saveLongTaskAiConfig({
+        mode: "api",
+        api: configForSelectedProfile($("#long-ai-profile-select-main").value, longConfig),
+        systemPrompt: $("#long-system-prompt-main").value,
+      });
+      populateSavedProfiles();
+      setStatus("长期任务 AI 设置已保存。", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      $("#long-ai-save-main").disabled = false;
+    }
+  }
+  function showAppAlert(title, message) {
+    $("#app-alert-title").textContent = title;
+    $("#app-alert-message").textContent = message;
+    $("#app-alert-modal").hidden = false;
+    $("#app-alert-ok").focus();
+  }
+  async function testApi() {
+    $("#api-test").disabled = true;
+    setStatus("正在测试 API…");
+    try {
+      const result = await PlannerBridge.testApiConfig({
+        profileId: $("#api-profile-select").value,
+        baseUrl: $("#api-base-url").value,
+        model: $("#api-model").value,
+        apiKey: $("#api-key").value,
+      });
+      setStatus(result.message, "success");
+      showAppAlert("验证成功", result.message);
+    } catch (error) {
+      setStatus(error.message, "error");
+      showAppAlert("验证失败", error.message);
+    } finally {
+      $("#api-test").disabled = false;
+    }
+  }
   async function deleteSelectedProfile() {
     const select = $("#api-profile-select");
     const profileId = select.value;
-    const profile = apiProfiles.find((item) => item.id === profileId);
+    const profile = profileById(profileId);
     if (!profile) return;
     if (!confirm(`删除已保存的 API 配置"${profile.label}"？`)) return;
     $("#api-profile-delete").disabled = true;
     setStatus("正在删除 API 配置…");
     try {
       const config = await PlannerBridge.deletePlannerApiProfile(profileId);
-      populateSavedProfiles(config);
-      if (config.activeApiProfileId) applySavedProfile();
+      dailyConfig = config;
+      longConfig = await PlannerBridge.getLongTaskAiConfig();
+      populateSavedProfiles();
+      if (dailyConfig.activeApiProfileId) applySavedProfile();
       else {
         $("#api-profile-name").value = "";
         $("#api-base-url").value = config.api.baseUrl;
@@ -794,7 +936,7 @@ const PlannerSettings = (() => {
         selectMatchingApiPreset();
         renderCredentialState(true);
       }
-      renderSummary(config);
+      renderSummary(dailyConfig);
       setStatus("API 配置已删除。", "success");
     } catch (error) {
       setStatus(error.message, "error");
@@ -803,10 +945,14 @@ const PlannerSettings = (() => {
     }
   }
 
-  $("#planner-settings-open").addEventListener("click", open);
+  $("#app-settings-open").addEventListener("click", () => open("general"));
+  $("#planner-settings-open").addEventListener("click", () => open("daily-ai"));
   $("#planner-settings-close").addEventListener("click", close);
-  $("#planner-settings-cancel").addEventListener("click", close);
-  $("#planner-settings-save").addEventListener("click", save);
+  $("#planner-settings-cancel")?.addEventListener("click", close);
+  $("#planner-settings-save").addEventListener("click", saveApiConfig);
+  $("#daily-ai-save").addEventListener("click", saveDailyAiConfig);
+  $("#long-ai-save-main").addEventListener("click", saveLongAiConfig);
+  $("#api-test").addEventListener("click", testApi);
   $("#api-profile-select").addEventListener("change", applySavedProfile);
   $("#api-profile-new").addEventListener("click", () => startNewApiProfile());
   $("#api-profile-delete").addEventListener("click", deleteSelectedProfile);
@@ -824,20 +970,49 @@ const PlannerSettings = (() => {
     selectMatchingApiPreset();
     detachSavedProfileIfChanged();
   });
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) close();
+  $("#app-language-select").addEventListener("change", async () => {
+    try {
+      const previousLanguage = preferences.language || "zh-CN";
+      const previousDefaults = defaultPrompts[previousLanguage] || defaultPrompts["zh-CN"];
+      preferences = await PlannerBridge.saveAppPreferences({ language: $("#app-language-select").value });
+      window.DeepStudyI18n?.setLanguage(preferences.language);
+      const nextDefaults = defaultPrompts[preferences.language] || defaultPrompts["zh-CN"];
+      if (!$("#planner-system-prompt").value.trim() || $("#planner-system-prompt").value.trim() === previousDefaults.daily) {
+        $("#planner-system-prompt").value = nextDefaults.daily;
+      }
+      if (!$("#long-system-prompt-main").value.trim() || $("#long-system-prompt-main").value.trim() === previousDefaults.long) {
+        $("#long-system-prompt-main").value = nextDefaults.long;
+      }
+      setStatus("语言设置已保存。", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
   });
+  $("#settings-open-tutorial").addEventListener("click", () => {
+    close();
+    window.DeepStudyTutorial?.start();
+  });
+  $("#app-alert-ok").addEventListener("click", () => $("#app-alert-modal").hidden = true);
+  $("#app-alert-modal").addEventListener("click", (event) => {
+    if (event.target.id === "app-alert-modal") $("#app-alert-modal").hidden = true;
+  });
+  $$(".settings-nav-item").forEach((button) => button.addEventListener("click", () => selectSection(button.dataset.settingsSection)));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modal.hidden) close();
   });
   populateApiPresets();
-  refreshSummary().catch((error) => {
+  window.electronAPI?.onOpenAppSettings((section) => open(section));
+  window.electronAPI?.onAppPreferencesChanged((next) => {
+    preferences = next || preferences;
+    window.DeepStudyI18n?.setLanguage(preferences.language);
+  });
+  refreshAll().catch((error) => {
     $("#planner-config").textContent = error.message;
     $("#planner-config").classList.add("bridge-warning");
     $("#planner-send").disabled = true;
     $("#planner-settings-save").disabled = true;
   });
-  return { refreshSummary };
+  return { open, close, refreshSummary };
 })();
 
 const PlannerChat = (() => {
@@ -943,9 +1118,6 @@ const PlannerChat = (() => {
 
 const SoulQuotes = (() => {
   const DEFAULT_QUOTE = "Attention Is All You Need";
-  const modal = $("#soul-modal");
-  const openButton = $("#soul-open");
-  const closeButton = $("#soul-close");
   const form = $("#soul-form");
   const editIdInput = $("#soul-edit-id");
   const textInput = $("#soul-input");
@@ -1017,16 +1189,6 @@ const SoulQuotes = (() => {
     textInput.value = "";
     saveButton.textContent = "添加句子";
     cancelEditButton.hidden = true;
-  }
-  function setModalOpen(open) {
-    modal.hidden = !open;
-    if (open) {
-      renderDefaultLibraryButton();
-      renderList();
-      textInput.focus();
-    } else {
-      clearForm();
-    }
   }
   function pickRandomQuote(currentText = "") {
     const pool = quotePool();
@@ -1144,8 +1306,6 @@ const SoulQuotes = (() => {
     clearForm();
     renderList();
   });
-  openButton.addEventListener("click", () => setModalOpen(true));
-  closeButton.addEventListener("click", () => setModalOpen(false));
   cancelEditButton.addEventListener("click", clearForm);
   defaultLibraryButton?.addEventListener("click", () => {
     defaultLibraryEnabled = !defaultLibraryEnabled;
@@ -1160,12 +1320,6 @@ const SoulQuotes = (() => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     renderGateQuote();
-  });
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) setModalOpen(false);
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) setModalOpen(false);
   });
   window.addEventListener("resize", scheduleGateQuoteFit);
   if (window.ResizeObserver) {
@@ -1189,6 +1343,7 @@ const AudioControls = (() => {
   const customPlayers = new Map();
   const menuButton = $("#noise-menu-button");
   const popover = $("#noise-popover");
+  document.body.append(popover);
   const noiseList = $("#noise-list");
   const customToggle = $("#noise-custom-toggle");
   const customPanel = $("#noise-custom-panel");
@@ -1218,6 +1373,11 @@ const AudioControls = (() => {
   function allPlayers() {
     return defaultTracks.map((track) => track.player).concat([...customPlayers.values()]);
   }
+  function trackName(track) {
+    if (track.id === "muyu") return tr("muyuNoise");
+    if (track.id === "rain") return tr("rainNoise");
+    return track.name;
+  }
   function applyVolume() {
     allPlayers().forEach((player) => {
       player.volume = volume;
@@ -1225,7 +1385,7 @@ const AudioControls = (() => {
     volumeInput.value = String(Math.round(volume * 100));
     volumeValue.textContent = `${Math.round(volume * 100)}%`;
     const volumeLevel = volume === 0 ? "muted" : volume < 0.5 ? "low" : "high";
-    const muteTitle = volume === 0 ? "恢复白噪音音量" : "静音白噪音";
+    const muteTitle = volume === 0 ? tr("unmuteNoise") : tr("muteNoise");
     muteButton.dataset.volumeLevel = volumeLevel;
     muteButton.title = muteTitle;
     muteButton.setAttribute("aria-label", muteTitle);
@@ -1247,7 +1407,7 @@ const AudioControls = (() => {
   function playbackErrorMessage(track, player, error) {
     const mediaCode = player?.error?.code;
     const detail = mediaCode ? `（媒体错误 ${mediaCode}）` : "";
-    return `${track.name}播放失败${detail}。${error?.message ? ` ${error.message}` : ""}`;
+    return `${trackName(track)} ${currentLocale() === "en-US" ? "failed to play" : "播放失败"}${detail}。${error?.message ? ` ${error.message}` : ""}`;
   }
   function stopOtherTracks(trackId) {
     allTracks().forEach((track) => {
@@ -1289,12 +1449,12 @@ const AudioControls = (() => {
       state.setAttribute("aria-hidden", "true");
       const label = document.createElement("span");
       label.className = "noise-track-label";
-      label.textContent = track.name;
+      label.textContent = trackName(track);
       play.append(state, label);
-      play.title = track.name;
+      play.title = trackName(track);
       play.classList.toggle("active", activeTrackId === track.id);
       play.setAttribute("aria-pressed", String(activeTrackId === track.id));
-      play.setAttribute("aria-label", `${activeTrackId === track.id ? "暂停" : "播放"}${track.name}`);
+      play.setAttribute("aria-label", `${activeTrackId === track.id ? tr("pauseVerb") : tr("play")} ${trackName(track)}`);
       play.addEventListener("click", () => toggleTrack(track));
       row.append(play);
       if (track.kind === "custom") {
@@ -1302,7 +1462,7 @@ const AudioControls = (() => {
         remove.type = "button";
         remove.className = "noise-remove";
         remove.textContent = "×";
-        remove.title = "删除";
+        remove.title = currentLocale() === "en-US" ? "Delete" : "删除";
         remove.addEventListener("click", async () => {
           if (activeTrackId === track.id) {
             const player = customPlayers.get(track.id);
@@ -1327,7 +1487,7 @@ const AudioControls = (() => {
       if (activeTrackId === track.id && !player.paused) {
         player.pause();
         activeTrackId = "";
-        setStatus(`已暂停${track.name}。`);
+        setStatus(tr("pausedNoise", { name: trackName(track) }));
         renderTracks();
         return;
       }
@@ -1335,10 +1495,10 @@ const AudioControls = (() => {
       if (volume === 0) setVolume(lastNonZeroVolume || 0.7);
       player.volume = volume;
       player.playbackRate = rate;
-      setStatus(`正在加载${track.name}…`);
+      setStatus(tr("loadingNoise", { name: trackName(track) }));
       await player.play();
       activeTrackId = track.id;
-      setStatus(`正在播放${track.name}。`);
+      setStatus(tr("playingNoise", { name: trackName(track) }));
       renderTracks();
     } catch (error) {
       console.warn(error);
@@ -1363,7 +1523,7 @@ const AudioControls = (() => {
   function chooseFile(file) {
     selectedFile = file && file.type.startsWith("audio/") ? file : null;
     addFile.disabled = !selectedFile;
-    setStatus(selectedFile ? `已选择：${selectedFile.name}` : "请选择音频文件。", !selectedFile);
+    setStatus(selectedFile ? tr("selectedFile", { name: selectedFile.name }) : tr("selectAudioFile"), !selectedFile);
   }
   function toggleMute() {
     if (volume > 0) {
@@ -1373,10 +1533,31 @@ const AudioControls = (() => {
       setVolume(lastNonZeroVolume || 0.7);
     }
   }
+  function positionPopover() {
+    if (popover.hidden) return;
+    const trigger = menuButton.getBoundingClientRect();
+    const edge = 8;
+    const width = Math.min(300, Math.max(180, window.innerWidth - edge * 2));
+    const left = Math.min(Math.max(edge, trigger.left), window.innerWidth - width - edge);
+    const viewportMaxHeight = Math.max(120, window.innerHeight - edge * 2);
+    const desiredHeight = Math.min(popover.scrollHeight || 260, viewportMaxHeight);
+    const belowTop = trigger.bottom + edge;
+    const belowSpace = window.innerHeight - belowTop - edge;
+    const aboveSpace = trigger.top - edge * 2;
+    const preferredTop = belowSpace >= Math.min(desiredHeight, 220) || belowSpace >= aboveSpace
+      ? belowTop
+      : trigger.top - edge - desiredHeight;
+    const top = Math.min(Math.max(edge, preferredTop), window.innerHeight - edge - Math.min(desiredHeight, 120));
+    popover.style.setProperty("--noise-popover-left", `${left}px`);
+    popover.style.setProperty("--noise-popover-right", "auto");
+    popover.style.setProperty("--noise-popover-top", `${top}px`);
+    popover.style.setProperty("--noise-popover-max-height", `${Math.max(96, window.innerHeight - top - edge)}px`);
+  }
   function setMenuOpen(open) {
     popover.hidden = !open;
     menuButton.classList.toggle("active", open || Boolean(activeTrackId));
     menuButton.setAttribute("aria-expanded", String(open));
+    if (open) requestAnimationFrame(positionPopover);
   }
   menuButton.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -1390,6 +1571,11 @@ const AudioControls = (() => {
   document.addEventListener("click", (event) => {
     if (!$("#noise-control").contains(event.target)) setMenuOpen(false);
   });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !popover.hidden) setMenuOpen(false);
+  });
+  window.addEventListener("resize", positionPopover);
+  window.addEventListener("scroll", positionPopover, true);
   customToggle.addEventListener("click", () => {
     customPanel.hidden = !customPanel.hidden;
   });
@@ -1409,7 +1595,7 @@ const AudioControls = (() => {
   addFile.addEventListener("click", async () => {
     if (!selectedFile) return;
     addFile.disabled = true;
-    setStatus("正在添加...");
+    setStatus(tr("adding"));
     try {
       const buffer = await selectedFile.arrayBuffer();
       const item = await window.electronAPI?.addCustomNoise({
@@ -1420,11 +1606,11 @@ const AudioControls = (() => {
       customTracks.push({ ...item, kind: "custom" });
       selectedFile = null;
       fileInput.value = "";
-      setStatus("已添加到我的白噪音。");
+      setStatus(tr("noiseAdded"));
       renderTracks();
     } catch (error) {
       addFile.disabled = false;
-      setStatus(error.message || "添加失败。", true);
+      setStatus(error.message || tr("addFailed"), true);
     }
   });
   $$(".audio-rate").forEach((button) =>
@@ -1447,7 +1633,6 @@ const AudioControls = (() => {
   return {};
 })();
 
-let activeMode = "focus";
 function switchMode(mode) {
   activeMode = mode;
   $$(".mode-tab").forEach((x) =>
@@ -1462,8 +1647,8 @@ function switchMode(mode) {
 function setGateVisible(visible) {
   $("#gate-view").hidden = !visible;
   $("#mode-shell").hidden = visible;
-  $("#soul-open").hidden = !visible;
-  $("#tutorial-open").hidden = !visible;
+  $("#app-settings-open").hidden = !visible;
+  if ($("#tutorial-open")) $("#tutorial-open").hidden = !visible;
 }
 
 $$(".mode-tab").forEach((button) =>
@@ -1489,7 +1674,7 @@ function setTabsCollapsed(collapsed) {
   if (!header) return;
   header.classList.toggle("collapsed", collapsed);
   btn.textContent = collapsed ? "▸" : "▾";
-  btn.title = collapsed ? "展开" : "收起";
+  btn.title = collapsed ? tr("expand") : tr("collapse");
 }
 $("#collapse-tabs").addEventListener("click", () => {
   const header = document.querySelector(".mode-sticky-header");
@@ -1500,16 +1685,16 @@ $("#collapse-tabs").addEventListener("click", () => {
 
 const DistractionList = (() => {
   const configs = {
-    "controllable-interesting": ["可控 + 有意思", "提前处理掉"],
-    "controllable-boring": ["可控 + 没意思", "提前处理掉"],
-    "uncontrollable-interesting": ["不可控 + 有意思", "顿一下再回来"],
-    "uncontrollable-boring": ["不可控 + 没意思", "预设边界并规避"],
+    "controllable-interesting": () => [tr("controllableInteresting"), tr("handleAhead")],
+    "controllable-boring": () => [tr("controllableBoring"), tr("handleAhead")],
+    "uncontrollable-interesting": () => [tr("uncontrollableInteresting"), tr("pauseAndReturn")],
+    "uncontrollable-boring": () => [tr("uncontrollableBoring"), tr("setBoundaries")],
   };
   function add(text, control, interest, durationMs = 0, resolved = true) {
     const items = readJSON(KEYS.distractions, []);
     const item = {
       id: createId(),
-      text: String(text || "").trim() || "未命名干扰",
+      text: String(text || "").trim() || tr("unnamedDistraction"),
       control,
       interest,
       quadrant: `${control}-${interest}`,
@@ -1539,11 +1724,12 @@ const DistractionList = (() => {
     const items = readJSON(KEYS.distractions, []).filter(
       (x) => todayKey(new Date(x.timestamp)) === todayKey(),
     );
-    Object.entries(configs).forEach(([key, [title, advice]]) => {
+    Object.entries(configs).forEach(([key, copy]) => {
+      const [title, advice] = copy();
       const matched = items.filter((x) => x.quadrant === key);
       const details = document.createElement("details");
       details.className = "quadrant";
-      details.innerHTML = `<summary><div class="quadrant-head"><span>${title}</span><span class="quadrant-count">${matched.length}</span></div><div class="quadrant-advice">${advice}</div></summary><ul class="quadrant-list">${matched.length ? matched.map((x) => `<li><span>${escapeHTML(x.text)}${x.durationMs ? ` · ${formatMinutes(x.durationMs)}` : ""}</span><button class="distraction-delete" type="button" data-id="${x.id}" title="删除干扰">删除</button></li>`).join("") : '<li class="subtle">暂无记录</li>'}</ul>`;
+      details.innerHTML = `<summary><div class="quadrant-head"><span>${title}</span><span class="quadrant-count">${matched.length}</span></div><div class="quadrant-advice">${advice}</div></summary><ul class="quadrant-list">${matched.length ? matched.map((x) => `<li><span>${escapeHTML(x.text)}${x.durationMs ? ` · ${formatMinutes(x.durationMs)}` : ""}</span><button class="distraction-delete" type="button" data-id="${x.id}" title="${tr("deleteDistraction")}">${tr("deleteDistraction")}</button></li>`).join("") : `<li class="subtle">${tr("noRecords")}</li>`}</ul>`;
       root.append(details);
     });
   }
@@ -1565,6 +1751,7 @@ const DistractionList = (() => {
   render();
   return { add, render, remove };
 })();
+window.addEventListener("deepstudy:language-changed", refreshLocaleSensitiveViews);
 function escapeHTML(value) {
   const node = document.createElement("div");
   node.textContent = String(value);
@@ -1603,10 +1790,10 @@ const FocusMode = (() => {
   function render() {
     display.textContent = formatClock(remaining).slice(3);
     $("#focus-start").textContent = running
-      ? "专注中"
+      ? tr("focusRunning")
       : remaining < selectedMs
-        ? "继续专注"
-        : "开始专注";
+        ? tr("continueFocus")
+        : tr("startFocus");
     $("#focus-start").disabled = running;
     $("#focus-pause").disabled = !running;
   }
@@ -1801,8 +1988,8 @@ const FocusMode = (() => {
       event.target.checked ? "core" : "maintenance",
     );
     $("#work-type-description").textContent = event.target.checked
-      ? "核心工作：高认知要求、直接推进目标"
-      : "维持性工作：流程化、支持性的日常事务";
+      ? tr("workTypeDesc")
+      : tr("maintenanceWorkDesc");
   });
   $("#work-type-toggle").dispatchEvent(new Event("change"));
   render();
@@ -1855,15 +2042,13 @@ const DistractionModal = (() => {
     const elapsed = Date.now() - openedAt;
     if (solving) {
       $("#modal-timer").textContent = `+${formatClock(elapsed).slice(3)}`;
-      $("#modal-help").textContent =
-        "正在记录干扰处理时长。处理完后立即回到专注。";
+      $("#modal-help").textContent = tr("distractionTiming");
     } else {
       $("#modal-timer").textContent = formatClock(
         Math.max(0, deadline - Date.now()),
       ).slice(3);
       if (Date.now() >= deadline)
-        $("#modal-help").textContent =
-          "两分钟已到。请选择回到专注，或明确继续解决。";
+        $("#modal-help").textContent = tr("distractionTimeUp");
     }
   }
   function open() {
@@ -1932,7 +2117,7 @@ const RestMode = (() => {
   function render() {
     $("#rest-timer").textContent = formatFlexibleClock(remaining);
     $("#rest-start").disabled = running || remaining <= 0;
-    $("#rest-start").textContent = remaining < total ? "继续休息" : "开始休息";
+    $("#rest-start").textContent = remaining < total ? tr("continueRest") : tr("startRest");
     $("#rest-pause").disabled = !running;
   }
   function captureSegment() {
@@ -2039,12 +2224,12 @@ const RestMode = (() => {
       const s = totalSec % 60;
       // Build inline edit UI
       timer.innerHTML = `
-        <div class="rest-edit-inline" role="group" aria-label="修改休息时长">
-          <label><span>时</span><input id="rest-edit-h" type="number" min="0" max="23" value="${h}" aria-label="小时" /></label>
+        <div class="rest-edit-inline" role="group" aria-label="${tr("editRestDuration")}">
+          <label><span>${tr("hourShort")}</span><input id="rest-edit-h" type="number" min="0" max="23" value="${h}" aria-label="${tr("hourShort")}" /></label>
           <span class="rest-edit-sep">:</span>
-          <label><span>分</span><input id="rest-edit-m" type="number" min="0" max="59" value="${m}" aria-label="分钟" /></label>
+          <label><span>${tr("minuteShort")}</span><input id="rest-edit-m" type="number" min="0" max="59" value="${m}" aria-label="${tr("minuteShort")}" /></label>
           <span class="rest-edit-sep">:</span>
-          <label><span>秒</span><input id="rest-edit-s" type="number" min="0" max="59" value="${s}" aria-label="秒" /></label>
+          <label><span>${tr("secondShort")}</span><input id="rest-edit-s" type="number" min="0" max="59" value="${s}" aria-label="${tr("secondShort")}" /></label>
         </div>`;
       const hInput = $("#rest-edit-h");
       const mInput = $("#rest-edit-m");
@@ -2309,6 +2494,7 @@ const Breathing = (() => {
 const Reflections = (() => {
   let items = readJSON(KEYS.reflections, []);
   let editingId = null;
+  let completedLongReflectionTasks = [];
   const input = $("#reflection-input");
 
   function migrateLegacyAutoBlock() {
@@ -2363,9 +2549,13 @@ const Reflections = (() => {
   }
 
   function syncCompletedTasks(tasks) {
-    const next = PlannerUtils.syncCompletedTaskEntries(
+    const taskSource = [
+      ...(Array.isArray(tasks) ? tasks : []),
+      ...completedLongReflectionTasks,
+    ];
+    const next = PlannerUtils.syncCompletedTasksIntoReflection(
       items,
-      tasks,
+      taskSource,
       todayKey(),
       Date.now(),
       createId,
@@ -2373,21 +2563,54 @@ const Reflections = (() => {
     if (JSON.stringify(next) === JSON.stringify(items)) return;
     items = next;
     writeJSON(KEYS.reflections, items);
+    const today = items.find(
+      (item) => item.date === todayKey() && !item.kind?.startsWith("completed-task"),
+    );
+    if (!editingId) input.value = today?.content || "";
     render();
   }
 
   function syncCompletedLongTask(task) {
     if (!task?.id || !task.title) return;
-    syncCompletedTasks([
-      ...DailyPlan.getTasks(),
-      {
-        id: `long-${task.id}`,
-        text: task.title,
-        done: true,
-        createdAt: Number(task.createdAt) || Number(task.completedAt) || Date.now(),
-        completedAt: Number(task.completedAt) || Date.now(),
-      },
-    ]);
+    const sourceId = `long-${task.id}`;
+    completedLongReflectionTasks = completedLongReflectionTasks.filter((item) => item.id !== sourceId);
+    completedLongReflectionTasks.push({
+      id: sourceId,
+      text: task.title,
+      done: true,
+      createdAt: Number(task.createdAt) || Number(task.completedAt) || Date.now(),
+      completedAt: Number(task.completedAt) || Date.now(),
+    });
+    syncCompletedTasks(DailyPlan.getTasks());
+  }
+
+  function removeCompletedLongTask(task) {
+    if (!task?.id || !task.title) return;
+    const sourceId = `long-${task.id}`;
+    completedLongReflectionTasks = completedLongReflectionTasks.filter((item) => item.id !== sourceId);
+    const completedLine = `已完成：${task.title}`;
+    items = items
+      .map((item) => {
+        if (item.date !== todayKey() || !item.kind?.startsWith("completed-task")) return item;
+        if (item.sourceTaskId === sourceId) return null;
+        if (Array.isArray(item.sourceTaskIds) && item.sourceTaskIds.includes(sourceId)) {
+          const lines = String(item.content || "")
+            .split("\n")
+            .filter((line) => line.trim() && line.trim() !== completedLine);
+          if (!lines.length) return null;
+          return {
+            ...item,
+            content: lines.join("\n"),
+            sourceTaskIds: item.sourceTaskIds.filter((id) => id !== sourceId),
+            updatedAt: Date.now(),
+          };
+        }
+        return item;
+      })
+      .filter(Boolean);
+    writeJSON(KEYS.reflections, items);
+    syncCompletedTasks(DailyPlan.getTasks());
+    render();
   }
 
   const selectedIds = new Set();
@@ -2553,12 +2776,13 @@ const Reflections = (() => {
   writeJSON(KEYS.reflections, items);
   syncCompletedTasks(DailyPlan.getTasks());
   window.electronAPI?.onLongTaskCompleted(syncCompletedLongTask);
+  window.electronAPI?.onLongTaskCompletionUndone?.(removeCompletedLongTask);
   const today = items.find(
     (item) => item.date === todayKey() && !item.kind?.startsWith("completed-task"),
   );
   if (today) input.value = today.content;
   render();
-  return { syncCompletedTasks, syncCompletedLongTask };
+  return { syncCompletedTasks, syncCompletedLongTask, removeCompletedLongTask };
 })();
 
 function setupStopwatch() {

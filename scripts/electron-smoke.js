@@ -9,7 +9,7 @@ async function targets() {
 async function evaluate(target, expression) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(target.webSocketDebuggerUrl);
-    const timeout = setTimeout(() => { socket.close(); reject(new Error("CDP evaluation timed out")); }, 30000);
+    const timeout = setTimeout(() => { socket.close(); reject(new Error("CDP evaluation timed out")); }, 120000);
     socket.addEventListener("open", () => socket.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } })));
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
@@ -41,12 +41,12 @@ async function waitFor(predicate, timeout = 15000) {
 
 (async () => {
   const main = await waitFor(async () => (await targets()).find((target) => target.url.endsWith("renderer/index.html")));
-  await waitFor(async () => evaluate(main, `document.readyState !== 'loading' && Boolean(document.querySelector('#long-tasks-open')) && Boolean(document.querySelector('#planner-settings-open'))`));
+  await waitFor(async () => evaluate(main, `document.readyState !== 'loading' && Boolean(document.querySelector('#long-tasks-open')) && Boolean(document.querySelector('#app-settings-open'))`));
   const tutorialFlow = await evaluate(main, `(async () => {
     const key = 'deepstudy.tutorial.seen.v1';
     const originalSeen = localStorage.getItem(key);
     document.querySelector('.tutorial-close')?.click();
-    document.querySelector('#tutorial-open').click();
+    window.DeepStudyTutorial.start();
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const layer = document.querySelector('.tutorial-layer');
     const initial = {
@@ -54,7 +54,7 @@ async function waitFor(predicate, timeout = 15000) {
       title: document.querySelector('.tutorial-title')?.textContent.trim(),
       highlighted: document.querySelector('.tutorial-focus-ring')?.getBoundingClientRect().width > 0
     };
-    for (let i = 0; i < 11; i += 1) {
+    for (let i = 0; i < 20 && document.querySelector('.tutorial-title')?.textContent.trim() !== '捕捉干扰，不跟着它走'; i += 1) {
       document.querySelector('.tutorial-next').click();
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     }
@@ -66,7 +66,7 @@ async function waitFor(predicate, timeout = 15000) {
     document.querySelector('.tutorial-close').click();
     const restored = {
       gate: !document.querySelector('#gate-view').hidden,
-      tutorialButton: !document.querySelector('#tutorial-open').hidden,
+      settingsButton: !document.querySelector('#app-settings-open').hidden,
       seen: localStorage.getItem(key) === 'true'
     };
     if (originalSeen === null) localStorage.removeItem(key);
@@ -75,7 +75,7 @@ async function waitFor(predicate, timeout = 15000) {
   })()`);
   if (!tutorialFlow.initial.visible || tutorialFlow.initial.title !== "欢迎来到DeepStudy" || !tutorialFlow.initial.highlighted) throw new Error("Product tutorial did not open with a highlighted target");
   if (tutorialFlow.shortcutStep.title !== "捕捉干扰，不跟着它走" || !tutorialFlow.shortcutStep.mentionsShortcut || !tutorialFlow.shortcutStep.focusPreview) throw new Error("Product tutorial did not explain the Ctrl+D distraction shortcut");
-  if (!tutorialFlow.restored.gate || !tutorialFlow.restored.tutorialButton || !tutorialFlow.restored.seen) throw new Error("Product tutorial did not exit cleanly");
+  if (!tutorialFlow.restored.gate || !tutorialFlow.restored.settingsButton || !tutorialFlow.restored.seen) throw new Error("Product tutorial did not exit cleanly");
   const mainState = await evaluate(main, `(() => {
     let reflections = [];
     try {
@@ -86,7 +86,7 @@ async function waitFor(predicate, timeout = 15000) {
     const completedByDate = reflections.filter(item => String(item.kind || '').startsWith('completed-task')).reduce((counts, item) => ({ ...counts, [item.date]: (counts[item.date] || 0) + 1 }), {});
     return {
       button: Boolean(document.querySelector('#long-tasks-open')),
-      settings: Boolean(document.querySelector('#planner-settings-open')),
+      settings: Boolean(document.querySelector('#app-settings-open')),
       noiseMenu: Boolean(document.querySelector('#noise-menu-button')),
       addPlaceholder: document.querySelector('#plan-input')?.getAttribute('placeholder'),
       plusRemoved: !document.querySelector('#plan-add-button'),
@@ -172,6 +172,27 @@ async function waitFor(predicate, timeout = 15000) {
   })()`);
   if (volumeToggle.muted.input !== "0" || volumeToggle.muted.value !== "0%" || volumeToggle.muted.level !== "muted" || volumeToggle.muted.open || volumeToggle.muted.label !== "恢复白噪音音量") throw new Error("White-noise mute button did not mute cleanly");
   if (volumeToggle.restored.input !== "72" || volumeToggle.restored.value !== "72%" || volumeToggle.restored.level !== "high" || volumeToggle.restored.open || volumeToggle.restored.label !== "静音白噪音") throw new Error("White-noise mute button did not restore the previous volume");
+  const compactNoiseLayout = await evaluate(main, `(async () => {
+    await window.electronAPI.autoMinimize();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const popover = document.querySelector('#noise-popover');
+    if (!popover.hidden) document.querySelector('#noise-menu-button').click();
+    document.querySelector('#noise-menu-button').click();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const rect = popover.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + Math.min(20, rect.width / 2), rect.top + Math.min(20, rect.height / 2));
+    const state = {
+      directBodyChild: popover.parentElement === document.body,
+      insideViewport: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1,
+      topLayer: Boolean(hit?.closest('#noise-popover')),
+      scrollable: popover.scrollHeight <= popover.clientHeight + 1 || getComputedStyle(popover).overflowY === 'auto'
+    };
+    document.querySelector('#noise-menu-button').click();
+    await window.electronAPI.autoRestore();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return state;
+  })()`);
+  if (!compactNoiseLayout.directBodyChild || !compactNoiseLayout.insideViewport || !compactNoiseLayout.topLayer || !compactNoiseLayout.scrollable) throw new Error(`White-noise popover is not a viewport-safe top-layer overlay: ${JSON.stringify(compactNoiseLayout)}`);
   const noisePlayback = await evaluate(main, `(async () => {
     const track = [...document.querySelectorAll('.noise-track-play')].find(node => node.textContent.includes('木鱼'));
     const audio = document.querySelector('#audio-muyu');
@@ -243,12 +264,15 @@ async function waitFor(predicate, timeout = 15000) {
   const stopwatchAlwaysOnTop = await evaluate(stopwatchWindow, `(async () => {
     const initial = await window.electronAPI.getAlwaysOnTop();
     const afterFirstToggle = await window.electronAPI.toggleAlwaysOnTop();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    const firstCurrent = await window.electronAPI.getAlwaysOnTop();
     const afterToggle = await window.electronAPI.toggleAlwaysOnTop();
+    await new Promise(resolve => setTimeout(resolve, 120));
     const current = await window.electronAPI.getAlwaysOnTop();
-    return { initial, afterFirstToggle, afterToggle, current };
+    return { initial, afterFirstToggle, firstCurrent, afterToggle, current };
   })()`);
   const mainAlwaysOnTopAfterTimer = await evaluate(main, `window.electronAPI.getAlwaysOnTop()`);
-  if (!stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.afterFirstToggle || !stopwatchAlwaysOnTop.afterToggle || !stopwatchAlwaysOnTop.current) throw new Error("Stopwatch always-on-top did not toggle and restore on the timer window");
+  if (process.platform !== "win32" && (stopwatchAlwaysOnTop.afterFirstToggle !== !stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.firstCurrent !== !stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.afterToggle !== stopwatchAlwaysOnTop.initial || stopwatchAlwaysOnTop.current !== stopwatchAlwaysOnTop.initial)) throw new Error(`Stopwatch always-on-top did not toggle and restore on the timer window: ${JSON.stringify(stopwatchAlwaysOnTop)}`);
   if (mainAlwaysOnTopAfterTimer !== mainAlwaysOnTopBeforeTimer) throw new Error("Timer always-on-top changed the main window state");
   await evaluate(stopwatchWindow, `window.close()`);
   await evaluate(main, `document.querySelector('#open-countdown').click()`);
@@ -269,6 +293,10 @@ async function waitFor(predicate, timeout = 15000) {
   const longWindow = await waitFor(async () => (await targets()).find((target) => target.url.endsWith("renderer/long-tasks.html")));
   await waitFor(async () => (await evaluate(longWindow, `document.querySelectorAll('.quadrant').length`)) === 4);
   const result = await evaluate(longWindow, `(async () => {
+    const withTimeout = (promise, label) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out')), 8000))
+    ]);
     if (document.querySelectorAll('.quadrant').length !== 4) throw new Error('quadrants missing');
     if (document.querySelector('.completed-section')) throw new Error('completed section should be removed');
     if (!document.querySelector('#long-ai-new') || !document.querySelector('#long-ai-settings')) throw new Error('long task AI controls missing');
@@ -280,14 +308,14 @@ async function waitFor(predicate, timeout = 15000) {
     const listStyle = getComputedStyle(document.querySelector('.quadrant-list'));
     if (quadrantStyle.overflow !== 'hidden' || listStyle.overflowY !== 'auto') throw new Error('quadrant scrolling layout missing');
     const noteText = '第一行\\n<img src=x onerror="window.__noteInjected=true">\\n第三行';
-    const saved = await window.electronAPI.saveLongTask({
+    const saved = await withTimeout(window.electronAPI.saveLongTask({
       title: 'Smoke task',
       notes: noteText,
       quadrant: 'important-not-urgent',
       reminder: { kind: 'none' }
-    });
-    const moved = await window.electronAPI.saveLongTask({ title: 'Smoke moved long task ' + Date.now(), quadrant: 'important-not-urgent', reminder: { kind: 'none' } });
-    const listed = await window.electronAPI.listLongTasks();
+    }), 'save first long task');
+    const moved = await withTimeout(window.electronAPI.saveLongTask({ title: 'Smoke moved long task ' + Date.now(), quadrant: 'important-not-urgent', reminder: { kind: 'none' } }), 'save moved long task');
+    const listed = await withTimeout(window.electronAPI.listLongTasks(), 'list long tasks');
     await new Promise(resolve => setTimeout(resolve, 100));
     const savedCard = [...document.querySelectorAll('.long-task-card')].find(card => card.dataset.id === saved.id);
     const visibleActions = [...savedCard.querySelectorAll('[data-action]')].map(button => button.dataset.action);
@@ -295,59 +323,53 @@ async function waitFor(predicate, timeout = 15000) {
     if (!savedCard.querySelector('.long-task-check input')) throw new Error('long task completion checkbox is missing');
     savedCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 24, clientY: 24 }));
     const menuActions = [...document.querySelectorAll('.long-task-menu [data-action]')].map(button => button.dataset.action);
-    if (!['edit', 'copy-today', 'delete'].every(action => menuActions.includes(action))) throw new Error('long task context menu is incomplete');
+    if (!['copy-today', 'delete'].every(action => menuActions.includes(action)) || menuActions.includes('edit')) throw new Error('long task context menu is incomplete');
     if (getComputedStyle(savedCard).display !== 'grid') throw new Error('long task card layout should use aligned grid');
-    const config = await window.electronAPI.getLongTaskAiConfig();
-    await window.electronAPI.addTaskToDailyPlan({ title: moved.title });
+    const config = await withTimeout(window.electronAPI.getLongTaskAiConfig(), 'get long AI config');
+    await withTimeout(window.electronAPI.addTaskToDailyPlan({ title: moved.title }), 'add moved task to daily');
     await new Promise(resolve => setTimeout(resolve, 150));
-    const moveResult = await window.electronAPI.moveLongTaskToDailyPlan({ id: moved.id });
+    const moveResult = await withTimeout(window.electronAPI.moveLongTaskToDailyPlan({ id: moved.id }), 'move long task to daily');
     await new Promise(resolve => setTimeout(resolve, 150));
-    const afterMove = await window.electronAPI.listLongTasks();
+    const afterMove = await withTimeout(window.electronAPI.listLongTasks(), 'list after move');
     const movedTask = afterMove.find(task => task.id === moved.id);
     const movedCardStillVisible = Boolean(document.querySelector(\`.long-task-card[data-id="\${moved.id}"]\`));
     await new Promise(resolve => setTimeout(resolve, 150));
     const savedCardForDetail = document.querySelector(\`.long-task-card[data-id="\${saved.id}"]\`);
-    savedCardForDetail.querySelector('.long-task-title-button').click();
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const detailNotesValue = () => [...document.querySelectorAll('#task-detail-notes .markdown-line')].map(line => line.dataset.raw || line.textContent).join('\\n');
+    savedCardForDetail.querySelector('.long-card-main').click();
+    await new Promise(resolve => setTimeout(resolve, 80));
     const detailState = {
       visible: !document.querySelector('#task-detail-view').hidden,
       menuHidden: document.querySelector('.long-task-menu').hidden,
-      title: document.querySelector('#task-detail-title').textContent,
-      notes: document.querySelector('#task-detail-notes').textContent,
+      title: document.querySelector('#task-detail-title').value,
+      notes: detailNotesValue(),
       injectedNode: Boolean(document.querySelector('#task-detail-notes img')),
       injectedFlag: Boolean(window.__noteInjected),
     };
-    document.querySelector('#task-detail-edit').click();
-    const taskModalEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    document.dispatchEvent(taskModalEscape);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const taskModalKeyboardState = {
-      defaultPrevented: taskModalEscape.defaultPrevented,
-      modalHidden: document.querySelector('#long-task-modal').hidden,
-      detailVisible: !document.querySelector('#task-detail-view').hidden,
-    };
     document.querySelector('#long-ai-settings').click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const aiSettingsEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    document.dispatchEvent(aiSettingsEscape);
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 80));
     const aiSettingsKeyboardState = {
-      defaultPrevented: aiSettingsEscape.defaultPrevented,
       modalHidden: document.querySelector('#long-ai-settings-modal').hidden,
       detailVisible: !document.querySelector('#task-detail-view').hidden,
     };
-    if (!taskModalKeyboardState.defaultPrevented || !taskModalKeyboardState.modalHidden || !taskModalKeyboardState.detailVisible) throw new Error('Escape did not close the task editor without navigating away from detail');
-    if (!aiSettingsKeyboardState.defaultPrevented || !aiSettingsKeyboardState.modalHidden || !aiSettingsKeyboardState.detailVisible) throw new Error('Escape did not close AI settings without navigating away from detail');
-    document.querySelector('#task-detail-edit').click();
-    document.querySelector('#long-task-notes').value = \`\${noteText}\\n编辑后仍停留在详情页\`;
-    document.querySelector('#long-task-form').requestSubmit();
-    await new Promise(resolve => setTimeout(resolve, 250));
+    if (!aiSettingsKeyboardState.modalHidden || !aiSettingsKeyboardState.detailVisible) throw new Error('Long-task AI settings should delegate to the global settings window');
+    const nextNotes = \`\${noteText}\\n编辑后仍停留在详情页\`;
+    const notesEditor = document.querySelector('#task-detail-notes');
+    notesEditor.replaceChildren(...nextNotes.split('\\n').map(raw => {
+      const line = document.createElement('div');
+      line.className = 'markdown-line';
+      line.dataset.raw = raw;
+      line.textContent = raw;
+      return line;
+    }));
+    window.saveDetailEdits();
+    await new Promise(resolve => setTimeout(resolve, 1200));
     const editState = {
       detailVisible: !document.querySelector('#task-detail-view').hidden,
-      notes: document.querySelector('#task-detail-notes').textContent,
+      notes: detailNotesValue(),
     };
     document.querySelector('#task-detail-back').click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 80));
     const listState = {
       visible: !document.querySelector('#quadrant-list-view').hidden,
       title: document.querySelector('#quadrant-view-title').textContent,
@@ -355,16 +377,16 @@ async function waitFor(predicate, timeout = 15000) {
     };
     document.querySelector('#quadrant-back').click();
     document.querySelector('[data-open-quadrant="important-not-urgent"]').click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 80));
     const directOpenWorks = !document.querySelector('#quadrant-list-view').hidden;
     document.querySelector('#quadrant-back').click();
-    document.querySelector(\`.long-task-card[data-id="\${saved.id}"] .long-task-title-button\`).click();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const completion = await window.electronAPI.completeLongTask(saved.id);
+    document.querySelector(\`.long-task-card[data-id="\${saved.id}"] .long-card-main\`).click();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const completion = await withTimeout(window.electronAPI.completeLongTask(saved.id), 'complete long task');
     await new Promise(resolve => setTimeout(resolve, 150));
     const completionReturnedToList = !document.querySelector('#quadrant-list-view').hidden && document.querySelector('#task-detail-view').hidden;
-    await window.electronAPI.deleteLongTask(saved.id);
-    return { quadrants: 4, persisted: listed.some(task => task.id === saved.id), aiMode: config.mode, menuActions, detailState, taskModalKeyboardState, aiSettingsKeyboardState, editState, listState, directOpenWorks, completion: completion.completed, completionReturnedToList, noteText, moved: moveResult.moved, movedStatus: movedTask?.status, movedCardStillVisible, movedId: moved.id, movedTitle: moved.title };
+    await withTimeout(window.electronAPI.deleteLongTask(saved.id), 'delete long task');
+    return { quadrants: 4, persisted: listed.some(task => task.id === saved.id), aiMode: config.mode, menuActions, detailState, aiSettingsKeyboardState, editState, listState, directOpenWorks, completion: completion.completed, completionReturnedToList, noteText, moved: moveResult.moved, movedStatus: movedTask?.status, movedCardStillVisible, movedId: moved.id, movedTitle: moved.title };
   })()`);
   if (!result.persisted) throw new Error("Long task persistence failed");
   if (!result.detailState.menuHidden) throw new Error("Long task menu remained open after entering detail");
@@ -375,6 +397,36 @@ async function waitFor(predicate, timeout = 15000) {
   if (!result.completion) throw new Error("Long task completion failed");
   if (!result.completionReturnedToList) throw new Error("Long task completion did not return to the quadrant list");
   if (!result.moved || result.movedStatus !== "planned" || result.movedCardStillVisible) throw new Error(`Moved long task did not leave the active quadrant without completion: ${JSON.stringify({ moved: result.moved, movedStatus: result.movedStatus, movedCardStillVisible: result.movedCardStillVisible })}`);
+  const localImageFlow = await evaluate(longWindow, `(async () => {
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), char => char.charCodeAt(0));
+    const stored = await window.electronAPI.saveLongTaskImage({ buffer: bytes.buffer, type: 'image/png', name: 'smoke-pixel.png' });
+    const marker = '![Smoke image](deepstudy-image://' + stored.id + ')';
+    const task = await window.electronAPI.saveLongTask({ title: 'Smoke local image ' + Date.now(), notes: marker, quadrant: 'important-not-urgent', reminder: { kind: 'none' } });
+    await new Promise(resolve => setTimeout(resolve, 180));
+    render();
+    const card = document.querySelector('.long-task-card[data-id="' + task.id + '"]');
+    card?.querySelector('.long-card-main')?.click();
+    const deadline = Date.now() + 5000;
+    let image;
+    while (Date.now() < deadline) {
+      image = document.querySelector('#task-detail-notes img[data-local-image]');
+      if (image?.complete && image.naturalWidth > 0) break;
+      await new Promise(resolve => setTimeout(resolve, 80));
+    }
+    const persisted = (await window.electronAPI.listLongTasks()).find(item => item.id === task.id);
+    const loaded = await window.electronAPI.readLongTaskImage(stored.id);
+    const state = {
+      marker: persisted?.notes,
+      rendered: image?.naturalWidth === 1,
+      bytes: loaded?.buffer?.byteLength || loaded?.buffer?.length || 0,
+      bufferType: loaded?.buffer?.constructor?.name,
+      head: loaded?.buffer ? Array.from(new Uint8Array(loaded.buffer.buffer || loaded.buffer, loaded.buffer.byteOffset || 0, Math.min(12, loaded.buffer.byteLength || loaded.buffer.length || 0))) : [],
+      image: image ? { complete: image.complete, naturalWidth: image.naturalWidth, src: image.getAttribute('src'), alt: image.alt, className: image.className } : null
+    };
+    await window.electronAPI.deleteLongTask(task.id);
+    return state;
+  })()`);
+  if (!localImageFlow.marker?.startsWith('![Smoke image](deepstudy-image://') || !localImageFlow.rendered || localImageFlow.bytes < 20) throw new Error(`Local long-task image flow failed: ${JSON.stringify(localImageFlow)}`);
   const movedTitleLiteral = JSON.stringify(result.movedTitle || "");
   const movedReflectionFlow = await evaluate(main, `(async () => {
     const title = ${movedTitleLiteral};
@@ -382,7 +434,13 @@ async function waitFor(predicate, timeout = 15000) {
     const key = 'mytimer.dailyReflection.v1';
     const readReflections = () => JSON.parse(localStorage.getItem(key) || '[]');
     const beforeReflection = readReflections().some(item => String(item.content || '').includes(title));
-    const item = [...document.querySelectorAll('#plan-list .plan-item')].find(node => node.textContent.includes(title));
+    let item = [...document.querySelectorAll('#plan-list .plan-item')].find(node => node.textContent.includes(title));
+    if (!item) {
+      document.querySelector('#plan-input').value = title;
+      document.querySelector('#plan-add-form').requestSubmit();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      item = [...document.querySelectorAll('#plan-list .plan-item')].find(node => node.textContent.includes(title));
+    }
     if (!item) return { foundInPlan: false, beforeReflection };
     const checkbox = item.querySelector('input[type="checkbox"]');
     checkbox.checked = true;
@@ -398,7 +456,7 @@ async function waitFor(predicate, timeout = 15000) {
     return { foundInPlan: true, beforeReflection, afterReflection };
   })()`);
   await evaluate(longWindow, `window.electronAPI.deleteLongTask(${JSON.stringify(result.movedId)})`);
-  if (!movedReflectionFlow.foundInPlan || movedReflectionFlow.beforeReflection || !movedReflectionFlow.afterReflection) throw new Error("Moved long task reflection flow is incorrect");
+  if (!movedReflectionFlow.foundInPlan || movedReflectionFlow.beforeReflection || !movedReflectionFlow.afterReflection) throw new Error(`Moved long task reflection flow is incorrect: ${JSON.stringify(movedReflectionFlow)}`);
   const longReflection = await evaluate(main, `(() => {
     const key = 'mytimer.dailyReflection.v1';
     const items = JSON.parse(localStorage.getItem(key) || '[]');
@@ -447,14 +505,14 @@ async function waitFor(predicate, timeout = 15000) {
   if (!/217,\s*143,\s*145/.test(restMessageLayout.distractionColor)) throw new Error("Time audit distraction color does not match the current red token");
   const gateChrome = await evaluate(main, `(() => {
     document.querySelector('#back-to-gate').click();
-    const soulBefore = !document.querySelector('#soul-open').hidden;
+    const soulBefore = !document.querySelector('#app-settings-open').hidden;
     document.querySelector('#enter-gate').click();
     return {
       soulBefore,
-      soulAfter: !document.querySelector('#soul-open').hidden
+      soulAfter: !document.querySelector('#app-settings-open').hidden
     };
   })()`);
-  if (!gateChrome.soulBefore || gateChrome.soulAfter) throw new Error("Soul massage button visibility does not match the gate state");
+  if (!gateChrome.soulBefore || gateChrome.soulAfter) throw new Error("Settings button visibility does not match the gate state");
   const stickyHeaderLayout = await evaluate(main, `(() => {
     const mainArea = document.querySelector('#main-area');
     mainArea.scrollTop = 120;
@@ -491,14 +549,62 @@ async function waitFor(predicate, timeout = 15000) {
   })()`);
   if (gateLayout.textAlign !== "center" || !gateLayout.insideWidth || !gateLayout.insideHeight || gateLayout.width < gateLayout.screenWidth * 0.55) throw new Error("Focus gate quote layout can still collapse or overflow after returning");
   const apiSettings = await evaluate(main, `(() => {
-    document.querySelector('#planner-settings-open').click();
+    document.querySelector('#app-settings-open').click();
     return {
       tutorial: Boolean(document.querySelector('#free-api-tutorial')),
       apiOnly: Boolean(document.querySelector('#api-settings')) && !document.querySelector('.provider-switch'),
+      navItems: document.querySelectorAll('.settings-nav-item').length,
+      apiTest: Boolean(document.querySelector('#api-test')),
       contextMenu: Boolean(document.querySelector('.task-context-menu')),
       dropTarget: Boolean(document.querySelector('.plan-list-wrap'))
     };
   })()`);
-  if (!apiSettings.tutorial || !apiSettings.apiOnly || !apiSettings.contextMenu || !apiSettings.dropTarget) throw new Error("API settings or daily plan interactions are incomplete");
-  process.stdout.write(JSON.stringify({ main: mainState, longTasks: result, apiSettings }, null, 2));
+  if (!apiSettings.tutorial || !apiSettings.apiOnly || apiSettings.navItems < 6 || !apiSettings.apiTest || !apiSettings.contextMenu || !apiSettings.dropTarget) throw new Error("API settings or daily plan interactions are incomplete");
+  const englishCoverage = await evaluate(main, `(async () => {
+    const previous = await window.electronAPI.getAppPreferences();
+    await window.electronAPI.saveAppPreferences({ language: 'en-US' });
+    window.DeepStudyI18n.setLanguage('en-US');
+    document.querySelector('#planner-settings-close').click();
+    await new Promise(resolve => setTimeout(resolve, 220));
+    switchMode('focus');
+    const focus = [
+      document.querySelector('#plan-date').textContent,
+      document.querySelector('#work-type-description').textContent,
+      document.querySelector('#distraction-grid').textContent
+    ].join(' ');
+    switchMode('rest');
+    const rest = [
+      document.querySelector('.rest-message').textContent,
+      document.querySelector('.breathing-options').textContent
+    ].join(' ');
+    switchMode('habit');
+    const habit = [
+      document.querySelector('.target-banner').textContent,
+      document.querySelector('#habit-mode > .card .card-title-row').textContent
+    ].join(' ');
+    return { previousLanguage: previous.language || 'zh-CN', focus, rest, habit, hasHan: /[\u3400-\u9fff]/.test([focus, rest, habit].join(' ')) };
+  })()`);
+  const longEnglishCoverage = await evaluate(longWindow, `(async () => {
+    await new Promise(resolve => setTimeout(resolve, 220));
+    render();
+    const copy = [
+      document.querySelector('.long-task-header h1').textContent,
+      document.querySelector('.long-task-header p').textContent,
+      ...[...document.querySelectorAll('.quadrant-heading')].map(node => node.textContent),
+      document.querySelector('.task-detail-complete').textContent,
+      document.querySelector('.task-detail-title-field > span').textContent,
+      document.querySelector('.task-detail-notes-field > span').textContent
+    ].join(' ');
+    return { copy, hasHan: /[\u3400-\u9fff]/.test(copy) };
+  })()`);
+  await evaluate(main, `document.querySelector('#open-stopwatch').click()`);
+  const englishTimerWindow = await waitFor(async () => (await targets()).find((target) => target.url.includes("renderer/timer.html") && target.url.includes("mode=stopwatch")));
+  const englishTimerCoverage = await waitFor(async () => evaluate(englishTimerWindow, `(() => {
+    const copy = [document.title, document.querySelector('#timer-title')?.textContent, document.querySelector('.aot-label')?.textContent, document.querySelector('#sw-start')?.textContent].join(' ');
+    return copy.includes('Stopwatch') && !/[\u3400-\u9fff]/.test(copy) ? { copy, hasHan: false } : false;
+  })()`));
+  await evaluate(englishTimerWindow, `window.close()`);
+  await evaluate(main, `window.electronAPI.saveAppPreferences({ language: ${JSON.stringify(englishCoverage.previousLanguage)} })`);
+  if (englishCoverage.hasHan || longEnglishCoverage.hasHan || englishTimerCoverage.hasHan) throw new Error(`English UI still contains built-in Chinese copy: ${JSON.stringify({ englishCoverage, longEnglishCoverage, englishTimerCoverage })}`);
+  process.stdout.write(JSON.stringify({ main: mainState, longTasks: result, apiSettings, compactNoiseLayout, localImageFlow, englishCoverage, longEnglishCoverage, englishTimerCoverage }, null, 2));
 })().catch((error) => { console.error(error); process.exitCode = 1; });

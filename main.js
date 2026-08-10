@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu, Notificati
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { createAppReadyRunner } = require("./renderer/app-lifecycle");
 const {
   createCredentialStore,
@@ -9,6 +10,7 @@ const {
   createLegacyBackupStore,
   createStateStore,
 } = require("./renderer/desktop-sync-service");
+const { importLocalImage, writeBufferAtomically } = require("./renderer/local-image-import");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
 const APP_DATA_DIR_NAME = "deepstudy";
@@ -76,6 +78,7 @@ if (!gotTheLock) {
 }
 
 const {
+  formatApiResponsePreview,
   sanitizeChatHistory,
   upsertApiProfile,
 } = require("./renderer/planner-utils");
@@ -83,8 +86,41 @@ const { dueTasks, extractJson, fallbackAiOperationsFromText, normalizeAiOperatio
 
 const DEFAULT_PLANNER_SETTINGS = {
   mode: "api",
-  api: { baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-oss-120b:free" },
+  api: { baseUrl: "https://openrouter.ai/api/v1", model: "nvidia/nemotron-3-super-120b-a12b:free" },
 };
+const DEFAULT_DAILY_SYSTEM_PROMPT = [
+  "You help turn a short chat into a practical daily plan for a desktop timer app.",
+  "Reply in the same language as the user, defaulting to Simplified Chinese.",
+  "Keep the response concise and action-oriented.",
+  "When you suggest tasks to add, end with a section named exactly PLAN_ITEMS:",
+  "Use one plain-text bullet per task under PLAN_ITEMS. Do not use JSON, arrays, brackets, or code blocks in PLAN_ITEMS.",
+  "Each task should be specific, short, and suitable for a checklist.",
+  "Split sequential user plans into separate checklist tasks instead of collapsing them into one task.",
+  "Prefix the most important tasks with [PRIORITY]. Mark at most three.",
+  "Priority means purposeful work that produces short-term progress or meaningful personal growth.",
+  "Do not mark entertainment, passive video watching, or routine administration as priority.",
+  "Only suggest tasks that follow from the current conversation.",
+  "Do not invent filler tasks just to reach a target number of priorities unless the user-customized preference prompt explicitly asks for recurring default tasks.",
+  "Do not guess exact times, durations, locations, tools, or process details unless the user provided them.",
+].join("\n");
+const LEGACY_DAILY_USER_PROMPTS = [
+  "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。",
+  "Turn my goals into clear, short, actionable tasks for today, while matching my working style.",
+];
+const DEFAULT_DAILY_USER_PROMPT = "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。如果我没有明确给出足够的高优先级任务，可以按我的默认偏好补充：[PRIORITY] 读书、[PRIORITY] 运动；我可以在设置里改掉这两个默认偏好。";
+const DEFAULT_DAILY_USER_PROMPT_EN = "Turn my goals into clear, short, actionable tasks for today, while matching my working style. If I did not give enough priority tasks, you may use my default preferences: [PRIORITY] Reading and [PRIORITY] Exercise. I can change these defaults in Settings.";
+const DEFAULT_LONG_TASK_SYSTEM_PROMPT = [
+  "You manage a four-quadrant long-term task board.",
+  "Reply by returning JSON only: {\"operations\":[{\"action\":\"create|update|delete|restore\",\"id\":\"existing id when needed\",\"task\":{\"title\":\"\",\"notes\":\"\",\"quadrant\":\"important-urgent|important-not-urgent|urgent-not-important|not-important-not-urgent\",\"reminder\":{\"kind\":\"none|once|daily|weekly\",\"at\":\"ISO date\",\"time\":\"HH:mm\",\"weekdays\":[0]}}}]}",
+  "Use the same language as the user for titles and notes. If the user writes Chinese, task titles and notes must be Chinese.",
+  "If the user asks to add a future task, create exactly one operation unless they clearly ask for multiple tasks.",
+  "If the user asks for a reminder relative to the task time, calculate the reminder time and set reminder.kind to once.",
+  "Never invent a reminder time, duration, schedule, workflow, or intermediate steps. Leave reminder.kind as none when time is unclear.",
+  "Use the user's local timezone. Keep titles concise.",
+].join("\n");
+const DEFAULT_LONG_TASK_USER_PROMPT = "请帮我维护长期任务，任务名称和备注保持简洁，优先尊重我明确给出的信息。";
+const DEFAULT_LONG_TASK_USER_PROMPT_EN = "Help me maintain long-term tasks with concise titles and notes, and prioritize information I explicitly provide.";
+const APP_PREFERENCES_DEFAULT = { language: "zh-CN" };
 const FREE_API_TUTORIAL_URL = "https://my.feishu.cn/docx/Sr9RdRzFaop9BSxBgcAcdxDonOc";
 const PLANNER_TIMEOUT_MS = 120000;
 const PORTABLE_ICON_PATH = process.env.PORTABLE_EXECUTABLE_FILE
@@ -202,7 +238,16 @@ function bringMainWindowToFront() {
   return runWhenAppReady(() => {
     if (!mainWindow || mainWindow.isDestroyed()) createWindow();
     if (mainWindow.isMinimized()) mainWindow.restore();
+    const wasAlwaysOnTop = mainWindow.isAlwaysOnTop();
     mainWindow.show();
+    if (process.platform === "win32") {
+      mainWindow.setAlwaysOnTop(true, "screen-saver");
+      setTimeout(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.setAlwaysOnTop(wasAlwaysOnTop, "normal");
+        mainWindow.focus();
+      }, 120).unref?.();
+    }
     mainWindow.moveTop?.();
     mainWindow.focus();
     return mainWindow;
@@ -290,6 +335,69 @@ function modelNetworkError(error, baseUrl) {
 
 function longTasksPath() {
   return path.join(app.getPath("userData"), "long-tasks.json");
+}
+
+function longTaskImagesDir() {
+  return path.join(app.getPath("userData"), "long-task-images");
+}
+
+function imageExtension(name = "", type = "") {
+  const named = path.extname(name).slice(1).toLowerCase();
+  const allowed = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
+  if (allowed.has(named)) return named === "jpeg" ? "jpg" : named;
+  if (/png/i.test(type)) return "png";
+  if (/jpe?g/i.test(type)) return "jpg";
+  if (/gif/i.test(type)) return "gif";
+  if (/webp/i.test(type)) return "webp";
+  if (/bmp/i.test(type)) return "bmp";
+  return "";
+}
+
+function imageTypeFromId(id = "") {
+  const extension = path.extname(id).slice(1).toLowerCase();
+  return {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    bmp: "image/bmp",
+  }[extension] || "application/octet-stream";
+}
+
+function safeLongTaskImagePath(id) {
+  const fileName = cleanString(id, "");
+  if (!fileName || path.basename(fileName) !== fileName || !imageExtension(fileName)) {
+    throw new Error("图片引用无效。");
+  }
+  return path.join(longTaskImagesDir(), fileName);
+}
+
+function longTaskImageIds(notes = "") {
+  return [...String(notes).matchAll(/deepstudy-image:\/\/([^\s)]+)/g)]
+    .map((match) => cleanString(match[1]))
+    .filter(Boolean);
+}
+
+function removeUnreferencedLongTaskImages(removedTasks, remainingTasks) {
+  const referenced = new Set(remainingTasks.flatMap((task) => longTaskImageIds(task.notes)));
+  for (const id of new Set(removedTasks.flatMap((task) => longTaskImageIds(task.notes)))) {
+    if (referenced.has(id)) continue;
+    try {
+      fs.rmSync(safeLongTaskImagePath(id), { force: true });
+    } catch {
+      // A missing or malformed attachment must not prevent task deletion.
+    }
+  }
+}
+
+function discardUnreferencedLongTaskImage(id) {
+  const target = safeLongTaskImagePath(id);
+  const fileName = path.basename(target);
+  const referenced = readLongTasks().some((task) => longTaskImageIds(task.notes).includes(fileName));
+  if (referenced) return false;
+  fs.rmSync(target, { force: true });
+  return true;
 }
 
 function noiseDir() {
@@ -383,6 +491,25 @@ function completeLongTask(id) {
   return { completed: true, task };
 }
 
+function undoLongTaskCompletion(input = {}) {
+  const id = cleanString(input.id);
+  const tasks = readLongTasks();
+  const index = tasks.findIndex((item) => item.id === id);
+  if (index < 0) throw new Error("长期任务不存在。");
+  const restored = normalizeTask({
+    ...tasks[index],
+    ...input,
+    id,
+    status: "active",
+    completedAt: null,
+  });
+  restored.createdAt = tasks[index].createdAt;
+  tasks[index] = restored;
+  writeLongTasks(tasks);
+  mainWindow?.webContents.send("long-tasks:completion-undone", restored);
+  return restored;
+}
+
 function moveLongTaskToDailyPlan(id) {
   const tasks = readLongTasks();
   const task = tasks.find((item) => item.id === cleanString(id) && item.status === "active");
@@ -459,6 +586,31 @@ function plannerSettingsPath(scope = "planner") {
   return path.join(app.getPath("userData"), scope === "long-tasks" ? "long-task-ai-settings.json" : "planner-settings.json");
 }
 
+function appPreferencesPath() {
+  return path.join(app.getPath("userData"), "app-preferences.json");
+}
+
+function readAppPreferences() {
+  try {
+    const stored = JSON.parse(fs.readFileSync(appPreferencesPath(), "utf8"));
+    return {
+      language: ["zh-CN", "en-US"].includes(stored.language) ? stored.language : APP_PREFERENCES_DEFAULT.language,
+    };
+  } catch {
+    return { ...APP_PREFERENCES_DEFAULT };
+  }
+}
+
+function saveAppPreferences(input = {}) {
+  const preferences = {
+    language: ["zh-CN", "en-US"].includes(input.language) ? input.language : APP_PREFERENCES_DEFAULT.language,
+  };
+  fs.writeFileSync(appPreferencesPath(), JSON.stringify(preferences, null, 2), "utf8");
+  mainWindow?.webContents.send("app:preferences-changed", preferences);
+  longTasksWindow?.webContents.send("app:preferences-changed", preferences);
+  return preferences;
+}
+
 function decryptApiKey(value) {
   if (!value || !safeStorage.isEncryptionAvailable()) return "";
   try {
@@ -470,6 +622,47 @@ function decryptApiKey(value) {
 
 function createConfigId() {
   return `api-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function stripHiddenPromptRules(value, scope = "planner") {
+  const raw = cleanString(value);
+  const fallback = defaultUserPrompt(scope);
+  if (!raw) return fallback;
+  const blocked = scope === "long-tasks"
+    ? [/json/i, /operations/i, /quadrant/i, /important-urgent/i, /important-not-urgent/i, /urgent-not-important/i, /not-important-not-urgent/i, /reminder\.kind/i, /same language/i]
+    : [/PLAN_ITEMS/i, /\[PRIORITY\]/i, /plain-text bullet/i, /Do not use JSON/i, /section named/i, /Priority means/i];
+  const kept = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !blocked.some((pattern) => pattern.test(line)))
+    .join("\n")
+    .trim();
+  if (!kept || kept.length < 8) return fallback;
+  return kept;
+}
+
+function defaultUserPrompt(scope = "planner") {
+  const english = readAppPreferences().language === "en-US";
+  if (scope === "long-tasks") return english ? DEFAULT_LONG_TASK_USER_PROMPT_EN : DEFAULT_LONG_TASK_USER_PROMPT;
+  return english ? DEFAULT_DAILY_USER_PROMPT_EN : DEFAULT_DAILY_USER_PROMPT;
+}
+
+function storedUserPromptOrDefault(value, scope = "planner") {
+  const prompt = cleanString(value);
+  if (!prompt) return defaultUserPrompt(scope);
+  if (scope === "planner" && LEGACY_DAILY_USER_PROMPTS.includes(prompt)) {
+    return defaultUserPrompt(scope);
+  }
+  return prompt;
+}
+
+function composeSystemPrompt(scope, userPrompt) {
+  return [
+    scope === "long-tasks" ? DEFAULT_LONG_TASK_SYSTEM_PROMPT : DEFAULT_DAILY_SYSTEM_PROMPT,
+    "",
+    "User-customized style and workflow preference:",
+    stripHiddenPromptRules(userPrompt, scope),
+  ].join("\n");
 }
 
 function readRawStoredSettings(scope = "planner") {
@@ -536,6 +729,7 @@ function readPlannerSettings(scope = "planner") {
   );
   return {
     mode: "api",
+    systemPrompt: stripHiddenPromptRules(storedUserPromptOrDefault(stored.systemPrompt, scope), scope),
     api: {
       baseUrl: activeProfile?.baseUrl || cleanString(
           stored.api?.baseUrl,
@@ -552,6 +746,7 @@ function readPlannerSettings(scope = "planner") {
 function publicPlannerSettings(settings = readPlannerSettings()) {
   return {
     mode: settings.mode,
+    systemPrompt: settings.systemPrompt,
     api: {
       baseUrl: settings.api.baseUrl,
       model: settings.api.model,
@@ -579,6 +774,7 @@ function savePlannerSettings(input = {}, scope = "planner") {
   }
   const settings = {
     mode,
+    systemPrompt: stripHiddenPromptRules(cleanString(input.systemPrompt, current.systemPrompt), scope),
     api: {
       baseUrl: normalizeBaseUrl(input.api?.baseUrl, current.api.baseUrl),
       model: cleanString(input.api?.model, current.api.model),
@@ -608,6 +804,7 @@ function savePlannerSettings(input = {}, scope = "planner") {
   }
   const stored = {
     mode: settings.mode,
+    systemPrompt: settings.systemPrompt,
     api: { baseUrl: settings.api.baseUrl, model: settings.api.model },
     activeApiProfileId: settings.activeApiProfileId,
     apiProfiles: settings.apiProfiles.map((profile) => ({
@@ -640,6 +837,7 @@ function syncApiProfilesToOtherScope(sourceScope, sourceProfilesEncrypted) {
   if (updatedActive) otherApi = { baseUrl: updatedActive.baseUrl, model: updatedActive.model };
   const otherStoredUpdated = {
     mode: otherStored.mode || "api",
+    systemPrompt: stripHiddenPromptRules(otherStored.systemPrompt || defaultUserPrompt(otherScope), otherScope),
     api: otherApi,
     activeApiProfileId: typeof otherStored.activeApiProfileId === "string" ? otherStored.activeApiProfileId : (mergedOtherProfiles[0]?.id || ""),
     apiProfiles: mergedOtherProfiles,
@@ -658,6 +856,7 @@ function deleteApiProfile(profileId, scope = "planner") {
   const activeProfile = nextProfiles.find((profile) => profile.id === current.activeApiProfileId) || nextProfiles[0];
   const settings = {
     mode: "api",
+    systemPrompt: current.systemPrompt,
     api: {
       baseUrl: activeProfile?.baseUrl || DEFAULT_PLANNER_SETTINGS.api.baseUrl,
       model: activeProfile?.model || DEFAULT_PLANNER_SETTINGS.api.model,
@@ -668,6 +867,7 @@ function deleteApiProfile(profileId, scope = "planner") {
   };
   const stored = {
     mode: settings.mode,
+    systemPrompt: settings.systemPrompt,
     api: { baseUrl: settings.api.baseUrl, model: settings.api.model },
     activeApiProfileId: settings.activeApiProfileId,
     apiProfiles: settings.apiProfiles.map((profile) => ({
@@ -697,6 +897,7 @@ function deleteApiProfileFromOtherScope(deletedProfileId, sourceScope) {
   const otherActive = nextOtherProfiles.find((profile) => profile.id === otherActiveId) || nextOtherProfiles[0];
   const otherStoredUpdated = {
     mode: otherStored.mode || "api",
+    systemPrompt: stripHiddenPromptRules(otherStored.systemPrompt || defaultUserPrompt(otherScope), otherScope),
     api: otherActive
       ? { baseUrl: otherActive.baseUrl, model: otherActive.model }
       : (otherStored.api || DEFAULT_PLANNER_SETTINGS.api),
@@ -706,7 +907,7 @@ function deleteApiProfileFromOtherScope(deletedProfileId, sourceScope) {
   fs.writeFileSync(plannerSettingsPath(otherScope), JSON.stringify(otherStoredUpdated, null, 2), "utf8");
 }
 
-function buildPlannerMessages(payload = {}) {
+function buildPlannerMessages(payload = {}, settings = readPlannerSettings()) {
   const userMessage = cleanString(payload.message);
   const date = cleanString(payload.date, new Date().toISOString().slice(0, 10));
 
@@ -714,20 +915,7 @@ function buildPlannerMessages(payload = {}) {
   return [
     {
       role: "system",
-      content: [
-        "You help turn a short chat into a practical daily plan for a desktop timer app.",
-        "Reply in the same language as the user, defaulting to Simplified Chinese.",
-        "Keep the response concise and action-oriented.",
-        "When you suggest tasks to add, end with a section named exactly PLAN_ITEMS:",
-        "Use one plain-text bullet per task under PLAN_ITEMS. Do not use JSON, arrays, brackets, or code blocks in PLAN_ITEMS.",
-        "Each task should be specific, short, and suitable for a checklist.",
-        "Split sequential user plans into separate checklist tasks instead of collapsing them into one task.",
-        "Prefix the most important tasks with [PRIORITY]. Mark at most three.",
-        "Priority means purposeful work that produces short-term progress or meaningful personal growth.",
-        "Do not mark entertainment, passive video watching, or routine administration as priority.",
-        "Only suggest tasks that follow from the current conversation.",
-        "Do not invent filler tasks just to reach a target number of priorities.",
-      ].join("\n"),
+      content: composeSystemPrompt("planner", settings.systemPrompt),
     },
     ...history,
     {
@@ -739,6 +927,41 @@ function buildPlannerMessages(payload = {}) {
       ].join("\n"),
     },
   ];
+}
+
+function buildChatCompletionBody(messages, settings, extraBody = {}) {
+  const body = {
+    model: settings.api.model,
+    stream: false,
+    max_tokens: 800,
+    temperature: 0.2,
+    messages,
+    ...extraBody,
+  };
+  if (/generativelanguage\.googleapis\.com/i.test(settings.api.baseUrl) || /^gemini-/i.test(settings.api.model)) {
+    body.reasoning_effort = body.reasoning_effort || "low";
+  }
+  return body;
+}
+
+function buildApiTestMessages(input = {}) {
+  const prompt = cleanString(input.message, "Reply with a single word: ok.");
+  return [
+    { role: "user", content: prompt },
+  ];
+}
+
+function resolveInputApiSettings(input = {}, scope = "planner") {
+  const current = readPlannerSettings(scope);
+  const selectedProfile = current.apiProfiles.find(
+    (profile) => profile.id === cleanString(input.profileId),
+  );
+  const api = {
+    baseUrl: normalizeBaseUrl(input.baseUrl, selectedProfile?.baseUrl || current.api.baseUrl),
+    model: cleanString(input.model, selectedProfile?.model || current.api.model),
+    apiKey: cleanString(input.apiKey) || selectedProfile?.apiKey || "",
+  };
+  return { ...current, api };
 }
 
 async function requestPlannerReply(payload) {
@@ -755,13 +978,7 @@ async function requestPlannerReply(payload) {
     const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
       method: "POST",
       headers: modelHeaders(settings),
-      body: JSON.stringify({
-        model: settings.api.model,
-        stream: false,
-        max_tokens: 800,
-        temperature: 0.2,
-        messages: buildPlannerMessages(payload),
-      }),
+      body: JSON.stringify(buildChatCompletionBody(buildPlannerMessages(payload, settings), settings)),
       signal: controller.signal,
     });
 
@@ -775,21 +992,54 @@ async function requestPlannerReply(payload) {
     const data = await response.json();
     const content = cleanString(extractModelContent(data, true));
     if (!content) {
-      throw new Error("API 返回了空内容。");
+      const debugInfo = JSON.stringify({
+        choices: data?.choices,
+        message: data?.choices?.[0]?.message,
+        finish_reason: data?.choices?.[0]?.finish_reason,
+      }, null, 2);
+      throw new Error(`API 已连接，但模型返回了空内容。请检查：\n1. API Key 是否有效\n2. 模型名称是否正确（Gemini 免费版请用 gemini-3.5-flash）\n3. 是否触发了内容过滤\n\n调试信息：${debugInfo}`);
     }
-
-    return {
-      content,
-      model: cleanString(
-        data.model,
-        settings.api.model,
-      ),
-      mode: settings.mode,
-    };
+    return { ok: true, message: "API 验证成功。" };
   } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("模型请求在 120 秒后超时。");
+    throw new Error(modelNetworkError(error, settings.api.baseUrl));
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function testApiConfiguration(input = {}) {
+  const settings = resolveInputApiSettings(input);
+  if (!settings.api.apiKey) {
+    throw new Error("请先填写 API Key。");
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
+      method: "POST",
+      headers: modelHeaders(settings),
+      body: JSON.stringify(buildChatCompletionBody(buildApiTestMessages(input), settings, {
+        max_tokens: 128,
+        temperature: 0,
+      })),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`API 返回 HTTP ${response.status}: ${body.slice(0, 300)}`);
     }
+    const data = await response.json();
+    const content = cleanString(extractModelContent(data, true));
+    if (!content) {
+      const debugInfo = JSON.stringify({
+        choices: data?.choices,
+        message: data?.choices?.[0]?.message,
+        finish_reason: data?.choices?.[0]?.finish_reason,
+      }, null, 2);
+      throw new Error(`API 已连接，但模型返回了空内容。请检查：\n1. API Key 是否有效\n2. Base URL 是否对应当前模型服务\n3. 模型名称是否正确（Gemini 请用 gemini-3.5-flash）\n\n调试信息：${debugInfo}`);
+    }
+    return { ok: true, message: "API 验证成功。" };
+  } catch (error) {
     throw new Error(modelNetworkError(error, settings.api.baseUrl));
   } finally {
     clearTimeout(timeoutId);
@@ -798,26 +1048,35 @@ async function requestPlannerReply(payload) {
 
 async function requestStructuredModel(messages, signal, settingsOverride) {
   const settings = settingsOverride || readPlannerSettings();
+  const controller = signal ? null : new AbortController();
+  const timeoutId = controller ? setTimeout(() => controller.abort(), PLANNER_TIMEOUT_MS) : null;
   try {
     const response = await net.fetch(`${normalizeBaseUrl(settings.api.baseUrl)}/chat/completions`, {
       method: "POST",
       headers: modelHeaders(settings),
-      signal,
-      body: JSON.stringify({
-        model: settings.api.model,
-        stream: false,
-        temperature: 0,
+      signal: signal || controller.signal,
+      body: JSON.stringify(buildChatCompletionBody(messages, settings, {
         max_tokens: 700,
-        messages,
-      }),
+        temperature: 0,
+      })),
     });
-    if (!response.ok) throw new Error(`模型返回 HTTP ${response.status}`);
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`模型返回 HTTP ${response.status}: ${body.slice(0, 300)}`);
+    }
     const data = await response.json();
     const content = cleanString(extractModelContent(data, true));
-    if (!content) throw new Error("模型返回了空内容。");
-    return { content, metrics: data };
+    if (!content) {
+      throw new Error("模型返回了空内容。");
+    }
+    return {
+      content,
+      model: cleanString(data?.model, settings.api.model),
+    };
   } catch (error) {
     throw new Error(modelNetworkError(error, settings.api.baseUrl));
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
@@ -825,21 +1084,16 @@ async function proposeLongTaskOperations(payload = {}) {
   const tasks = readLongTasks();
   const history = sanitizeChatHistory(payload.history, 6);
   const requestText = cleanString(payload.message);
+  const settings = readPlannerSettings("long-tasks");
   const messages = [{
     role: "system",
-    content: [
-      "You manage a four-quadrant long-term task board.",
-      "Return JSON only: {\"operations\":[{\"action\":\"create|update|delete|restore\",\"id\":\"existing id when needed\",\"task\":{\"title\":\"\",\"notes\":\"\",\"quadrant\":\"important-urgent|important-not-urgent|urgent-not-important|not-important-not-urgent\",\"reminder\":{\"kind\":\"none|once|daily|weekly\",\"at\":\"ISO date\",\"time\":\"HH:mm\",\"weekdays\":[0]}}}]}",
-      "If the user asks to add a future task, create exactly one operation unless they clearly ask for multiple tasks.",
-      "If the user asks for a reminder relative to the task time, calculate the reminder time and set reminder.kind to once.",
-      "Never invent a reminder time. Use the user's local timezone. Keep titles concise.",
-    ].join("\n"),
+    content: composeSystemPrompt("long-tasks", settings.systemPrompt),
   }, ...history, {
     role: "user",
     content: `Current local time: ${new Date().toString()}\nExisting tasks: ${JSON.stringify(tasks.map(({ id, title, quadrant, status, reminder }) => ({ id, title, quadrant, status, reminder })))}\nRequest: ${requestText}`,
   }];
   try {
-    const reply = await requestStructuredModel(messages, null, readPlannerSettings("long-tasks"));
+    const reply = await requestStructuredModel(messages, null, settings);
     return { content: reply.content, operations: normalizeAiOperations(reply.content, tasks) };
   } catch (error) {
     const recoverable = /空内容|结构化结果|JSON|Unexpected token|变更列表无效/.test(error.message);
@@ -870,12 +1124,35 @@ ipcMain.handle("long-tasks:save", (_event, input) => {
   writeLongTasks(tasks);
   return normalized;
 });
+ipcMain.handle("long-tasks:save-image", (_event, payload = {}) => {
+  const buffer = normalizeNoiseBuffer(payload.buffer);
+  const extension = imageExtension(payload.name, payload.type);
+  if (!buffer || !buffer.length || !extension) throw new Error("请选择有效的本地图片。");
+  if (buffer.length > 16 * 1024 * 1024) throw new Error("图片不能超过 16 MB。");
+  const id = `${Date.now().toString(36)}-${crypto.randomBytes(8).toString("hex")}.${extension}`;
+  fs.mkdirSync(longTaskImagesDir(), { recursive: true });
+  writeBufferAtomically(safeLongTaskImagePath(id), buffer);
+  return { id, type: imageTypeFromId(id), size: buffer.length };
+});
+ipcMain.handle("long-tasks:discard-image", (_event, id) => discardUnreferencedLongTaskImage(id));
+ipcMain.handle("long-tasks:import-image-path", (_event, sourcePath) => {
+  return importLocalImage(sourcePath, longTaskImagesDir());
+});
+ipcMain.handle("long-tasks:read-image", (_event, id) => {
+  const target = safeLongTaskImagePath(id);
+  return { id: path.basename(target), type: imageTypeFromId(target), buffer: fs.readFileSync(target) };
+});
 ipcMain.handle("long-tasks:delete", (_event, id) => {
-  const tasks = readLongTasks().filter((task) => task.id !== cleanString(id));
+  const taskId = cleanString(id);
+  const existing = readLongTasks();
+  const removed = existing.filter((task) => task.id === taskId);
+  const tasks = existing.filter((task) => task.id !== taskId);
   writeLongTasks(tasks);
+  removeUnreferencedLongTaskImages(removed, tasks);
   return true;
 });
 ipcMain.handle("long-tasks:complete", (_event, id) => completeLongTask(id));
+ipcMain.handle("long-tasks:undo-complete", (_event, task) => undoLongTaskCompletion(task));
 ipcMain.handle("long-tasks:reorder", (_event, updates) => {
   const tasks = readLongTasks();
   for (const update of Array.isArray(updates) ? updates : []) {
@@ -1027,6 +1304,16 @@ ipcMain.handle("window:get-always-on-top", (event) => {
 	});
 
 ipcMain.handle("planner:get-config", () => publicPlannerSettings());
+ipcMain.handle("app:get-preferences", () => readAppPreferences());
+ipcMain.handle("app:save-preferences", (_event, preferences) => saveAppPreferences(preferences));
+ipcMain.handle("app:test-api-config", (_event, input) => testApiConfiguration(input));
+ipcMain.handle("app:open-settings", (_event, section = "general") => {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send("app:open-settings", cleanString(section, "general"));
+  return true;
+});
 
 ipcMain.handle("planner:save-config", (_event, settings) =>
   savePlannerSettings(settings),

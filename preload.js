@@ -10,13 +10,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("planner:save-config", settings),
   deletePlannerApiProfile: (profileId) =>
     ipcRenderer.invoke("planner:delete-api-profile", profileId),
+  getAppPreferences: () => ipcRenderer.invoke("app:get-preferences"),
+  saveAppPreferences: (preferences) => ipcRenderer.invoke("app:save-preferences", preferences),
+  testApiConfig: (payload) => ipcRenderer.invoke("app:test-api-config", payload),
+  openAppSettings: (section) => ipcRenderer.invoke("app:open-settings", section),
   openFreeApiTutorial: () => ipcRenderer.invoke("app:open-free-api-tutorial"),
   chatWithPlanner: (payload) => ipcRenderer.invoke("planner:chat", payload),
   openLongTasks: () => ipcRenderer.invoke("long-tasks:open"),
   listLongTasks: () => ipcRenderer.invoke("long-tasks:list"),
   saveLongTask: (task) => ipcRenderer.invoke("long-tasks:save", task),
+  saveLongTaskImage: (payload) => ipcRenderer.invoke("long-tasks:save-image", payload),
+  discardLongTaskImage: (id) => ipcRenderer.invoke("long-tasks:discard-image", id),
+  importLongTaskImage: (sourcePath) => ipcRenderer.invoke("long-tasks:import-image-path", sourcePath),
+  readLongTaskImage: (id) => ipcRenderer.invoke("long-tasks:read-image", id),
   deleteLongTask: (id) => ipcRenderer.invoke("long-tasks:delete", id),
   completeLongTask: (id) => ipcRenderer.invoke("long-tasks:complete", id),
+  undoLongTaskCompletion: (task) => ipcRenderer.invoke("long-tasks:undo-complete", task),
   setLongTaskDragPayload: (payload) => ipcRenderer.invoke("long-tasks:set-drag-payload", payload),
   getLongTaskDragPayload: () => ipcRenderer.invoke("long-tasks:get-drag-payload"),
   chatWithLongTasks: (payload) => ipcRenderer.invoke("long-tasks:chat", payload),
@@ -70,6 +79,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("focus:open-distraction", listener);
     return () => ipcRenderer.removeListener("focus:open-distraction", listener);
   },
+  onOpenAppSettings: (callback) => {
+    const listener = (_event, section) => callback(section);
+    ipcRenderer.on("app:open-settings", listener);
+    return () => ipcRenderer.removeListener("app:open-settings", listener);
+  },
+  onAppPreferencesChanged: (callback) => {
+    const listener = (_event, preferences) => callback(preferences);
+    ipcRenderer.on("app:preferences-changed", listener);
+    return () => ipcRenderer.removeListener("app:preferences-changed", listener);
+  },
   onMinimizedChanged: (callback) => {
     const listener = (_event, minimized) => callback(minimized);
     ipcRenderer.on("window:minimized-changed", listener);
@@ -94,6 +113,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     const listener = (_event, task) => callback(task);
     ipcRenderer.on("long-tasks:completed", listener);
     return () => ipcRenderer.removeListener("long-tasks:completed", listener);
+  },
+  onLongTaskCompletionUndone: (callback) => {
+    const listener = (_event, task) => callback(task);
+    ipcRenderer.on("long-tasks:completion-undone", listener);
+    return () => ipcRenderer.removeListener("long-tasks:completion-undone", listener);
   },
   onRemindersDue: (callback) => {
     const listener = (_event, tasks) => callback(tasks);

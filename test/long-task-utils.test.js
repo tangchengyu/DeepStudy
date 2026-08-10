@@ -4,17 +4,114 @@ const {
   activeTasksForQuadrant,
   applyPriorityDecision,
   dueTasks,
+  detailReturnView,
   fallbackAiOperationsFromText,
+  imageInsertionLines,
+  indentNoteLines,
+  mergeNoteLineBackward,
+  newTaskDefaultsForView,
   nextReminderAt,
   normalizeAiOperations,
   normalizeTask,
+  parseObsidianImagePath,
+  replaceNoteSelection,
   resolveLongTaskView,
+  splitNoteLineAtOffset,
 } = require("../renderer/long-task-utils");
+
+test("inserts image lines at a caret in the middle of a markdown line", () => {
+  assert.deepEqual(
+    imageInsertionLines("前半后半", 2, ["![a](deepstudy-image://a.png)", "![b](deepstudy-image://b.png)"]),
+    ["前半", "![a](deepstudy-image://a.png)", "![b](deepstudy-image://b.png)", "后半"],
+  );
+});
+
+test("replaces an empty markdown line with image lines", () => {
+  assert.deepEqual(
+    imageInsertionLines("", 0, ["![a](deepstudy-image://a.png)"]),
+    ["![a](deepstudy-image://a.png)"],
+  );
+});
+
+test("places image lines before text at offset zero", () => {
+  assert.deepEqual(
+    imageInsertionLines("正文", 0, ["![a](deepstudy-image://a.png)"]),
+    ["![a](deepstudy-image://a.png)", "正文"],
+  );
+});
+
+test("places image lines after text at the line end", () => {
+  assert.deepEqual(
+    imageInsertionLines("正文", 2, ["![a](deepstudy-image://a.png)"]),
+    ["正文", "![a](deepstudy-image://a.png)"],
+  );
+});
+
+test("clamps image insertion offsets to the markdown line bounds", () => {
+  const image = ["![a](deepstudy-image://a.png)"];
+  assert.deepEqual(imageInsertionLines("正文", -1, image), ["![a](deepstudy-image://a.png)", "正文"]);
+  assert.deepEqual(imageInsertionLines("正文", 99, image), ["正文", "![a](deepstudy-image://a.png)"]);
+});
+
+test("splits a note line exactly at the caret offset", () => {
+  assert.deepEqual(splitNoteLineAtOffset("123456789", 6), ["123456", "789"]);
+  assert.deepEqual(splitNoteLineAtOffset("", 0), ["", ""]);
+});
+
+test("replaces a partial multi-line note selection", () => {
+  assert.deepEqual(
+    replaceNoteSelection(["abcde", "fghij", "klmno"], {
+      startLine: 0,
+      startOffset: 2,
+      endLine: 2,
+      endOffset: 3,
+    }, "X"),
+    { lines: ["abXno"], caret: { line: 0, offset: 3 } },
+  );
+});
+
+test("deletes a partial multi-line note selection", () => {
+  assert.deepEqual(
+    replaceNoteSelection(["123456", "middle", "789"], {
+      startLine: 0,
+      startOffset: 6,
+      endLine: 2,
+      endOffset: 0,
+    }, ""),
+    { lines: ["123456789"], caret: { line: 0, offset: 6 } },
+  );
+});
+
+test("indents and outdents the whole selected note block", () => {
+  const indented = indentNoteLines(["# 标题", "- 条目", "![图](deepstudy-image://a.png)"], 0, 2, 1);
+  assert.deepEqual(indented, ["  # 标题", "  - 条目", "  ![图](deepstudy-image://a.png)"]);
+  assert.deepEqual(indentNoteLines(indented, 0, 2, -1), ["# 标题", "- 条目", "![图](deepstudy-image://a.png)"]);
+});
+
+test("merges a note line backward at the start of the line", () => {
+  const previous = "这个不一定要做成软件，可以做成 Web APP 的形式，便于";
+  assert.deepEqual(
+    mergeNoteLineBackward([previous, "个人推广。"], 1),
+    { lines: [`${previous}个人推广。`], caret: { line: 0, offset: previous.length } },
+  );
+});
+
+test("backspace on an empty note line removes it and keeps the caret in the previous block", () => {
+  assert.deepEqual(
+    mergeNoteLineBackward(["第一行", "", ""], 2),
+    { lines: ["第一行", ""], caret: { line: 1, offset: 0 } },
+  );
+});
 
 test("normalizes a long task and its reminder", () => {
   const task = normalizeTask({ title: "  写论文  ", quadrant: "important-urgent", reminder: { kind: "weekly", time: "18:30", weekdays: [1, 3, 3] } }, 10);
   assert.equal(task.title, "写论文");
   assert.deepEqual(task.reminder.weekdays, [1, 3]);
+});
+
+test("preserves note leading and trailing blank lines", () => {
+  const task = normalizeTask({ title: "笔记", notes: "\n第一行\n\n" }, 10);
+  assert.equal(task.notes, "\n第一行\n\n");
 });
 
 test("preserves planned long tasks without treating them as completed", () => {
@@ -41,6 +138,24 @@ test("parses confirmed AI operations and rejects unknown ids", () => {
   const existing = [normalizeTask({ id: "a", title: "任务 A" }, 1)];
   assert.equal(normalizeAiOperations('{"operations":[{"action":"update","id":"a","task":{"title":"任务 A+","quadrant":"important-urgent"}}]}', existing)[0].task.title, "任务 A+");
   assert.throws(() => normalizeAiOperations('{"operations":[{"action":"delete","id":"missing"}]}', existing));
+});
+
+test("extracts an Obsidian Windows absolute image path", () => {
+  assert.equal(typeof parseObsidianImagePath, "function");
+  assert.equal(
+    parseObsidianImagePath("![[C:\\Users\\DELL\\Desktop\\论文阅读步骤.png]]"),
+    "C:\\Users\\DELL\\Desktop\\论文阅读步骤.png",
+  );
+  assert.equal(parseObsidianImagePath("![[C:/Users/DELL/Desktop/论文阅读步骤.png]]"), "C:/Users/DELL/Desktop/论文阅读步骤.png");
+  assert.equal(parseObsidianImagePath("![[relative.png]]"), null);
+  assert.equal(parseObsidianImagePath("![[C:\\Users\\DELL\\Desktop\\notes.txt]]"), null);
+});
+
+test("parses long-task JSON even when the model adds trailing prose", () => {
+  const operations = normalizeAiOperations('{"operations":[{"action":"create","task":{"title":"经营自己的自媒体","notes":"中文备注","quadrant":"important-not-urgent","reminder":{"kind":"none"}}}]}\\n请确认。', []);
+  assert.equal(operations[0].action, "create");
+  assert.equal(operations[0].task.title, "经营自己的自媒体");
+  assert.equal(operations[0].task.notes, "中文备注");
 });
 
 test("demotes the selected priority when adding a worthy task", () => {
@@ -85,6 +200,7 @@ test("keeps detail on the latest active task and falls back when it disappears",
     mode: "detail",
     quadrant: "urgent-not-important",
     taskId: "a",
+    returnMode: "quadrant",
     task: active,
   });
   assert.deepEqual(resolveLongTaskView({ mode: "detail", quadrant: "important-urgent", taskId: "missing" }, []), {
@@ -93,4 +209,33 @@ test("keeps detail on the latest active task and falls back when it disappears",
     taskId: null,
     task: null,
   });
+});
+
+test("returns board detail views to the board when the task is unavailable", () => {
+  assert.deepEqual(detailReturnView({ mode: "detail", quadrant: "urgent-not-important", returnMode: "board" }), {
+    mode: "board",
+    quadrant: null,
+    taskId: null,
+  });
+  assert.deepEqual(resolveLongTaskView({ mode: "detail", quadrant: "urgent-not-important", taskId: "missing", returnMode: "board" }, []), {
+    mode: "board",
+    quadrant: null,
+    taskId: null,
+    task: null,
+  });
+});
+
+test("returns quadrant detail views to their source quadrant", () => {
+  assert.deepEqual(detailReturnView({ mode: "detail", quadrant: "urgent-not-important", returnMode: "quadrant" }), {
+    mode: "quadrant",
+    quadrant: "urgent-not-important",
+    taskId: null,
+  });
+});
+
+test("preselects the active quadrant only when creating from its list", () => {
+  assert.deepEqual(newTaskDefaultsForView({ mode: "quadrant", quadrant: "urgent-not-important" }), {
+    quadrant: "urgent-not-important",
+  });
+  assert.deepEqual(newTaskDefaultsForView({ mode: "board", quadrant: null }), {});
 });
