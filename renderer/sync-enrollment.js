@@ -9,7 +9,7 @@
     return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
   }
 
-  function createEnrollmentController({ api, legacySync, storage, deviceName, platform = "desktop", beforeApply = async () => {} }) {
+  function createEnrollmentController({ api, legacySync, storage, deviceName, platform = "desktop", beforeApply = async () => {}, onImportProgress = () => {} }) {
     let pending = null;
 
     async function collect() {
@@ -71,6 +71,7 @@
         }
         const nextCursor = Math.max(cursor, Number(result.cursor) || cursor);
         if (!result.hasMore) return { records: [...byIdentity.values()], cursor: nextCursor, status, binding };
+        onImportProgress({ phase: "pull", nextIndex: byIdentity.size, cursor: nextCursor });
         if (nextCursor === cursor) throw new Error("同步服务返回了无进展的拉取游标。");
         cursor = nextCursor;
       }
@@ -199,6 +200,13 @@
             throw new Error("首次导入没有取得进展，已停止以保护本地数据。");
           }
           importResult = next;
+          onImportProgress({
+            phase: "commit",
+            importId: importResult.importId,
+            status: importResult.status,
+            nextIndex: Number(importResult.nextIndex) || 0,
+            totalItems: Number(importResult.totalItems) || 0,
+          });
           pending.preview = { ...pending.preview, ...next };
           if (typeof api.syncSaveImportProgress === "function") {
             await api.syncSaveImportProgress({ ...pending.preview, snapshot: { records: pending.snapshot.records } });
@@ -208,12 +216,14 @@
 
         const pulled = await pullAll();
         const cloudRecords = pulled.records;
+        onImportProgress({ phase: "pull", nextIndex: cloudRecords.length, cursor: pulled.cursor });
         const finalSnapshot = await collect();
         if (canonicalJson(finalSnapshot.records) !== canonicalJson(pending.snapshot.records)) {
           throw new Error("云端提交后本地旧数据又发生变化；云端数据已安全保存，但尚未覆盖本地，请重新拉取。");
         }
         verifyCloudReadback(pending.snapshot, pending.preview, cloudRecords);
         const apply = await applyCloudRecords(cloudRecords);
+        onImportProgress({ phase: "apply", nextIndex: Number(apply?.appliedRecords) || 0, backupId: apply?.backupId });
         try {
           if (typeof api.syncFinishEnrollment === "function") await api.syncFinishEnrollment({
             records: cloudRecords,
@@ -226,6 +236,12 @@
           throw error;
         }
         if (typeof api.syncSaveImportProgress === "function") await api.syncSaveImportProgress(null);
+        onImportProgress({
+          phase: "finish",
+          importId: importResult.importId,
+          nextIndex: Number(importResult.nextIndex) || 0,
+          totalItems: Number(importResult.totalItems) || 0,
+        });
         pending = null;
         return { import: importResult, apply, cloudRecords };
       },

@@ -512,7 +512,7 @@ describe("gateway", () => {
         entityId: "local-only",
         payload: { title: "Local only", notes: "preserve me", custom: { nested: true } }
       },
-      ...Array.from({ length: 6 }, (_, index) => ({
+      ...Array.from({ length: 23 }, (_, index) => ({
         ...cloudRecord,
         entityId: `local-only-${index + 2}`,
         payload: { title: `Local ${index + 2}`, notes: `legacy note ${index + 2}` }
@@ -531,8 +531,8 @@ describe("gateway", () => {
       totalItems: number;
       counts: { conflicts: number; additions: number };
     }>();
-    expect(preview.counts).toMatchObject({ conflicts: 1, additions: 7 });
-    expect(preview.totalItems).toBe(8);
+    expect(preview.counts).toMatchObject({ conflicts: 1, additions: 24 });
+    expect(preview.totalItems).toBe(25);
 
     const firstCommit = await jsonRequest("/v1/imports/commit", {
       importId: preview.importId,
@@ -541,7 +541,7 @@ describe("gateway", () => {
     expect(firstCommit.status).toBe(200);
     preview = await firstCommit.json<typeof preview>();
     expect(preview.status).toBe("applying");
-    expect(preview.nextIndex).toBe(6);
+    expect(preview.nextIndex).toBe(20);
 
     const staleCommit = await jsonRequest("/v1/imports/commit", {
       importId: preview.importId,
@@ -576,9 +576,9 @@ describe("gateway", () => {
     expect(changedPreview.status).toBe(409);
     expect(await changedPreview.json()).toMatchObject({ error: "DEVICE_ALREADY_ENROLLED" });
 
-    const pull = await SELF.fetch("https://gateway.test/v1/sync/pull?cursor=0&limit=20", { headers });
+    const pull = await SELF.fetch("https://gateway.test/v1/sync/pull?cursor=0&limit=100", { headers });
     const records = (await pull.json<{ records: Array<Record<string, unknown>> }>()).records;
-    expect(records).toHaveLength(9);
+    expect(records).toHaveLength(26);
     const fork = records.find((record) => record.legacySourceId === "shared-id") as {
       payload: Record<string, unknown>;
     };
@@ -597,12 +597,12 @@ describe("gateway", () => {
     expect(await secondPreviewResponse.json()).toMatchObject({
       status: "committed",
       totalItems: 0,
-      counts: { conflicts: 0, duplicates: 8, merged: 9 }
+      counts: { conflicts: 0, duplicates: 25, merged: 26 }
     });
-    const secondPull = await SELF.fetch("https://gateway.test/v1/sync/pull?cursor=0&limit=20", {
+    const secondPull = await SELF.fetch("https://gateway.test/v1/sync/pull?cursor=0&limit=100", {
       headers: secondHeaders
     });
-    expect((await secondPull.json<{ records: unknown[] }>()).records).toHaveLength(9);
+    expect((await secondPull.json<{ records: unknown[] }>()).records).toHaveLength(26);
   });
 
   it("requires a new preview when cloud data races an import commit", async () => {

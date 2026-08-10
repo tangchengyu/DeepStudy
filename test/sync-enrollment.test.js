@@ -305,6 +305,45 @@ test("lost import-chunk acknowledgement adopts a matching durable server cursor"
   assert.equal(saved.some((entry) => entry?.nextIndex === 1), true);
 });
 
+test("first import reports durable progress after each committed chunk", async () => {
+  const local = record("progress-1");
+  const progress = [];
+  const controller = createEnrollmentController({
+    api: {
+      syncStatus: async () => ({ deviceId: "desktop-progress" }),
+      syncPreviewImport: async () => ({
+        importId: "import-progress",
+        snapshotHash: "hash-progress",
+        status: "previewed",
+        nextIndex: 0,
+        totalItems: 12,
+        counts: {},
+        conflicts: [],
+      }),
+      syncSaveImportProgress: async () => {},
+      syncCommitImport: async (input) => input.expectedIndex === 0
+        ? { importId: "import-progress", snapshotHash: "hash-progress", status: "applying", nextIndex: 6, totalItems: 12 }
+        : { importId: "import-progress", snapshotHash: "hash-progress", status: "committed", nextIndex: 12, totalItems: 12 },
+      syncPull: async () => ({ records: [{ ...local, revision: 1, serverUpdatedAt: 2 }], cursor: 1, hasMore: false }),
+    },
+    legacySync: {
+      collectConsistentSnapshot: async () => ({ records: [local] }),
+      applyPulledSnapshot: async () => ({ backupId: "progress-backup", appliedRecords: 1 }),
+    },
+    storage: {},
+    onImportProgress: (event) => progress.push(event),
+  });
+  await controller.previewFirstImport();
+  await controller.commitFirstImport();
+  assert.deepEqual(progress.map((event) => [event.phase, event.nextIndex, event.totalItems]), [
+    ["commit", 6, 12],
+    ["commit", 12, 12],
+    ["pull", 1, undefined],
+    ["apply", 1, undefined],
+    ["finish", 12, 12],
+  ]);
+});
+
 test("manual pull does not advance the cursor before apply and rolls local data back if commit fails", async () => {
   const legacy = require("../renderer/legacy-sync");
   const originalStores = Object.fromEntries(Object.values(legacy.LEGACY_STORAGE_KEYS)

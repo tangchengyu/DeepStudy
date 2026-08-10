@@ -8,7 +8,7 @@ import { applyMutation } from "./sync";
 const MAX_IMPORT_RECORDS = 5_000;
 const MAX_IMPORT_BYTES = 900_000;
 const MAX_IMPORT_REQUEST_BYTES = 920_000;
-const COMMIT_CHUNK_SIZE = 6;
+const COMMIT_CHUNK_SIZE = 20;
 const MAX_REPORT_ITEMS = 200;
 const MAX_IMPORT_PLAN_BYTES = 1_800_000;
 

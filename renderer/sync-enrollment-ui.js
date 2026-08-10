@@ -41,6 +41,19 @@
     deviceName: navigator.userAgentData?.platform || navigator.platform || "DeepStudy desktop",
     platform: /Mac/i.test(navigator.platform) ? "macos" : /Win/i.test(navigator.platform) ? "windows" : "desktop",
     beforeApply: async () => window.dispatchEvent(new CustomEvent("deepstudy:before-sync-apply")),
+    onImportProgress: (event) => {
+      if (event?.phase === "commit") {
+        const done = Math.max(0, Number(event.nextIndex) || 0);
+        const total = Math.max(done, Number(event.totalItems) || 0);
+        setStatus(`正在导入旧数据：已提交 ${done}/${total} 条，请保持窗口打开。`);
+      } else if (event?.phase === "pull") {
+        setStatus(`正在核对云端数据：已读取 ${Math.max(0, Number(event.nextIndex) || 0)} 条。`);
+      } else if (event?.phase === "apply") {
+        setStatus(`正在写入本地数据：已应用 ${Math.max(0, Number(event.nextIndex) || 0)} 条。`);
+      } else if (event?.phase === "finish") {
+        setStatus("首次导入已完成，正在刷新同步状态。");
+      }
+    },
   });
   const continuousSync = window.DeepStudyContinuousSync.createContinuousSync({
     api: window.electronAPI,
@@ -243,7 +256,7 @@
 
   async function action(button, work, successText, options = {}) {
     setBusy(button, true);
-    setStatus("处理中…");
+    setStatus(options.processingText || "处理中…");
     try {
       const result = await work();
       setStatus(successText);
@@ -465,7 +478,9 @@
     if (result) renderPreview(result);
   });
   confirmImport.addEventListener("click", async (event) => {
-    const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.commitFirstImport()), "首次导入、云端读回和本地校验均已完成。");
+    const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.commitFirstImport()), "首次导入、云端读回和本地校验均已完成。", {
+      processingText: "正在开始首次导入：会分批提交旧数据，请保持窗口打开。",
+    });
     if (result) {
       confirmImport.disabled = true;
       previewResult.textContent = `已应用 ${result.apply.appliedRecords} 条；本地备份编号：${result.apply.backupId}`;
@@ -474,7 +489,9 @@
     }
   });
   byId("sync-pull").addEventListener("click", async (event) => {
-    const result = await action(event.currentTarget, () => continuousSync.syncOnce(), "云端数据已安全同步、备份并验证写回。");
+    const result = await action(event.currentTarget, () => continuousSync.syncOnce(), "云端数据已安全同步、备份并验证写回。", {
+      processingText: "正在同步：上传本地修改、拉取云端更新并写入本地。",
+    });
     if (result) {
       previewResult.textContent = `同步完成：上传 ${result.mutations || 0} 条，拉取核对 ${result.records?.length || 0} 条。`;
       reloadAfterApply();

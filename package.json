@@ -1,6 +1,6 @@
 {
   "name": "deepstudy",
-  "version": "1.2.33",
+  "version": "1.2.34",
   "description": "Focus management desktop app with planning, recovery, and time auditing",
   "main": "main.js",
   "scripts": {

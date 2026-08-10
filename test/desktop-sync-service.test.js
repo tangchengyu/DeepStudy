@@ -357,6 +357,53 @@ test("gateway config is fetched before auth without exposing bearer credentials"
   assert.equal(requests[0].init.headers["X-Device-Id"], "desktop-config-device");
 });
 
+test("gateway requests time out so manual sync cannot remain pending forever", async () => {
+  const { createDesktopSyncService } = require(MODULE_PATH);
+  let aborted = false;
+  const state = {
+    gatewayUrl: "https://gateway.example",
+    deviceId: "desktop-timeout-device",
+    username: "alice",
+    activeScopeKey: "scope-timeout",
+    authGeneration: 1,
+  };
+  const service = createDesktopSyncService({
+    requestTimeoutMs: 5,
+    fetch: async (_url, init = {}) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => {
+        aborted = true;
+        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      });
+    }),
+    credentialStore: {
+      loadToken: () => "token",
+      saveToken: () => ({ persistence: "memory-only", warning: "" }),
+      clearToken() {},
+      scopeKey: () => "scope-timeout",
+      securityStatus: () => ({ persistence: "memory-only", warning: "" }),
+    },
+    stateStore: {
+      read: () => ({ ...state }),
+      update: (patch) => Object.assign(state, patch),
+      readScope: () => ({
+        scopeKey: "scope-timeout",
+        cursor: 0,
+        enrolled: true,
+        outbox: [],
+        revisions: {},
+        records: {},
+        deferredPullRecords: [],
+      }),
+    },
+  });
+
+  await assert.rejects(
+    service.pull({ cursor: 0, limit: 1 }),
+    (error) => error.code === "NETWORK_TIMEOUT" && /超时/.test(error.message),
+  );
+  assert.equal(aborted, true);
+});
+
 test("gateway client requires an explicit takeover flag and uses the conflict-resolution contract", async () => {
   const { createDesktopSyncService } = require(MODULE_PATH);
   const requests = [];

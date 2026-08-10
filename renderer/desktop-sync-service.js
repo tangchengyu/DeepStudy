@@ -463,6 +463,7 @@ function createDesktopSyncService({
   credentialStore,
   stateStore,
   hashSnapshot,
+  requestTimeoutMs = 60000,
 }) {
   if (typeof fetchImpl !== "function") throw new TypeError("A fetch implementation is required.");
   if (!credentialStore || !stateStore) throw new TypeError("Credential and state stores are required.");
@@ -525,14 +526,23 @@ function createDesktopSyncService({
       headers.Authorization = `Bearer ${capturedToken}`;
     }
     let response;
+    const timeoutMs = Math.max(1000, Number(requestTimeoutMs) || 60000);
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
     try {
       response = await fetchImpl(`${baseUrl}${route}`, {
         method,
         headers,
+        ...(controller ? { signal: controller.signal } : {}),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch (error) {
+      if (controller?.signal.aborted || error?.name === "AbortError") {
+        throw new GatewayRequestError("同步服务请求超时，请检查网络后重试。", { code: "NETWORK_TIMEOUT" });
+      }
       throw new GatewayRequestError(`无法连接同步服务：${error?.message || error}`, { code: "NETWORK_ERROR" });
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
     let payload = null;
     const text = await response.text();
