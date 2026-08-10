@@ -6,6 +6,7 @@ const path = require("node:path");
 const renderer = path.resolve(__dirname, "..", "renderer");
 const html = fs.readFileSync(path.join(renderer, "index.html"), "utf8");
 const script = fs.readFileSync(path.join(renderer, "sync-enrollment-ui.js"), "utf8");
+const css = fs.readFileSync(path.join(renderer, "styles.css"), "utf8");
 const appScript = fs.readFileSync(path.join(renderer, "app.js"), "utf8");
 const timerScript = fs.readFileSync(path.join(renderer, "timer-sync-runtime.js"), "utf8");
 const tutorialScript = fs.readFileSync(path.join(renderer, "tutorial.js"), "utf8");
@@ -49,6 +50,14 @@ test("desktop account panel uses Turnstile config before auth and does not close
   assert.match(script, /resetTurnstileChallenge/);
   assert.doesNotMatch(script, /sync-turnstile-token/);
   assert.doesNotMatch(script, /event\.target === modal[\s\S]*modal\.hidden = true/);
+});
+
+test("desktop Turnstile challenge has enough modal width and cannot be clipped by the host layout", () => {
+  assert.match(css, /\.modal-card\.sync-card\s*\{[\s\S]*width:\s*min\(820px,\s*calc\(100vw - 32px\)\)/);
+  assert.match(css, /\.sync-turnstile-panel\s*\{[\s\S]*grid-template-columns:\s*1fr/s);
+  assert.match(css, /\.sync-turnstile-host\s*\{[\s\S]*justify-content:\s*center/s);
+  assert.doesNotMatch(css, /\.sync-turnstile-host\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.sync-turnstile-host iframe\s*\{[\s\S]*max-width:\s*100%/);
 });
 
 test("tutorial explains account sync safety, first import, conflicts, and backup recovery", () => {
