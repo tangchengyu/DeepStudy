@@ -63,6 +63,8 @@ test("the API test path uses a dedicated Gemini-aware request", () => {
   assert.match(mainJs, /function testApiConfiguration\(input = \{\}\)/);
   assert.match(mainJs, /buildApiTestMessages/);
   assert.match(mainJs, /buildChatCompletionBody/);
+  assert.match(mainJs, /function testApiConfiguration\(input = \{\}\)[\s\S]*max_tokens:\s*128/s);
+  assert.doesNotMatch(mainJs, /function testApiConfiguration\(input = \{\}\)[\s\S]*max_tokens:\s*16/s);
   assert.match(mainJs, /reasoning_effort/);
   assert.match(mainJs, /gemini-3\.5-flash/);
 });

@@ -297,6 +297,56 @@
     return retained;
   }
 
+  function completedTaskTexts(tasks) {
+    const knownTexts = new Set();
+    const ordered = [];
+    (Array.isArray(tasks) ? tasks : [])
+      .filter((task) => task.done && task.id && task.text)
+      .sort(
+        (left, right) =>
+          Number(left.completedAt || left.createdAt || 0) -
+          Number(right.completedAt || right.createdAt || 0),
+      )
+      .forEach((task) => {
+        const clean = String(task.text || "").trim();
+        if (!clean || knownTexts.has(clean)) return;
+        knownTexts.add(clean);
+        ordered.push(clean);
+      });
+    return ordered;
+  }
+
+  function syncCompletedTasksIntoReflection(
+    entries,
+    tasks,
+    date,
+    now = Date.now(),
+    idFactory = () => `${now}-${Math.random().toString(36).slice(2, 8)}`,
+  ) {
+    const result = (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry.date !== date || !entry.kind?.startsWith("completed-task"))
+      .map((entry) => ({ ...entry }));
+    const manual = result.find((entry) => entry.date === date && !entry.kind?.startsWith("completed-task"));
+    const completed = completedTaskTexts(tasks);
+    const content = mergeCompletedTasksIntoReflection(manual?.content || "", completed);
+    if (!content) return manual ? result.filter((entry) => entry !== manual) : result;
+    if (manual) {
+      const previousContent = manual.content;
+      manual.content = content;
+      manual.kind = manual.kind || "manual";
+      manual.updatedAt = content === previousContent ? Number(manual.updatedAt || now) : now;
+      return result;
+    }
+    result.push({
+      id: idFactory(),
+      date,
+      content,
+      kind: "manual",
+      updatedAt: now,
+    });
+    return result;
+  }
+
   function upsertApiProfile(profiles, input, idFactory) {
     const result = (Array.isArray(profiles) ? profiles : []).map((profile) => ({
       ...profile,
@@ -461,6 +511,7 @@
     parsePlanItems,
     sanitizeChatHistory,
     syncCompletedTaskEntries,
+    syncCompletedTasksIntoReflection,
     upsertApiProfile,
   };
 });

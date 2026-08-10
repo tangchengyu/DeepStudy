@@ -954,7 +954,7 @@ async function testApiConfiguration(input = {}) {
       method: "POST",
       headers: modelHeaders(settings),
       body: JSON.stringify(buildChatCompletionBody(buildApiTestMessages(input), settings, {
-        max_tokens: 16,
+        max_tokens: 128,
         temperature: 0,
       })),
       signal: controller.signal,

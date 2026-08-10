@@ -15,6 +15,7 @@ let suppressTaskOpenUntil = 0;
 let undoTimer = null;
 let pendingUndoTask = null;
 let detailSaveTimer = null;
+let noteUndoStack = [];
 const localImageUrls = new Map();
 
 const undoButton = document.createElement("button");
@@ -133,22 +134,25 @@ function markdownLineToHTML(value) {
     return `<figure class="markdown-image"><img src="${escapeHTML(image[2])}" alt="${alt}" /></figure>`;
   }
   const leading = raw.match(/^[\t ]+/)?.[0] || "";
-  const leadingHTML = leading.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;").replace(/ /g, "&nbsp;");
   const body = raw.slice(leading.length);
   const heading = body.match(/^(#{1,3})\s+(.+)$/);
-  if (heading) return `<h${heading[1].length}>${leadingHTML}${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
+  if (heading) return `<h${heading[1].length}>${renderInlineMarkdown(heading[2])}</h${heading[1].length}>`;
   const listItem = body.match(/^[-*]\s+(.+)$/);
-  if (listItem) return `<ul><li>${leadingHTML}${renderInlineMarkdown(listItem[1])}</li></ul>`;
+  if (listItem) return `<ul><li>${renderInlineMarkdown(listItem[1])}</li></ul>`;
   const orderedItem = body.match(/^(\d+)[.)]\s+(.+)$/);
-  if (orderedItem) return `<ol start="${Number(orderedItem[1])}"><li>${leadingHTML}${renderInlineMarkdown(orderedItem[2])}</li></ol>`;
-  return `<p>${leadingHTML}${renderInlineMarkdown(body.trim())}</p>`;
+  if (orderedItem) return `<ol start="${Number(orderedItem[1])}"><li>${renderInlineMarkdown(orderedItem[2])}</li></ol>`;
+  return `<p>${renderInlineMarkdown(body) || "<br>"}</p>`;
+}
+function noteLineIndentColumns(raw) {
+  return (String(raw || "").match(/^[\t ]+/)?.[0] || "").split("").reduce((total, char) => total + (char === "\t" ? 2 : 1), 0);
 }
 function renderMarkdownLine(line) {
   const raw = line.dataset.raw || "";
   line.contentEditable = "false";
   line.classList.remove("editing");
+  line.style.setProperty("--note-line-indent", `${Math.floor(noteLineIndentColumns(raw) / 2) * 1.6}rem`);
   line.innerHTML = markdownLineToHTML(raw);
-  line.style.whiteSpace = /^\s/.test(raw) ? "pre-wrap" : "";
+  line.style.whiteSpace = "";
   hydrateMarkdownImages(line);
   importObsidianImageLine(line);
 }
@@ -158,7 +162,9 @@ const markdownSelectionState = {
   dragging: false,
   anchorLine: null,
   anchorIndex: -1,
+  anchorOffset: 0,
   focusIndex: -1,
+  focusOffset: 0,
   startX: 0,
   startY: 0,
 };
@@ -177,14 +183,81 @@ function clearMarkdownLineSelection() {
   markdownSelectionState.dragging = false;
   markdownSelectionState.anchorLine = null;
   markdownSelectionState.anchorIndex = -1;
+  markdownSelectionState.anchorOffset = 0;
   markdownSelectionState.focusIndex = -1;
+  markdownSelectionState.focusOffset = 0;
 }
 
 function selectedMarkdownLines() {
   return markdownLineElements().filter((line) => line.classList.contains("selected"));
 }
 
-function selectMarkdownLineRange(startIndex, endIndex) {
+function markdownTextSelectionRange() {
+  if (markdownSelectionState.anchorIndex < 0 || markdownSelectionState.focusIndex < 0) return null;
+  const start = {
+    line: markdownSelectionState.anchorIndex,
+    offset: markdownSelectionState.anchorOffset,
+  };
+  const end = {
+    line: markdownSelectionState.focusIndex,
+    offset: markdownSelectionState.focusOffset,
+  };
+  if (start.line > end.line || (start.line === end.line && start.offset > end.offset)) {
+    return { startLine: end.line, startOffset: end.offset, endLine: start.line, endOffset: start.offset };
+  }
+  return { startLine: start.line, startOffset: start.offset, endLine: end.line, endOffset: end.offset };
+}
+
+function markdownSelectedLineRange() {
+  const textRange = markdownTextSelectionRange();
+  if (textRange) return { start: textRange.startLine, end: textRange.endLine };
+  const selected = selectedMarkdownLines();
+  if (!selected.length) return null;
+  const indices = selected.map(markdownLineIndex).filter((index) => index >= 0);
+  if (!indices.length) return null;
+  return { start: Math.min(...indices), end: Math.max(...indices) };
+}
+
+function finishAllMarkdownLineEdits() {
+  $$(".markdown-line.editing").forEach(finishMarkdownLineEdit);
+}
+
+function pushNoteUndoSnapshot() {
+  const snapshot = notesEditorValue();
+  if (noteUndoStack[noteUndoStack.length - 1] === snapshot) return;
+  noteUndoStack.push(snapshot);
+  if (noteUndoStack.length > 80) noteUndoStack.shift();
+}
+
+function restoreNoteSnapshot() {
+  const snapshot = noteUndoStack.pop();
+  if (snapshot === undefined) return false;
+  renderNotesEditor(snapshot, false);
+  saveDetailEdits();
+  return true;
+}
+
+function setNoteLines(lines, caret) {
+  const editor = $("#task-detail-notes");
+  clearMarkdownLineSelection();
+  editor.replaceChildren(...(Array.isArray(lines) && lines.length ? lines : [""]).map(createMarkdownLine));
+  hydrateMarkdownImages(editor);
+  const target = markdownLineElements()[Math.max(0, Math.min(markdownLineElements().length - 1, Number(caret?.line) || 0))];
+  if (target) startMarkdownLineEdit(target, Number(caret?.offset) || 0);
+}
+
+function replaceMarkdownSelectionWithText(text) {
+  const range = markdownTextSelectionRange();
+  if (!range) return false;
+  finishAllMarkdownLineEdits();
+  pushNoteUndoSnapshot();
+  const result = LongTaskUtils.replaceNoteSelection(markdownLineElements().map((line) => line.dataset.raw || ""), range, text);
+  setNoteLines(result.lines, result.caret);
+  saveDetailEdits();
+  return true;
+}
+
+function selectMarkdownLineRange(startIndex, endIndex, focusOffset = 0) {
   const lines = markdownLineElements();
   const start = Math.min(startIndex, endIndex);
   const end = Math.max(startIndex, endIndex);
@@ -193,6 +266,7 @@ function selectMarkdownLineRange(startIndex, endIndex) {
   });
   markdownSelectionState.anchorIndex = startIndex;
   markdownSelectionState.focusIndex = endIndex;
+  markdownSelectionState.focusOffset = focusOffset;
 }
 
 function caretOffsetFromPoint(line, x, y) {
@@ -218,12 +292,33 @@ function caretOffsetFromPoint(line, x, y) {
   return line.textContent.length;
 }
 
+function displayOffsetToRawOffset(raw, displayOffset) {
+  const source = String(raw || "");
+  const offset = Math.max(0, Number(displayOffset) || 0);
+  const leading = source.match(/^[\t ]+/)?.[0] || "";
+  const body = source.slice(leading.length);
+  const heading = body.match(/^(#{1,3})\s+/);
+  if (heading) return Math.min(source.length, leading.length + heading[0].length + offset);
+  const unordered = body.match(/^[-*]\s+/);
+  if (unordered) return Math.min(source.length, leading.length + unordered[0].length + offset);
+  const ordered = body.match(/^\d+[.)]\s+/);
+  if (ordered) return Math.min(source.length, leading.length + ordered[0].length + offset);
+  return Math.min(source.length, leading.length + offset);
+}
+
+function rawCaretOffsetFromPoint(line, x, y) {
+  if (line.classList.contains("editing")) return caretOffset(line);
+  return displayOffsetToRawOffset(line.dataset.raw || "", caretOffsetFromPoint(line, x, y));
+}
+
 function beginMarkdownLineSelection(line, event) {
   markdownSelectionState.pointerDown = true;
   markdownSelectionState.dragging = false;
   markdownSelectionState.anchorLine = line;
   markdownSelectionState.anchorIndex = markdownLineIndex(line);
+  markdownSelectionState.anchorOffset = rawCaretOffsetFromPoint(line, event.clientX, event.clientY);
   markdownSelectionState.focusIndex = markdownSelectionState.anchorIndex;
+  markdownSelectionState.focusOffset = markdownSelectionState.anchorOffset;
   markdownSelectionState.startX = event.clientX;
   markdownSelectionState.startY = event.clientY;
 }
@@ -233,12 +328,13 @@ function updateMarkdownLineSelection(x, y) {
   const target = noteLineAtPoint(x, y);
   if (!target) return;
   const targetIndex = markdownLineIndex(target);
+  const targetOffset = rawCaretOffsetFromPoint(target, x, y);
   const moved = Math.abs(x - markdownSelectionState.startX) > 4
     || Math.abs(y - markdownSelectionState.startY) > 4
     || targetIndex !== markdownSelectionState.anchorIndex;
   if (!moved) return;
   markdownSelectionState.dragging = true;
-  selectMarkdownLineRange(markdownSelectionState.anchorIndex, targetIndex);
+  selectMarkdownLineRange(markdownSelectionState.anchorIndex, targetIndex, targetOffset);
 }
 
 function endMarkdownLineSelection(event) {
@@ -249,14 +345,15 @@ function endMarkdownLineSelection(event) {
   markdownSelectionState.anchorLine = null;
   if (dragging) {
     const selected = selectedMarkdownLines();
+    const range = markdownTextSelectionRange();
     markdownSelectionState.dragging = false;
-    if (selected.length > 1) selected[0]?.focus();
+    if (selected.length && range && (range.startLine !== range.endLine || range.startOffset !== range.endOffset)) selected[0]?.focus();
     else clearMarkdownLineSelection();
     return;
   }
   clearMarkdownLineSelection();
   if (!anchorLine || anchorLine.classList.contains("editing")) return;
-  startMarkdownLineEdit(anchorLine, caretOffsetFromPoint(anchorLine, event.clientX, event.clientY));
+  startMarkdownLineEdit(anchorLine, rawCaretOffsetFromPoint(anchorLine, event.clientX, event.clientY));
 }
 
 function importObsidianImage(sourcePath) {
@@ -331,7 +428,7 @@ function createMarkdownLine(raw = "") {
   });
   line.addEventListener("click", (event) => {
     if (line.classList.contains("editing") || markdownSelectionState.dragging || selectedMarkdownLines().length > 1) return;
-    startMarkdownLineEdit(line, caretOffsetFromPoint(line, event.clientX, event.clientY));
+    startMarkdownLineEdit(line, rawCaretOffsetFromPoint(line, event.clientX, event.clientY));
   });
   line.addEventListener("dblclick", (event) => {
     event.preventDefault();
@@ -339,11 +436,13 @@ function createMarkdownLine(raw = "") {
   });
   line.addEventListener("keydown", (event) => {
     if (line.classList.contains("editing")) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "Tab" && selectedMarkdownLines().length > 0) {
       event.preventDefault();
       indentSelectedMarkdownLines(event.shiftKey ? -1 : 1);
       return;
     }
+    if (markdownTextSelectionRange()) return;
     if (event.key.length === 1 || event.key === "Backspace" || event.key === "Delete") {
       startMarkdownLineEdit(line);
     }
@@ -395,6 +494,7 @@ function startMarkdownLineEdit(line, pendingCaret) {
   line.classList.add("editing");
   line.contentEditable = "true";
   line.spellcheck = false;
+  line.style.setProperty("--note-line-indent", "0rem");
   line.textContent = line.dataset.raw || "";
   line.focus();
   requestAnimationFrame(() => placeCaretAt(line, Number.isFinite(Number(pendingCaret)) ? Number(pendingCaret) : line.textContent.length));
@@ -430,17 +530,26 @@ function indentMarkdownLine(line, direction) {
 }
 
 function indentSelectedMarkdownLines(direction) {
-  const selected = selectedMarkdownLines();
-  if (!selected.length) return false;
-  selected.forEach((line) => indentMarkdownLine(line, direction));
+  const range = markdownSelectedLineRange();
+  if (!range) return false;
+  finishAllMarkdownLineEdits();
+  pushNoteUndoSnapshot();
+  const lines = LongTaskUtils.indentNoteLines(
+    markdownLineElements().map((line) => line.dataset.raw || ""),
+    range.start,
+    range.end,
+    direction,
+  );
+  setNoteLines(lines, { line: range.start, offset: 0 });
   saveDetailEdits();
   return true;
 }
 
-function renderNotesEditor(notes) {
+function renderNotesEditor(notes, resetUndo = true) {
   const editor = $("#task-detail-notes");
   const lines = String(notes || "").split(/\r?\n/);
   clearMarkdownLineSelection();
+  if (resetUndo) noteUndoStack = [];
   editor.replaceChildren(...(lines.length ? lines : [""]).map(createMarkdownLine));
   hydrateMarkdownImages(editor);
 }
@@ -452,14 +561,13 @@ function notesEditorValue() {
 function splitMarkdownLine(line) {
   const text = line.textContent.replace(/\u00a0/g, " ");
   const offset = caretOffset(line);
-  const before = text.slice(0, offset);
-  const after = text.slice(offset);
+  pushNoteUndoSnapshot();
+  const [before, after] = LongTaskUtils.splitNoteLineAtOffset(text, offset);
   line.dataset.raw = before;
   finishMarkdownLineEdit(line);
   const next = createMarkdownLine(after);
   line.after(next);
-  next.focus();
-  requestAnimationFrame(() => placeCaretAt(next, 0));
+  startMarkdownLineEdit(next, 0);
   saveDetailEdits();
 }
 function insertPlainTextAtCaret(text) {
@@ -920,12 +1028,48 @@ $("#task-detail-notes").addEventListener("input", (event) => {
 });
 $("#task-detail-notes").addEventListener("keydown", (event) => {
   const line = event.target.closest(".markdown-line.editing");
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
+    event.preventDefault();
+    restoreNoteSnapshot();
+    return;
+  }
+  const textRange = markdownTextSelectionRange();
+  if (textRange) {
+    if (event.key === "Tab") {
+      event.preventDefault();
+      indentSelectedMarkdownLines(event.shiftKey ? -1 : 1);
+      return;
+    }
+    if (event.key === "Backspace" || event.key === "Delete") {
+      event.preventDefault();
+      replaceMarkdownSelectionWithText("");
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      replaceMarkdownSelectionWithText("\n");
+      return;
+    }
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      replaceMarkdownSelectionWithText(event.key);
+      return;
+    }
+  }
   if (event.key === "Tab") {
     event.preventDefault();
     if (indentSelectedMarkdownLines(event.shiftKey ? -1 : 1)) return;
     if (line) {
-      insertPlainTextAtCaret("  ");
-      line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
+      const index = markdownLineIndex(line);
+      finishMarkdownLineEdit(line);
+      pushNoteUndoSnapshot();
+      const lines = LongTaskUtils.indentNoteLines(
+        markdownLineElements().map((item) => item.dataset.raw || ""),
+        index,
+        index,
+        event.shiftKey ? -1 : 1,
+      );
+      setNoteLines(lines, { line: index, offset: 0 });
       saveDetailEdits();
     }
     return;
@@ -944,6 +1088,7 @@ $("#task-detail-notes").addEventListener("keydown", (event) => {
   }
   if (event.key === "Backspace" && !line.textContent && $$("#task-detail-notes .markdown-line").length > 1) {
     event.preventDefault();
+    pushNoteUndoSnapshot();
     const previous = line.previousElementSibling || line.nextElementSibling;
     line.remove();
     previous.focus();
@@ -965,8 +1110,14 @@ $("#task-detail-notes").addEventListener("paste", (event) => {
     alert(tr("imageImportFailed"));
     return;
   }
+  if (markdownTextSelectionRange()) {
+    event.preventDefault();
+    replaceMarkdownSelectionWithText(event.clipboardData.getData("text/plain"));
+    return;
+  }
   if (!line) return;
   event.preventDefault();
+  pushNoteUndoSnapshot();
   pasteIntoMarkdownLine(line, event.clipboardData.getData("text/plain"));
 });
 $("#task-detail-notes").addEventListener("dragover", (event) => {

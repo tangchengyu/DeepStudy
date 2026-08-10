@@ -2359,6 +2359,7 @@ const Breathing = (() => {
 const Reflections = (() => {
   let items = readJSON(KEYS.reflections, []);
   let editingId = null;
+  let completedLongReflectionTasks = [];
   const input = $("#reflection-input");
 
   function migrateLegacyAutoBlock() {
@@ -2413,9 +2414,13 @@ const Reflections = (() => {
   }
 
   function syncCompletedTasks(tasks) {
-    const next = PlannerUtils.syncCompletedTaskEntries(
+    const taskSource = [
+      ...(Array.isArray(tasks) ? tasks : []),
+      ...completedLongReflectionTasks,
+    ];
+    const next = PlannerUtils.syncCompletedTasksIntoReflection(
       items,
-      tasks,
+      taskSource,
       todayKey(),
       Date.now(),
       createId,
@@ -2423,26 +2428,31 @@ const Reflections = (() => {
     if (JSON.stringify(next) === JSON.stringify(items)) return;
     items = next;
     writeJSON(KEYS.reflections, items);
+    const today = items.find(
+      (item) => item.date === todayKey() && !item.kind?.startsWith("completed-task"),
+    );
+    if (!editingId) input.value = today?.content || "";
     render();
   }
 
   function syncCompletedLongTask(task) {
     if (!task?.id || !task.title) return;
-    syncCompletedTasks([
-      ...DailyPlan.getTasks(),
-      {
-        id: `long-${task.id}`,
-        text: task.title,
-        done: true,
-        createdAt: Number(task.createdAt) || Number(task.completedAt) || Date.now(),
-        completedAt: Number(task.completedAt) || Date.now(),
-      },
-    ]);
+    const sourceId = `long-${task.id}`;
+    completedLongReflectionTasks = completedLongReflectionTasks.filter((item) => item.id !== sourceId);
+    completedLongReflectionTasks.push({
+      id: sourceId,
+      text: task.title,
+      done: true,
+      createdAt: Number(task.createdAt) || Number(task.completedAt) || Date.now(),
+      completedAt: Number(task.completedAt) || Date.now(),
+    });
+    syncCompletedTasks(DailyPlan.getTasks());
   }
 
   function removeCompletedLongTask(task) {
     if (!task?.id || !task.title) return;
     const sourceId = `long-${task.id}`;
+    completedLongReflectionTasks = completedLongReflectionTasks.filter((item) => item.id !== sourceId);
     const completedLine = `已完成：${task.title}`;
     items = items
       .map((item) => {
@@ -2464,6 +2474,7 @@ const Reflections = (() => {
       })
       .filter(Boolean);
     writeJSON(KEYS.reflections, items);
+    syncCompletedTasks(DailyPlan.getTasks());
     render();
   }
 

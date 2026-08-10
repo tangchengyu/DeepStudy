@@ -7,12 +7,15 @@ const {
   detailReturnView,
   fallbackAiOperationsFromText,
   imageInsertionLines,
+  indentNoteLines,
   newTaskDefaultsForView,
   nextReminderAt,
   normalizeAiOperations,
   normalizeTask,
   parseObsidianImagePath,
+  replaceNoteSelection,
   resolveLongTaskView,
+  splitNoteLineAtOffset,
 } = require("../renderer/long-task-utils");
 
 test("inserts image lines at a caret in the middle of a markdown line", () => {
@@ -47,6 +50,41 @@ test("clamps image insertion offsets to the markdown line bounds", () => {
   const image = ["![a](deepstudy-image://a.png)"];
   assert.deepEqual(imageInsertionLines("正文", -1, image), ["![a](deepstudy-image://a.png)", "正文"]);
   assert.deepEqual(imageInsertionLines("正文", 99, image), ["正文", "![a](deepstudy-image://a.png)"]);
+});
+
+test("splits a note line exactly at the caret offset", () => {
+  assert.deepEqual(splitNoteLineAtOffset("123456789", 6), ["123456", "789"]);
+  assert.deepEqual(splitNoteLineAtOffset("", 0), ["", ""]);
+});
+
+test("replaces a partial multi-line note selection", () => {
+  assert.deepEqual(
+    replaceNoteSelection(["abcde", "fghij", "klmno"], {
+      startLine: 0,
+      startOffset: 2,
+      endLine: 2,
+      endOffset: 3,
+    }, "X"),
+    { lines: ["abXno"], caret: { line: 0, offset: 3 } },
+  );
+});
+
+test("deletes a partial multi-line note selection", () => {
+  assert.deepEqual(
+    replaceNoteSelection(["123456", "middle", "789"], {
+      startLine: 0,
+      startOffset: 6,
+      endLine: 2,
+      endOffset: 0,
+    }, ""),
+    { lines: ["123456789"], caret: { line: 0, offset: 6 } },
+  );
+});
+
+test("indents and outdents the whole selected note block", () => {
+  const indented = indentNoteLines(["# 标题", "- 条目", "![图](deepstudy-image://a.png)"], 0, 2, 1);
+  assert.deepEqual(indented, ["  # 标题", "  - 条目", "  ![图](deepstudy-image://a.png)"]);
+  assert.deepEqual(indentNoteLines(indented, 0, 2, -1), ["# 标题", "- 条目", "![图](deepstudy-image://a.png)"]);
 });
 
 test("normalizes a long task and its reminder", () => {

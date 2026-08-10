@@ -201,8 +201,16 @@ test("supports single-click positioning, drag selection, and Tab indentation for
   assert.match(longTasksJs, /document\.addEventListener\("mousemove"/);
   assert.match(longTasksJs, /document\.addEventListener\("mouseup"/);
   assert.match(longTasksJs, /event\.key === "Tab"/);
+  assert.match(longTasksJs, /event\.key\.toLowerCase\(\) === "z"/);
   assert.match(css, /\.markdown-line\.selected\s*\{/);
-  assert.match(longTasksJs, /line\.style\.whiteSpace = \/\^\\s\/\.test\(raw\) \? "pre-wrap" : "";/);
+  assert.match(longTasksJs, /--note-line-indent/);
+  assert.match(css, /\.markdown-line\s*\{[^}]*var\(--note-line-indent/s);
+});
+
+test("completed long tasks stay in reflection when daily tasks resync", () => {
+  assert.match(appJs, /let completedLongReflectionTasks = \[\]/);
+  assert.match(appJs, /completedLongReflectionTasks = completedLongReflectionTasks\.filter\(\(item\) => item\.id !== sourceId\)/);
+  assert.match(appJs, /const taskSource = \[\s*\.\.\.\(Array\.isArray\(tasks\) \? tasks : \[\]\),\s*\.\.\.completedLongReflectionTasks,\s*\]/s);
 });
 
 test("edits reminders directly from the long-task detail page", () => {

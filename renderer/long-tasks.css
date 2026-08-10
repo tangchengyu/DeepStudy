@@ -98,7 +98,7 @@
 .task-detail-notes-editor { width: 100%; min-height: 260px; padding: 24px 24px 24px 26px; border: 1px solid color-mix(in srgb, var(--detail-color, var(--accent)) 32%, var(--border)); border-left: 4px solid var(--detail-color, var(--accent)); border-radius: var(--radius-sm); background: rgba(255,255,255,.68); color: var(--text); font-size: 16px; line-height: 1.72; font-weight: 500; overflow-wrap: anywhere; cursor: text; }
 .task-detail-notes-editor:focus-within { box-shadow: 0 10px 28px rgba(44,62,56,.08); }
 .task-detail-notes-editor.image-drop-active { border-color: var(--detail-color, var(--accent)); background: color-mix(in srgb, var(--detail-soft, var(--accent-soft)) 42%, rgba(255,255,255,.68)); box-shadow: inset 0 0 0 2px var(--detail-color, var(--accent)); }
-.markdown-line { min-height: 1.72em; padding: 2px 0; border-radius: 7px; outline: none; white-space: normal; }
+.markdown-line { min-height: 1.72em; padding: 2px 0 2px var(--note-line-indent, 0rem); border-radius: 7px; outline: none; white-space: normal; }
 .markdown-line.editing { margin-left: -10px; padding-left: 10px; background: rgba(255,255,255,.82); box-shadow: inset 3px 0 0 var(--detail-color, var(--accent)); color: var(--text); font-family: Consolas, "Liberation Mono", monospace; font-size: 15px; white-space: pre-wrap; }
 .markdown-line.selected { background: color-mix(in srgb, var(--detail-soft, var(--accent-soft)) 68%, rgba(255,255,255,.82)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--detail-color, var(--accent)) 32%, transparent); }
 .markdown-line h1, .markdown-line h2, .markdown-line h3, .markdown-line p { margin: 0; color: var(--text); }

@@ -15,6 +15,7 @@ const {
   parsePlanItems,
   sanitizeChatHistory,
   syncCompletedTaskEntries,
+  syncCompletedTasksIntoReflection,
   upsertApiProfile,
 } = require("../renderer/planner-utils");
 
@@ -248,6 +249,39 @@ test("uses completion timestamps instead of plan order for a new daily summary",
     { id: "b", text: "后创建但先完成", done: true, createdAt: 2, completedAt: 10 },
   ], "2026-06-22", 30, () => "summary");
   assert.equal(result[0].content, "已完成：后创建但先完成\n已完成：先创建但后完成");
+});
+
+test("completed daily tasks write into today's manual reflection note", () => {
+  const result = syncCompletedTasksIntoReflection([
+    {
+      id: "manual-1",
+      date: "2026-06-22",
+      content: "手写反思",
+      kind: "manual",
+      updatedAt: 1,
+    },
+    {
+      id: "summary-1",
+      date: "2026-06-22",
+      content: "已完成：旧任务",
+      kind: "completed-task-summary",
+      updatedAt: 2,
+    },
+  ], [
+    { id: "b", text: "后创建但先完成", done: true, createdAt: 2, completedAt: 10 },
+    { id: "a", text: "先创建但后完成", done: true, createdAt: 1, completedAt: 20 },
+  ], "2026-06-22", 30, () => "manual-2");
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, "manual-1");
+  assert.equal(result[0].kind, "manual");
+  assert.equal(result[0].content, [
+    "手写反思",
+    "",
+    "【今日已完成任务（自动同步）】",
+    "- 后创建但先完成",
+    "- 先创建但后完成",
+    "【自动同步结束】",
+  ].join("\n"));
 });
 
 test("detects similar AI tasks while preserving distinct tasks", () => {
