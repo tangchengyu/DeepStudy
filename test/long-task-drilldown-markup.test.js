@@ -212,6 +212,13 @@ test("Enter splitting commits only the text before the caret to the current note
   assert.match(longTasksJs, /line\.textContent = before;\s*line\.dataset\.raw = before;\s*finishMarkdownLineEdit\(line\);/s);
 });
 
+test("Backspace at the start of a note line merges it into the previous editable block", () => {
+  assert.match(longTasksJs, /function mergeMarkdownLineBackward\(line\)/);
+  assert.match(longTasksJs, /LongTaskUtils\.mergeNoteLineBackward/);
+  assert.match(longTasksJs, /event\.key === "Backspace" && caretOffset\(line\) === 0/);
+  assert.match(longTasksJs, /setNoteLines\(result\.lines, result\.caret\)/);
+});
+
 test("completed long tasks stay in reflection when daily tasks resync", () => {
   assert.match(appJs, /let completedLongReflectionTasks = \[\]/);
   assert.match(appJs, /completedLongReflectionTasks = completedLongReflectionTasks\.filter\(\(item\) => item\.id !== sourceId\)/);

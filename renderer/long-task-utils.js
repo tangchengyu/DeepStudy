@@ -87,6 +87,28 @@
     });
   }
 
+  function mergeNoteLineBackward(lines, lineIndex) {
+    const source = Array.isArray(lines) && lines.length ? lines.map((line) => String(line || "")) : [""];
+    const index = Math.min(Math.max(0, Number(lineIndex) || 0), source.length - 1);
+    if (index <= 0) {
+      return {
+        lines: source,
+        caret: { line: 0, offset: clampOffset(source[0], 0) },
+      };
+    }
+    const previous = source[index - 1];
+    const current = source[index];
+    const next = [
+      ...source.slice(0, index - 1),
+      `${previous}${current}`,
+      ...source.slice(index + 1),
+    ];
+    return {
+      lines: next,
+      caret: { line: index - 1, offset: previous.length },
+    };
+  }
+
   function normalizeReminder(value = {}) {
     const kind = ["once", "daily", "weekly"].includes(value.kind) ? value.kind : "none";
     const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time || "") ? value.time : "09:00";
@@ -101,7 +123,7 @@
     return {
       id: cleanText(value.id, 80) || `lt-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      notes: String(value.notes || "").trim().slice(0, 2_000_000),
+      notes: String(value.notes || "").slice(0, 2_000_000),
       quadrant: QUADRANTS.includes(value.quadrant) ? value.quadrant : "important-not-urgent",
       status: ["completed", "planned"].includes(value.status) ? value.status : "active",
       reminder: normalizeReminder(value.reminder),
@@ -296,5 +318,5 @@
     return { mode: "board", quadrant: null, taskId: null, task: null };
   }
 
-  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, imageInsertionLines, indentNoteLines, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, replaceNoteSelection, resolveLongTaskView, splitNoteLineAtOffset };
+  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, imageInsertionLines, indentNoteLines, mergeNoteLineBackward, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, replaceNoteSelection, resolveLongTaskView, splitNoteLineAtOffset };
 });

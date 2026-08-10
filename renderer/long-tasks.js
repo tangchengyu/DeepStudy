@@ -232,7 +232,8 @@ function pushNoteUndoSnapshot() {
 function restoreNoteSnapshot() {
   const snapshot = noteUndoStack.pop();
   if (snapshot === undefined) return false;
-  renderNotesEditor(snapshot, false);
+  const lines = String(snapshot || "").split(/\r?\n/);
+  setNoteLines(lines, { line: Math.max(0, lines.length - 1), offset: lines.at(-1)?.length || 0 });
   saveDetailEdits();
   return true;
 }
@@ -252,6 +253,19 @@ function replaceMarkdownSelectionWithText(text) {
   finishAllMarkdownLineEdits();
   pushNoteUndoSnapshot();
   const result = LongTaskUtils.replaceNoteSelection(markdownLineElements().map((line) => line.dataset.raw || ""), range, text);
+  setNoteLines(result.lines, result.caret);
+  saveDetailEdits();
+  return true;
+}
+
+function mergeMarkdownLineBackward(line) {
+  const index = markdownLineIndex(line);
+  if (index <= 0) return false;
+  const lines = markdownLineElements().map((item) => (
+    item.classList.contains("editing") ? item.textContent.replace(/\u00a0/g, " ") : item.dataset.raw || ""
+  ));
+  pushNoteUndoSnapshot();
+  const result = LongTaskUtils.mergeNoteLineBackward(lines, index);
   setNoteLines(result.lines, result.caret);
   saveDetailEdits();
   return true;
@@ -1086,15 +1100,11 @@ $("#task-detail-notes").addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
     splitMarkdownLine(line);
+    return;
   }
-  if (event.key === "Backspace" && !line.textContent && $$("#task-detail-notes .markdown-line").length > 1) {
+  if (event.key === "Backspace" && caretOffset(line) === 0 && line.previousElementSibling?.classList.contains("markdown-line")) {
     event.preventDefault();
-    pushNoteUndoSnapshot();
-    const previous = line.previousElementSibling || line.nextElementSibling;
-    line.remove();
-    previous.focus();
-    requestAnimationFrame(() => placeCaretAt(previous, previous.textContent.length));
-    saveDetailEdits();
+    mergeMarkdownLineBackward(line);
   }
 });
 $("#task-detail-notes").addEventListener("paste", (event) => {

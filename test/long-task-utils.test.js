@@ -8,6 +8,7 @@ const {
   fallbackAiOperationsFromText,
   imageInsertionLines,
   indentNoteLines,
+  mergeNoteLineBackward,
   newTaskDefaultsForView,
   nextReminderAt,
   normalizeAiOperations,
@@ -87,10 +88,30 @@ test("indents and outdents the whole selected note block", () => {
   assert.deepEqual(indentNoteLines(indented, 0, 2, -1), ["# 标题", "- 条目", "![图](deepstudy-image://a.png)"]);
 });
 
+test("merges a note line backward at the start of the line", () => {
+  const previous = "这个不一定要做成软件，可以做成 Web APP 的形式，便于";
+  assert.deepEqual(
+    mergeNoteLineBackward([previous, "个人推广。"], 1),
+    { lines: [`${previous}个人推广。`], caret: { line: 0, offset: previous.length } },
+  );
+});
+
+test("backspace on an empty note line removes it and keeps the caret in the previous block", () => {
+  assert.deepEqual(
+    mergeNoteLineBackward(["第一行", "", ""], 2),
+    { lines: ["第一行", ""], caret: { line: 1, offset: 0 } },
+  );
+});
+
 test("normalizes a long task and its reminder", () => {
   const task = normalizeTask({ title: "  写论文  ", quadrant: "important-urgent", reminder: { kind: "weekly", time: "18:30", weekdays: [1, 3, 3] } }, 10);
   assert.equal(task.title, "写论文");
   assert.deepEqual(task.reminder.weekdays, [1, 3]);
+});
+
+test("preserves note leading and trailing blank lines", () => {
+  const task = normalizeTask({ title: "笔记", notes: "\n第一行\n\n" }, 10);
+  assert.equal(task.notes, "\n第一行\n\n");
 });
 
 test("preserves planned long tasks without treating them as completed", () => {
