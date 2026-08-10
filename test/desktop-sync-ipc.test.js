@@ -10,6 +10,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), 
 
 const channels = [
   "sync:config",
+  "sync:turnstile-verify",
   "sync:auth-register",
   "sync:auth-sign-in",
   "sync:auth-recover",
@@ -49,6 +50,15 @@ test("desktop sync exposes only named enrollment and synchronization IPC channel
   }
   assert.doesNotMatch(preload, /get(?:Bearer|Auth)?Token|credentialStore|sync:request|gateway:fetch/i);
   assert.doesNotMatch(preload, /Authorization\s*:/);
+});
+
+test("desktop Turnstile browser verification uses a loopback callback and external browser only", () => {
+  assert.match(main, /createServer\(/);
+  assert.match(main, /127\.0\.0\.1/);
+  assert.match(main, /shell\.openExternal/);
+  assert.match(main, /\/v1\/turnstile\/desktop/);
+  assert.match(main, /sync:turnstile-verify/);
+  assert.doesNotMatch(preload, /sync:request|gateway:fetch/i);
 });
 
 test("packaged desktop includes the shared sync contract used for snapshot hashing", () => {

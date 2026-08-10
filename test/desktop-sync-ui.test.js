@@ -43,21 +43,24 @@ test("sync UI renders server text safely and never clears all legacy LocalStorag
 });
 
 test("desktop account panel uses Turnstile config before auth and does not close from backdrop clicks", () => {
-  assert.match(html, /challenges\.cloudflare\.com/);
   assert.match(script, /syncConfig/);
+  assert.match(script, /syncTurnstileVerify/);
   assert.match(script, /turnstileToken/);
   assert.match(script, /同步服务未配置安全验证/);
-  assert.match(script, /resetTurnstileChallenge/);
+  assert.match(script, /resetTurnstileToken/);
   assert.doesNotMatch(script, /sync-turnstile-token/);
+  assert.doesNotMatch(html, /src="desktop-turnstile\.js"/);
+  assert.doesNotMatch(script, /turnstile\.render/);
   assert.doesNotMatch(script, /event\.target === modal[\s\S]*modal\.hidden = true/);
 });
 
 test("desktop Turnstile challenge has enough modal width and cannot be clipped by the host layout", () => {
+  assert.match(html, /id="sync-turnstile-open"/);
+  assert.match(html, />打开浏览器验证</);
   assert.match(css, /\.modal-card\.sync-card\s*\{[\s\S]*width:\s*min\(820px,\s*calc\(100vw - 32px\)\)/);
   assert.match(css, /\.sync-turnstile-panel\s*\{[\s\S]*grid-template-columns:\s*1fr/s);
   assert.match(css, /\.sync-turnstile-host\s*\{[\s\S]*justify-content:\s*center/s);
   assert.doesNotMatch(css, /\.sync-turnstile-host\s*\{[^}]*overflow:\s*hidden/s);
-  assert.match(css, /\.sync-turnstile-host iframe\s*\{[\s\S]*max-width:\s*100%/);
 });
 
 test("tutorial explains account sync safety, first import, conflicts, and backup recovery", () => {

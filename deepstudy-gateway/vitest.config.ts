@@ -10,6 +10,8 @@ export default defineConfig({
     cloudflareTest(async () => ({
       main: "./src/index.ts",
       miniflare: {
+        compatibilityDate: "2026-07-22",
+        compatibilityFlags: ["nodejs_compat"],
         d1Databases: ["DB"],
         bindings: {
           ENVIRONMENT: "development",

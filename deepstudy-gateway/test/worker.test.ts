@@ -89,6 +89,23 @@ describe("gateway", () => {
     }
   });
 
+  it("serves the desktop browser Turnstile page only for loopback callbacks", async () => {
+    const ok = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=sign-in&state=state-1&callback=http%3A%2F%2F127.0.0.1%3A49152%2Fcallback");
+    expect(ok.status).toBe(200);
+    const html = await ok.text();
+    expect(html).toContain("https://challenges.cloudflare.com/turnstile/v0/api.js");
+    expect(html).toContain(env.TURNSTILE_SITE_KEY);
+    expect(html).toContain("http://127.0.0.1:49152/callback");
+    expect(html).toContain("state-1");
+    expect(html).toContain("sign-in");
+
+    const badCallback = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=sign-in&state=state-1&callback=https%3A%2F%2Fattacker.example%2Fcallback");
+    expect(badCallback.status).toBe(400);
+
+    const badAction = await SELF.fetch("https://gateway.test/v1/turnstile/desktop?action=delete-account&state=state-1&callback=http%3A%2F%2Flocalhost%3A49152%2Fcallback");
+    expect(badAction.status).toBe(400);
+  });
+
   it("keeps raw provider auth endpoints private", async () => {
     const directSignup = await SELF.fetch("https://gateway.test/api/auth/sign-up/email", {
       method: "POST",

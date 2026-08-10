@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu, Notification, nativeImage, powerMonitor, shell, net } = require("electron");
 const fs = require("fs");
+const http = require("http");
 const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
@@ -128,6 +129,8 @@ const PORTABLE_ICON_PATH = process.env.PORTABLE_EXECUTABLE_FILE
   : "";
 const DIST_ICON_PATH = path.join(__dirname, "dist", "deepstudy.ico");
 const APP_ICON_PATH = path.join(__dirname, "build", "deepstudy.ico");
+const TURNSTILE_VERIFY_TIMEOUT_MS = 120000;
+const TURNSTILE_ACTIONS = new Set(["sign-in", "register", "recover", "regenerate-recovery"]);
 
 let mainWindow;
 let longTasksWindow;
@@ -277,6 +280,97 @@ function createTray() {
 
 function cleanString(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
+}
+
+function normalizeExternalGatewayUrl(value) {
+  const raw = cleanString(value);
+  if (!raw) throw new Error("请输入同步服务地址。");
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("同步服务地址格式无效。");
+  }
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
+    throw new Error("同步服务地址必须使用 HTTPS。");
+  }
+  url.pathname = url.pathname.replace(/\/+$/, "");
+  url.search = "";
+  url.hash = "";
+  return url;
+}
+
+function turnstileCallbackPage(message) {
+  return `<!doctype html><meta charset="utf-8"><title>DeepStudy 安全验证</title><body style="font-family:system-ui,sans-serif;padding:32px;line-height:1.7"><h1>DeepStudy 安全验证</h1><p>${message}</p><p>现在可以关闭这个浏览器窗口，回到 DeepStudy。</p></body>`;
+}
+
+function openExternalTurnstileVerification(input = {}) {
+  const gatewayUrl = normalizeExternalGatewayUrl(input.gatewayUrl);
+  const action = cleanString(input.action || "sign-in");
+  if (!TURNSTILE_ACTIONS.has(action)) throw new Error("人机验证动作无效。");
+  const state = crypto.randomUUID();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeout = null;
+    const server = http.createServer((request, response) => {
+      const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+      if (requestUrl.pathname !== "/callback") {
+        response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        response.end("Not found");
+        return;
+      }
+      if (requestUrl.searchParams.get("state") !== state) {
+        response.writeHead(400, { "content-type": "text/html; charset=utf-8" });
+        response.end(turnstileCallbackPage("验证状态不匹配，请回到 DeepStudy 重新打开浏览器验证。"));
+        settle(reject, new Error("人机验证状态不匹配。"));
+        return;
+      }
+      const error = requestUrl.searchParams.get("error");
+      if (error) {
+        response.writeHead(400, { "content-type": "text/html; charset=utf-8" });
+        response.end(turnstileCallbackPage("人机验证失败，请回到 DeepStudy 重新尝试。"));
+        settle(reject, new Error(error));
+        return;
+      }
+      const token = cleanString(requestUrl.searchParams.get("token"));
+      if (!token) {
+        response.writeHead(400, { "content-type": "text/html; charset=utf-8" });
+        response.end(turnstileCallbackPage("没有收到验证结果，请回到 DeepStudy 重新尝试。"));
+        settle(reject, new Error("没有收到人机验证结果。"));
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(turnstileCallbackPage("验证完成。"));
+      settle(resolve, token);
+    });
+
+    function settle(done, value) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      server.close(() => done(value));
+    }
+
+    server.once("error", (error) => settle(reject, error));
+    server.listen(0, "127.0.0.1", async () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      const callback = new URL(`http://127.0.0.1:${port}/callback`);
+      callback.searchParams.set("state", state);
+      const verifyUrl = new URL("/v1/turnstile/desktop", gatewayUrl);
+      verifyUrl.searchParams.set("action", action);
+      verifyUrl.searchParams.set("state", state);
+      verifyUrl.searchParams.set("callback", callback.toString());
+      timeout = setTimeout(() => settle(reject, new Error("人机验证已超时，请重新打开浏览器验证。")), TURNSTILE_VERIFY_TIMEOUT_MS);
+      try {
+        await shell.openExternal(verifyUrl.toString());
+      } catch (error) {
+        settle(reject, error);
+      }
+    });
+  });
 }
 
 function collectTextParts(value, output = []) {
@@ -1217,6 +1311,7 @@ ipcMain.handle("long-tasks:move-to-daily-plan", (_event, payload = {}) => {
 ipcMain.handle("reminders:acknowledge", acknowledgeReminders);
 
 ipcMain.handle("sync:config", (_event, input) => desktopSyncService.config(input));
+ipcMain.handle("sync:turnstile-verify", (_event, input) => openExternalTurnstileVerification(input));
 ipcMain.handle("sync:auth-register", (_event, input) => desktopSyncService.register(input));
 ipcMain.handle("sync:auth-sign-in", (_event, input) => desktopSyncService.signIn(input));
 ipcMain.handle("sync:auth-recover", (_event, input) => desktopSyncService.recover(input));

@@ -32,7 +32,7 @@
         "ENVIRONMENT": "production",
         "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5177,https://localhost,capacitor://localhost",
         "TURNSTILE_SITE_KEY": "0x4AAAAAAD7sfyZXxwNWdy77",
-        "TURNSTILE_ALLOWED_HOSTNAMES": "localhost"
+        "TURNSTILE_ALLOWED_HOSTNAMES": "deepstudy-gateway.jackbreese585.workers.dev,localhost"
       },
       "d1_databases": [
         {

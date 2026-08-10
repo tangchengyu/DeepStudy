@@ -61,6 +61,111 @@ app.get("/v1/config", (c) => c.json({
   minimumPasswordLength: 10
 }));
 
+const DESKTOP_TURNSTILE_ACTIONS = new Set(["sign-in", "register", "recover", "regenerate-recovery"]);
+const LOOPBACK_CALLBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function isLoopbackCallback(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" && LOOPBACK_CALLBACK_HOSTS.has(url.hostname) && Boolean(url.port);
+  } catch {
+    return false;
+  }
+}
+
+function desktopTurnstilePage(input: { siteKey: string; action: string; callback: string; state: string }) {
+  const config = JSON.stringify(input).replaceAll("<", "\\u003c");
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DeepStudy 安全验证</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+    <style>
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #30433b; background: #f3f7f2; }
+      main { width: min(420px, calc(100vw - 32px)); padding: 28px; border: 1px solid #d6e4d8; border-radius: 18px; background: #fffdf9; box-shadow: 0 18px 52px rgba(50, 68, 59, 0.14); text-align: center; }
+      h1 { margin: 0 0 10px; font-size: 24px; }
+      p { margin: 0 0 18px; color: #6d8578; line-height: 1.7; }
+      #turnstile { min-height: 78px; display: flex; justify-content: center; align-items: center; }
+      #status { margin-top: 14px; font-weight: 700; }
+      .error { color: #c57779; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>DeepStudy 安全验证</h1>
+      <p>请在浏览器中完成人机验证。完成后会自动回到 DeepStudy。</p>
+      <div id="turnstile"></div>
+      <p id="status">正在加载验证组件…</p>
+    </main>
+    <script>
+      const config = ${config};
+      const status = document.getElementById("status");
+      function finish(key, value) {
+        const callback = new URL(config.callback);
+        callback.searchParams.set("state", config.state);
+        callback.searchParams.set(key, value);
+        location.replace(callback.toString());
+      }
+      function renderTurnstile() {
+        if (!window.turnstile) {
+          setTimeout(renderTurnstile, 120);
+          return;
+        }
+        window.turnstile.render("#turnstile", {
+          sitekey: config.siteKey,
+          action: config.action,
+          theme: "light",
+          callback: (token) => {
+            status.textContent = "验证完成，正在返回 DeepStudy…";
+            finish("token", token || "");
+          },
+          "expired-callback": () => {
+            status.textContent = "验证已过期，请重新完成验证。";
+            status.className = "error";
+          },
+          "error-callback": () => {
+            status.textContent = "验证失败，请回到 DeepStudy 重新打开浏览器验证。";
+            status.className = "error";
+            finish("error", "人机验证失败，请重试。");
+          }
+        });
+        status.textContent = "请完成验证。";
+      }
+      renderTurnstile();
+    </script>
+  </body>
+</html>`;
+}
+
+app.get("/v1/turnstile/desktop", (c) => {
+  const action = String(c.req.query("action") || "");
+  const callback = String(c.req.query("callback") || "");
+  const state = String(c.req.query("state") || "");
+  if (!DESKTOP_TURNSTILE_ACTIONS.has(action)) return c.text("Invalid Turnstile action.", 400);
+  if (!state || state.length > 128) return c.text("Invalid Turnstile state.", 400);
+  if (!isLoopbackCallback(callback)) return c.text("Invalid Turnstile callback.", 400);
+  if (!c.env.TURNSTILE_SITE_KEY) return c.text("Turnstile site key is not configured.", 503);
+  return c.html(desktopTurnstilePage({
+    siteKey: c.env.TURNSTILE_SITE_KEY,
+    action: escapeHtml(action),
+    callback,
+    state: escapeHtml(state)
+  }), 200, {
+    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"
+  });
+});
+
 function publicUser(user: { id: string; username?: string | null; name?: string | null }) {
   return { id: user.id, username: user.username ?? null, name: user.name ?? user.username ?? null };
 }

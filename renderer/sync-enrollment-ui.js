@@ -18,7 +18,7 @@
   const manageSection = byId("sync-wizard-manage");
   const sessionBadge = byId("sync-session-badge");
   const turnstileStatus = byId("sync-turnstile-status");
-  const turnstileHost = byId("sync-turnstile-host");
+  const turnstileOpen = byId("sync-turnstile-open");
   let profileOperation = Promise.resolve();
   let profileTransitioning = false;
   let gatewayConfig = { turnstileSiteKey: "", minimumPasswordLength: 10 };
@@ -26,13 +26,7 @@
   let turnstileToken = "";
   let turnstileAction = "sign-in";
   let gatewayConfigTimer = 0;
-  const turnstileChallenge = window.DeepStudyTurnstile?.createChallenge({
-    document,
-    window,
-    host: turnstileHost,
-    onToken: (token) => { turnstileToken = token; },
-    onError: (message) => setTurnstileStatus(message, true),
-  });
+  let turnstileTokenTimer = 0;
 
   function runProfileExclusive(work) {
     const result = profileOperation.then(work, work);
@@ -121,33 +115,31 @@
     turnstileStatus.classList.toggle("error", isError);
   }
 
-  async function resetTurnstileChallenge(action = turnstileAction) {
+  function rememberTurnstileToken(token) {
+    clearTimeout(turnstileTokenTimer);
+    turnstileToken = String(token || "");
+    if (!turnstileToken) return;
+    turnstileTokenTimer = setTimeout(() => {
+      turnstileToken = "";
+      setTurnstileStatus("人机验证已过期，请重新打开浏览器验证。", true);
+    }, 270000);
+  }
+
+  function resetTurnstileToken(action = turnstileAction) {
     turnstileAction = action;
-    turnstileToken = "";
-    if (!turnstileChallenge) {
-      setTurnstileStatus("当前版本缺少人机验证组件，请更新应用后重试。", true);
-      return;
-    }
+    rememberTurnstileToken("");
     if (!gatewayConfig.turnstileSiteKey) {
-      turnstileChallenge.reset();
       setTurnstileStatus("同步服务未配置安全验证，已阻止登录和注册。", true);
+      if (turnstileOpen) turnstileOpen.disabled = true;
       return;
     }
-    setTurnstileStatus("请完成人机验证。");
-    try {
-      await turnstileChallenge.render({
-        siteKey: gatewayConfig.turnstileSiteKey,
-        action,
-      });
-      setTurnstileStatus("完成人机验证后即可继续。");
-    } catch (error) {
-      setTurnstileStatus(error?.message || String(error), true);
-    }
+    if (turnstileOpen) turnstileOpen.disabled = false;
+    setTurnstileStatus("点击“打开浏览器验证”，完成后回到 DeepStudy 继续登录或注册。");
   }
 
   function setTurnstileAction(action) {
     if (turnstileAction === action) return;
-    void resetTurnstileChallenge(action);
+    resetTurnstileToken(action);
   }
 
   async function loadGatewayConfig() {
@@ -162,11 +154,12 @@
       };
       byId("sync-password").minLength = String(gatewayConfig.minimumPasswordLength);
       byId("sync-new-password").minLength = String(gatewayConfig.minimumPasswordLength);
-      await resetTurnstileChallenge(turnstileAction);
+      resetTurnstileToken(turnstileAction);
     } catch (error) {
       if (requestId !== gatewayConfigRequest) return;
       gatewayConfig = { turnstileSiteKey: "", minimumPasswordLength: 10 };
-      turnstileChallenge?.reset();
+      rememberTurnstileToken("");
+      if (turnstileOpen) turnstileOpen.disabled = true;
       setTurnstileStatus(error?.message || String(error), true);
     }
   }
@@ -335,6 +328,23 @@
   });
   byId("sync-close").addEventListener("click", () => { if (mayCloseRecoveryNotice()) modal.hidden = true; });
   byId("sync-gateway-url").addEventListener("input", scheduleGatewayConfigLoad);
+  turnstileOpen?.addEventListener("click", async (event) => {
+    rememberTurnstileToken("");
+    if (!gatewayConfig.turnstileSiteKey) {
+      setTurnstileStatus("同步服务未配置安全验证，无法打开浏览器验证。", true);
+      return;
+    }
+    await action(event.currentTarget, async () => {
+      setTurnstileStatus("已打开浏览器，请在浏览器中完成人机验证。");
+      const token = await window.electronAPI.syncTurnstileVerify({
+        gatewayUrl: byId("sync-gateway-url").value.trim(),
+        action: turnstileAction,
+      });
+      rememberTurnstileToken(token);
+      setTurnstileStatus("人机验证已完成，可以继续操作。");
+      return token;
+    }, "浏览器验证完成。");
+  });
   recoverySaved.addEventListener("change", () => {
     if (recoverySaved.checked) setStatus("恢复码已确认保存。请妥善保管，它只显示这一次。");
   });
@@ -350,8 +360,7 @@
     const result = await action(event.currentTarget, () => runAuthTransition(() => controller.register(authInput())), "注册成功；请立即保存恢复码。");
     if (result?.recoveryCode) showRecoveryCode(result.recoveryCode);
     byId("sync-password").value = "";
-    if (result) turnstileChallenge?.reset();
-    else await resetTurnstileChallenge("register");
+    resetTurnstileToken("register");
     if (result) {
       await refreshStatus();
       continuousSync.start();
@@ -364,8 +373,7 @@
     setTurnstileAction("sign-in");
     const result = await action(event.currentTarget, () => runAuthTransition(() => controller.signIn(authInput())), "登录成功。");
     byId("sync-password").value = "";
-    if (result) turnstileChallenge?.reset();
-    else await resetTurnstileChallenge("sign-in");
+    resetTurnstileToken("sign-in");
     if (result) {
       await refreshStatus();
       continuousSync.start();
@@ -400,7 +408,7 @@
     }), "密码已重设；请保存新的恢复码后重新登录。");
     byId("sync-recovery-input").value = "";
     byId("sync-new-password").value = "";
-    await resetTurnstileChallenge("recover");
+    resetTurnstileToken("recover");
     if (result?.recoveryCode) showRecoveryCode(result.recoveryCode);
   });
   byId("sync-import-preview").addEventListener("click", async (event) => {
