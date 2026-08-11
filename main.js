@@ -14,6 +14,8 @@ const {
 const { importLocalImage, writeBufferAtomically } = require("./renderer/local-image-import");
 const {
   RELEASES_API_URL,
+  RELEASES_ATOM_URL,
+  releasesFromAtom,
   selectLatestUpdate,
 } = require("./renderer/update-checker");
 
@@ -391,8 +393,36 @@ async function fetchJson(url) {
   return response.json();
 }
 
+async function fetchText(url) {
+  const response = await net.fetch(url, {
+    headers: {
+      accept: "application/atom+xml,text/xml;q=0.9,text/plain;q=0.8",
+      "user-agent": `DeepStudy/${app.getVersion()} update-checker`,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`检查更新失败：GitHub 返回 HTTP ${response.status}`);
+  }
+  return response.text();
+}
+
+async function fetchReleasesWithFallback() {
+  try {
+    return await fetchJson(RELEASES_API_URL);
+  } catch (apiError) {
+    try {
+      const atomText = await fetchText(RELEASES_ATOM_URL);
+      const releases = releasesFromAtom(atomText);
+      if (releases.length > 0) return releases;
+    } catch {
+      // Keep the original GitHub API error because it carries the visible HTTP status.
+    }
+    throw apiError;
+  }
+}
+
 async function checkForUpdates() {
-  const releases = await fetchJson(RELEASES_API_URL);
+  const releases = await fetchReleasesWithFallback();
   return selectLatestUpdate(releases, {
     currentVersion: app.getVersion(),
     platform: process.platform,

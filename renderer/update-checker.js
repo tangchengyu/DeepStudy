@@ -4,6 +4,8 @@
   else root.DeepStudyUpdateChecker = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const RELEASES_API_URL = "https://api.github.com/repos/tangchengyu/DeepStudy/releases?per_page=30";
+  const RELEASES_ATOM_URL = "https://github.com/tangchengyu/DeepStudy/releases.atom";
+  const RELEASE_DOWNLOAD_BASE_URL = "https://github.com/tangchengyu/DeepStudy/releases/download";
   const MASTER_TAG_PATTERN = /^master-v(\d+\.\d+\.\d+)$/;
 
   function parseMasterReleaseVersion(tagName) {
@@ -41,6 +43,27 @@
     return null;
   }
 
+  function assetNameForPlatform(version, platform) {
+    if (platform === "win32" || platform === "windows") return `DeepStudy-Setup-${version}.exe`;
+    if (platform === "darwin" || platform === "mac") return `DeepStudy-Setup-${version}.dmg`;
+    if (platform === "android") return `DeepStudy-Android-master-v${version}.apk`;
+    return "";
+  }
+
+  function atomReleaseAssets(version, tagName) {
+    return ["win32", "darwin", "android"]
+      .map((platform) => {
+        const name = assetNameForPlatform(version, platform);
+        return name
+          ? {
+              name,
+              browser_download_url: `${RELEASE_DOWNLOAD_BASE_URL}/${encodeURIComponent(tagName)}/${encodeURIComponent(name)}`,
+            }
+          : null;
+      })
+      .filter(Boolean);
+  }
+
   function findAsset(release, platform) {
     const pattern = assetPatternForPlatform(platform);
     if (!pattern) return null;
@@ -64,6 +87,33 @@
         && !candidate.release?.prerelease,
       )
       .sort((left, right) => compareVersions(right.version, left.version));
+  }
+
+  function releasesFromAtom(atomText) {
+    const text = String(atomText || "");
+    const urls = [...text.matchAll(/href=["']([^"']*\/releases\/tag\/([^"']+))["']/gi)]
+      .map((match) => ({
+        url: match[1].replace(/&amp;/g, "&"),
+        tagName: decodeURIComponent(match[2].replace(/&amp;/g, "&")),
+      }));
+    const seen = new Set();
+    return urls
+      .filter(({ tagName }) => {
+        if (seen.has(tagName)) return false;
+        seen.add(tagName);
+        return Boolean(parseMasterReleaseVersion(tagName));
+      })
+      .map(({ tagName, url }) => {
+        const version = parseMasterReleaseVersion(tagName);
+        return {
+          tag_name: tagName,
+          name: `DeepStudy Master ${version}`,
+          draft: false,
+          prerelease: false,
+          html_url: url,
+          assets: atomReleaseAssets(version, tagName),
+        };
+      });
   }
 
   function selectLatestUpdate(releases, options = {}) {
@@ -94,8 +144,10 @@
 
   return {
     RELEASES_API_URL,
+    RELEASES_ATOM_URL,
     compareVersions,
     parseMasterReleaseVersion,
+    releasesFromAtom,
     selectLatestUpdate,
   };
 });

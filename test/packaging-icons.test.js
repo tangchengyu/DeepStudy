@@ -13,7 +13,7 @@ function pngDimensions(filePath) {
 }
 
 test("master desktop package uses the next public master version", () => {
-  assert.equal(pkg.version, "1.2.41");
+  assert.equal(pkg.version, "1.2.42");
   assert.doesNotMatch(pkg.version, /local/i);
 });
 

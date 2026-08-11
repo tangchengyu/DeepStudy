@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   compareVersions,
   parseMasterReleaseVersion,
+  releasesFromAtom,
   selectLatestUpdate,
 } = require("../renderer/update-checker");
 
@@ -61,4 +62,27 @@ test("reports latest when the installed version already matches the newest relea
   assert.equal(update.available, false);
   assert.equal(update.latestVersion, "1.2.41");
   assert.equal(update.assetName, "DeepStudy-Android-master-v1.2.41.apk");
+});
+
+test("builds update candidates from the public GitHub releases Atom feed when the API is blocked", () => {
+  const atom = `
+    <feed>
+      <entry>
+        <title>DeepStudy Master 1.2.42</title>
+        <link href="https://github.com/tangchengyu/DeepStudy/releases/tag/master-v1.2.42"/>
+      </entry>
+      <entry>
+        <title>DeepStudy Local 1.2.99</title>
+        <link href="https://github.com/tangchengyu/DeepStudy/releases/tag/local-v1.2.99-local"/>
+      </entry>
+    </feed>
+  `;
+  const update = selectLatestUpdate(releasesFromAtom(atom), { currentVersion: "1.2.41", platform: "win32" });
+  assert.equal(update.available, true);
+  assert.equal(update.latestVersion, "1.2.42");
+  assert.equal(update.assetName, "DeepStudy-Setup-1.2.42.exe");
+  assert.equal(
+    update.assetUrl,
+    "https://github.com/tangchengyu/DeepStudy/releases/download/master-v1.2.42/DeepStudy-Setup-1.2.42.exe",
+  );
 });

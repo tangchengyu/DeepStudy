@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  checkForUpdates,
   compareVersions,
   parseMasterReleaseVersion,
+  RELEASES_API_URL,
+  RELEASES_ATOM_URL,
   selectLatestUpdate,
 } from './updateService'
 
@@ -41,5 +44,30 @@ describe('mobile update service', () => {
     expect(update.latestVersion).toBe('1.2.41')
     expect(update.assetName).toBe('DeepStudy-Android-master-v1.2.41.apk')
     expect(update.assetUrl).toBe('https://example.test/app.apk')
+  })
+
+  it('falls back to the public releases feed when the GitHub API returns 403', async () => {
+    const calls: string[] = []
+    const fetchFn = async (input: RequestInfo | URL) => {
+      calls.push(String(input))
+      if (String(input) === RELEASES_API_URL) {
+        return new Response('rate limited', { status: 403 })
+      }
+      if (String(input) === RELEASES_ATOM_URL) {
+        return new Response(`
+          <feed>
+            <entry><link href="https://github.com/tangchengyu/DeepStudy/releases/tag/master-v9.9.9"/></entry>
+          </feed>
+        `, { status: 200, headers: { 'content-type': 'application/atom+xml' } })
+      }
+      return new Response('not found', { status: 404 })
+    }
+
+    const update = await checkForUpdates(fetchFn as typeof fetch)
+
+    expect(calls).toEqual([RELEASES_API_URL, RELEASES_ATOM_URL])
+    expect(update.available).toBe(true)
+    expect(update.latestVersion).toBe('9.9.9')
+    expect(update.assetName).toBe('DeepStudy-Android-master-v9.9.9.apk')
   })
 })

@@ -1,4 +1,6 @@
 export const RELEASES_API_URL = 'https://api.github.com/repos/tangchengyu/DeepStudy/releases?per_page=30'
+export const RELEASES_ATOM_URL = 'https://github.com/tangchengyu/DeepStudy/releases.atom'
+const RELEASE_DOWNLOAD_BASE_URL = 'https://github.com/tangchengyu/DeepStudy/releases/download'
 
 export interface ReleaseAsset {
   name?: string
@@ -67,6 +69,27 @@ function assetPatternForPlatform(platform: string) {
   return null
 }
 
+function assetNameForPlatform(version: string, platform: string) {
+  if (platform === 'android') return `DeepStudy-Android-master-v${version}.apk`
+  if (platform === 'win32' || platform === 'windows') return `DeepStudy-Setup-${version}.exe`
+  if (platform === 'darwin' || platform === 'mac') return `DeepStudy-Setup-${version}.dmg`
+  return ''
+}
+
+function atomReleaseAssets(version: string, tagName: string): ReleaseAsset[] {
+  return ['android', 'win32', 'darwin']
+    .map((platform) => {
+      const name = assetNameForPlatform(version, platform)
+      return name
+        ? {
+            name,
+            browser_download_url: `${RELEASE_DOWNLOAD_BASE_URL}/${encodeURIComponent(tagName)}/${encodeURIComponent(name)}`,
+          }
+        : null
+    })
+    .filter(Boolean) as ReleaseAsset[]
+}
+
 function findAsset(release: GitHubRelease, platform: string) {
   const pattern = assetPatternForPlatform(platform)
   if (!pattern) return null
@@ -116,14 +139,69 @@ export function selectLatestUpdate(
   }
 }
 
-export async function checkForUpdates(fetchFn: typeof fetch = fetch) {
+export function releasesFromAtom(atomText: string): GitHubRelease[] {
+  const text = String(atomText || '')
+  const links = [...text.matchAll(/href=["']([^"']*\/releases\/tag\/([^"']+))["']/gi)]
+    .map((match) => ({
+      url: match[1].replace(/&amp;/g, '&'),
+      tagName: decodeURIComponent(match[2].replace(/&amp;/g, '&')),
+    }))
+  const seen = new Set<string>()
+  return links
+    .filter(({ tagName }) => {
+      if (seen.has(tagName)) return false
+      seen.add(tagName)
+      return Boolean(parseMasterReleaseVersion(tagName))
+    })
+    .map(({ tagName, url }) => {
+      const version = parseMasterReleaseVersion(tagName)!
+      return {
+        tag_name: tagName,
+        name: `DeepStudy Master ${version}`,
+        draft: false,
+        prerelease: false,
+        html_url: url,
+        assets: atomReleaseAssets(version, tagName),
+      }
+    })
+}
+
+async function fetchApiReleases(fetchFn: typeof fetch) {
   const response = await fetchFn(RELEASES_API_URL, {
     headers: {
       accept: 'application/vnd.github+json',
     },
   })
   if (!response.ok) throw new Error(`检查更新失败：GitHub 返回 HTTP ${response.status}`)
-  const releases = await response.json() as GitHubRelease[]
+  return await response.json() as GitHubRelease[]
+}
+
+async function fetchAtomReleases(fetchFn: typeof fetch) {
+  const response = await fetchFn(RELEASES_ATOM_URL, {
+    headers: {
+      accept: 'application/atom+xml,text/xml;q=0.9,text/plain;q=0.8',
+    },
+  })
+  if (!response.ok) throw new Error(`检查更新失败：GitHub 返回 HTTP ${response.status}`)
+  return releasesFromAtom(await response.text())
+}
+
+async function fetchReleasesWithFallback(fetchFn: typeof fetch) {
+  try {
+    return await fetchApiReleases(fetchFn)
+  } catch (apiError) {
+    try {
+      const releases = await fetchAtomReleases(fetchFn)
+      if (releases.length > 0) return releases
+    } catch {
+      // Keep the GitHub API error visible when both public endpoints are unavailable.
+    }
+    throw apiError
+  }
+}
+
+export async function checkForUpdates(fetchFn: typeof fetch = fetch) {
+  const releases = await fetchReleasesWithFallback(fetchFn)
   return selectLatestUpdate(releases, {
     currentVersion: currentAppVersion,
     platform: 'android',
