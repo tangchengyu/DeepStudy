@@ -92,7 +92,16 @@ describe('connectivity-aware sync service', () => {
       platform: () => 'android',
     })
 
-    await expect(service.syncNow()).resolves.toMatchObject({ status: 'synced', conflicts: 1 })
+    await expect(service.syncNow()).resolves.toMatchObject({
+      status: 'synced',
+      pushed: 1,
+      pushConflicts: 1,
+      pulled: 1,
+      applied: 1,
+      pullConflicts: 0,
+      pending: 0,
+      conflicts: 1,
+    })
     expect(client.registerDevice).toHaveBeenCalledWith('android-device-sync', expect.any(String), 'android')
     expect(client.push).toHaveBeenCalledTimes(2)
     await expect(repository.listPendingMutations()).resolves.toEqual([])
@@ -116,6 +125,83 @@ describe('connectivity-aware sync service', () => {
       local: { payload: { title: '保留我的版本' } },
       remote: { payload: { title: '云端版本' } },
     }])
+    database.close()
+  })
+
+  it('previews remote account impact without applying records or advancing the cursor', async () => {
+    const database = databaseForTest()
+    const repository = createSyncRepository(database, {
+      createDeviceId: () => 'android-device-preview',
+      createMutationId: () => 'mutation-preview-0001',
+    })
+    await repository.enqueueUpsert('reflection', 'same', { content: '已经一致' })
+    await repository.acknowledgeMutation('mutation-preview-0001', { revision: 2, serverUpdatedAt: 2_000 })
+    const client = {
+      registerDevice: vi.fn(async () => ({ ok: true as const })),
+      push: vi.fn(),
+      pull: vi.fn()
+        .mockResolvedValueOnce({
+          records: [{
+            entityType: 'reflection' as const,
+            entityId: 'same',
+            payload: { content: '已经一致' },
+            deleted: false,
+            revision: 2,
+            clientUpdatedAt: 1_000,
+            serverUpdatedAt: 2_000,
+            deviceId: 'desktop-device',
+          }, {
+            entityType: 'soul_quote' as const,
+            entityId: 'quote-1',
+            payload: { text: '云端好句子' },
+            deleted: false,
+            revision: 1,
+            clientUpdatedAt: 1_100,
+            serverUpdatedAt: 2_100,
+            deviceId: 'desktop-device',
+          }],
+          cursor: 2,
+          hasMore: true,
+        })
+        .mockResolvedValueOnce({
+          records: [{
+            entityType: 'daily_task' as const,
+            entityId: 'deleted-daily',
+            payload: {},
+            deleted: true,
+            revision: 3,
+            clientUpdatedAt: 1_200,
+            serverUpdatedAt: 2_200,
+            deviceId: 'desktop-device',
+          }],
+          cursor: 3,
+          hasMore: false,
+        }),
+      conflicts: vi.fn(async () => ({ conflicts: [] })),
+      resolveConflict: vi.fn(),
+    }
+    const service = createSyncService({
+      repository,
+      client,
+      connectivity: { isOnline: () => true, subscribe: () => () => undefined },
+      delay: async () => undefined,
+      platform: () => 'android',
+    })
+
+    await expect(service.previewRemoteImpact()).resolves.toEqual({
+      total: 3,
+      active: 2,
+      deleted: 1,
+      create: 1,
+      update: 0,
+      delete: 0,
+      unchanged: 1,
+    })
+    expect(client.registerDevice).toHaveBeenCalledWith('android-device-preview', expect.any(String), 'android')
+    expect(client.pull).toHaveBeenNthCalledWith(1, 'android-device-preview', null, 500)
+    expect(client.pull).toHaveBeenNthCalledWith(2, 'android-device-preview', '2', 500)
+    await expect(repository.getRecord('soul_quote', 'quote-1')).resolves.toBeUndefined()
+    await expect(repository.getCursor()).resolves.toBeNull()
     database.close()
   })
 

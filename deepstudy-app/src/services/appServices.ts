@@ -54,8 +54,11 @@ export function initializeAppServices() {
       await accountCoordinator.initialize()
       await mobileFocusTimerService.initialize()
       await mobileSyncService.refreshState()
+      const importStatus = await syncRepository.getMetadata('importStatus')
+      const firstSyncComplete = importStatus === 'committed' || importStatus === 'skipped'
       if (accountCoordinator.state.status === 'signed-in'
         || accountCoordinator.state.status === 'offline-session') {
+        if (!firstSyncComplete) return
         mobileSyncService.start()
         if (connectivityMonitor.isOnline()) {
           void mobileSyncService.syncNow().catch(() => undefined)

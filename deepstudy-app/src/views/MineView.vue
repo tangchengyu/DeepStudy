@@ -14,6 +14,7 @@ import {
 import { GatewayError } from '../services/gatewayClient'
 import { gatewaySettings } from '../services/gatewaySettings'
 import { switchGatewayOrigin } from '../services/gatewaySwitch'
+import type { RemoteImpactPreview, SyncRunStats } from '../services/syncService'
 
 const gatewayUrl = ref(gatewaySettings.getBaseUrl())
 const gatewayMessage = ref<string | null>(null)
@@ -28,6 +29,7 @@ const actionMessage = ref<string | null>(null)
 const conflicts = ref<SyncConflictRecord[]>([])
 const resolvingConflictId = ref<string | null>(null)
 const localImportPreview = ref<LocalImportPreview | null>(null)
+const remoteImpactPreview = ref<RemoteImpactPreview | null>(null)
 const importingLocalData = ref(false)
 
 const account = accountCoordinator.state
@@ -64,14 +66,26 @@ const firstSyncPreviewText = computed(() => {
     return '先预览，不会修改本机或账号；确认后才会上传本机旧数据，并把账号数据写回本机。'
   }
   const preview = localImportPreview.value
+  const remote = remoteImpactPreview.value
+  const remoteParts = remote ? [
+    `账号已有 ${remote.active} 条可显示数据`,
+    `本机将新增 ${remote.create} 条`,
+    `更新 ${remote.update} 条`,
+    `保持不变 ${remote.unchanged} 条`,
+  ] : ['账号数据统计暂未读取']
   return [
     `本机旧数据 ${preview.total} 条`,
     `将上传到账号 ${preview.importable.length} 条`,
     `已在账号中存在 ${preview.duplicates.length} 条`,
     `需要稍后手动比较 ${preview.conflicts.length} 条`,
+    ...remoteParts,
     '确认后会立即同步，把账号数据下载并写回本机。',
   ].join('；')
 })
+
+function syncResultText(prefix: string, result: SyncRunStats) {
+  return `${prefix}：上传 ${result.pushed} 条；拉取核对 ${result.pulled} 条；写入本机 ${result.applied} 条；冲突 ${result.conflicts} 条。`
+}
 
 function formatTime(value: number | null) {
   return value ? new Intl.DateTimeFormat('zh-CN', {
@@ -132,12 +146,23 @@ async function loadDashboard() {
   deviceId.value = resolvedDeviceId
   importStatus.value = savedImportStatus || '未开始'
   localImportPreview.value = null
+  remoteImpactPreview.value = null
   conflicts.value = await syncRepository.listConflicts()
   await loadGatewayConfig()
 }
 
 async function refreshLocalImportPreview() {
-  localImportPreview.value = signedIn.value ? await syncRepository.previewLocalQuarantineImport() : null
+  if (!signedIn.value) {
+    localImportPreview.value = null
+    remoteImpactPreview.value = null
+    return
+  }
+  const [localPreview, remotePreview] = await Promise.all([
+    syncRepository.previewLocalQuarantineImport(),
+    mobileSyncService.previewRemoteImpact(),
+  ])
+  localImportPreview.value = localPreview
+  remoteImpactPreview.value = remotePreview
   importStatus.value = 'previewed'
   await syncRepository.setMetadata('importStatus', 'previewed')
 }
@@ -178,6 +203,7 @@ function openAuth() {
 async function afterSignIn() {
   authVisible.value = false
   localImportPreview.value = null
+  remoteImpactPreview.value = null
   importStatus.value = await syncRepository.getMetadata('importStatus') || '未开始'
   if (firstSyncComplete.value) {
     mobileSyncService.start()
@@ -215,13 +241,14 @@ async function confirmFirstSync() {
     importStatus.value = 'committed'
     await syncRepository.setMetadata('importStatus', 'committed')
     localImportPreview.value = null
+    remoteImpactPreview.value = null
     mobileSyncService.start()
-    await mobileSyncService.syncNow()
+    const syncResult = await mobileSyncService.syncNow()
     conflicts.value = await syncRepository.listConflicts()
     const conflictSuffix = Array.isArray(result.conflicts) && result.conflicts.length
       ? `；${result.conflicts.length} 条差异可在同步管理中查看冲突`
       : ''
-    actionMessage.value = `首次同步完成：已上传 ${result.imported} 条本机旧数据，并已把账号数据写回本机${conflictSuffix}。`
+    actionMessage.value = `首次同步完成：上传 ${result.imported} 条本机旧数据；拉取核对 ${syncResult.pulled} 条；写入本机 ${syncResult.applied} 条；冲突 ${syncResult.conflicts} 条。${conflictSuffix}`
   } catch (error) {
     importStatus.value = 'blocked'
     actionMessage.value = friendlyError(error)
@@ -234,11 +261,12 @@ async function skipLocalImport() {
   await syncRepository.setMetadata('importStatus', 'skipped')
   importStatus.value = 'skipped'
   localImportPreview.value = null
+  remoteImpactPreview.value = null
   mobileSyncService.start()
   try {
-    await mobileSyncService.syncNow()
+    const result = await mobileSyncService.syncNow()
     conflicts.value = await syncRepository.listConflicts()
-    actionMessage.value = '已跳过本机旧数据上传，并开始下载当前账号数据。'
+    actionMessage.value = syncResultText('已跳过本机旧数据上传，并同步当前账号数据', result)
   } catch (error) {
     actionMessage.value = friendlyError(error)
   }
@@ -309,9 +337,9 @@ async function confirmRecoveryCode() {
 async function manualSync() {
   actionMessage.value = null
   try {
-    await mobileSyncService.syncNow()
+    const result = await mobileSyncService.syncNow()
     conflicts.value = await syncRepository.listConflicts()
-    actionMessage.value = '同步完成'
+    actionMessage.value = syncResultText('同步完成', result)
   } catch (error) {
     actionMessage.value = friendlyError(error)
   }

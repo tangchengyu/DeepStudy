@@ -41,6 +41,27 @@ export interface SyncState {
   error: string | null
 }
 
+export interface SyncRunStats {
+  status: 'offline' | 'synced'
+  pushed: number
+  pushConflicts: number
+  pulled: number
+  applied: number
+  pullConflicts: number
+  pending: number
+  conflicts: number
+}
+
+export interface RemoteImpactPreview {
+  total: number
+  active: number
+  deleted: number
+  create: number
+  update: number
+  delete: number
+  unchanged: number
+}
+
 function defaultDelay(milliseconds: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds))
 }
@@ -69,6 +90,19 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value) ?? 'undefined'
 }
 
+function emptyRunStats(status: SyncRunStats['status']): SyncRunStats {
+  return {
+    status,
+    pushed: 0,
+    pushConflicts: 0,
+    pulled: 0,
+    applied: 0,
+    pullConflicts: 0,
+    pending: 0,
+    conflicts: 0,
+  }
+}
+
 export function createSyncService(options: SyncServiceOptions) {
   const delay = options.delay ?? defaultDelay
   const now = options.now ?? (() => Date.now())
@@ -84,7 +118,7 @@ export function createSyncService(options: SyncServiceOptions) {
   let currentSync: {
     scopeKey: string
     generation: number
-    promise: Promise<{ status: string; conflicts: number }>
+    promise: Promise<SyncRunStats>
   } | null = null
   let unsubscribe: (() => void) | null = null
   let generation = 0
@@ -150,11 +184,12 @@ export function createSyncService(options: SyncServiceOptions) {
     if (!state.online) {
       state.phase = 'offline'
       await refreshState()
-      return { status: 'offline', conflicts: state.conflicts }
+      return { ...emptyRunStats('offline'), pending: state.pending, conflicts: state.conflicts }
     }
 
     state.phase = 'syncing'
     state.error = null
+    const stats = emptyRunStats('synced')
     const deviceId = await options.repository.getOrCreateDeviceId()
     assertCurrentRun()
     await withRetry(() => options.client.registerDevice(
@@ -177,8 +212,10 @@ export function createSyncService(options: SyncServiceOptions) {
           revision: result.revision,
           serverUpdatedAt: result.serverUpdatedAt,
         })
+        stats.pushed += 1
       } else {
         await storeConflict(mutation, result)
+        stats.pushConflicts += 1
       }
     }
 
@@ -188,10 +225,13 @@ export function createSyncService(options: SyncServiceOptions) {
       assertCurrentRun()
       const pulled = await withRetry(() => options.client.pull(deviceId, cursor))
       assertCurrentRun()
+      stats.pulled += pulled.records.length
       for (const record of pulled.records) {
         const normalized = normalizeRecord(record, scopeKey)
         if (!await options.repository.hasOpenConflict(normalized.key)) {
-          await options.repository.applyRemoteRecord(normalized)
+          const result = await options.repository.applyRemoteRecord(normalized)
+          if (result.status === 'applied') stats.applied += 1
+          else stats.pullConflicts += 1
         }
       }
       cursor = String(pulled.cursor)
@@ -213,7 +253,34 @@ export function createSyncService(options: SyncServiceOptions) {
     await options.repository.setMetadata('lastSyncAt', String(completedAt))
     state.phase = 'idle'
     await refreshState()
-    return { status: 'synced', conflicts: state.conflicts }
+    stats.pending = state.pending
+    stats.conflicts = state.conflicts
+    return stats
+  }
+
+  async function pullRemoteRecordsForPreview(scopeKey: string) {
+    state.online = options.connectivity.isOnline()
+    if (!state.online) throw new Error('OFFLINE')
+    const deviceId = await options.repository.getOrCreateDeviceId()
+    options.repository.assertActiveScope(scopeKey)
+    await withRetry(() => options.client.registerDevice(
+      deviceId,
+      options.deviceName?.() ?? 'Android phone',
+      options.platform?.() ?? Capacitor.getPlatform(),
+    ))
+    options.repository.assertActiveScope(scopeKey)
+    let cursor: string | null = null
+    const records: SyncRecordEnvelope[] = []
+    for (let page = 0; page < 10000; page += 1) {
+      const pulled = await withRetry(() => options.client.pull(deviceId, cursor, 500))
+      options.repository.assertActiveScope(scopeKey)
+      records.push(...pulled.records.map((record) => normalizeRecord(record, scopeKey)))
+      const nextCursor = String(pulled.cursor)
+      if (!pulled.hasMore) return records
+      if (nextCursor === (cursor ?? '0')) throw new Error('REMOTE_PREVIEW_CURSOR_STALLED')
+      cursor = nextCursor
+    }
+    throw new Error('REMOTE_PREVIEW_TOO_MANY_PAGES')
   }
 
   async function recoverAlreadyResolved(
@@ -311,6 +378,40 @@ export function createSyncService(options: SyncServiceOptions) {
   return {
     state,
     refreshState,
+    async previewRemoteImpact(): Promise<RemoteImpactPreview> {
+      const scopeKey = options.repository.getActiveScope()
+      const records = await pullRemoteRecordsForPreview(scopeKey)
+      const preview: RemoteImpactPreview = {
+        total: records.length,
+        active: 0,
+        deleted: 0,
+        create: 0,
+        update: 0,
+        delete: 0,
+        unchanged: 0,
+      }
+      for (const record of records) {
+        const local = await options.repository.getRecord(record.entityType, record.entityId)
+        if (record.deleted) {
+          preview.deleted += 1
+          if (local && !local.deleted) preview.delete += 1
+          continue
+        }
+        preview.active += 1
+        if (!local || local.deleted) {
+          preview.create += 1
+        } else if (
+          local.revision !== record.revision
+          || local.deleted !== record.deleted
+          || canonicalJson(local.payload) !== canonicalJson(record.payload)
+        ) {
+          preview.update += 1
+        } else {
+          preview.unchanged += 1
+        }
+      }
+      return preview
+    },
     async syncNow() {
       const scopeKey = options.repository.getActiveScope()
       if (currentSync?.scopeKey === scopeKey && currentSync.generation === generation) {
@@ -318,7 +419,7 @@ export function createSyncService(options: SyncServiceOptions) {
       }
       if (currentSync) await currentSync.promise.catch(() => undefined)
       const runGeneration = generation
-      let promise!: Promise<{ status: string; conflicts: number }>
+      let promise!: Promise<SyncRunStats>
       promise = performSync(scopeKey, runGeneration).catch(async (error) => {
         state.phase = options.connectivity.isOnline() ? 'error' : 'offline'
         state.online = options.connectivity.isOnline()
