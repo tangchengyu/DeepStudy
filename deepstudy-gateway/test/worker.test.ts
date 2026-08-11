@@ -477,6 +477,43 @@ describe("gateway", () => {
     expect((await secondPage.json<{ cursor: number }>()).cursor).toBeGreaterThan(firstPageBody.cursor);
   });
 
+  it("accepts soul quotes from desktop clients and returns them to another device", async () => {
+    const account = await register("soul_quote");
+    const sourceHeaders = authHeaders(account.token, "desktop-soul-source-0001");
+    const destinationHeaders = authHeaders(account.token, "mac-soul-destination-0002");
+    const record = {
+      entityType: "soul_quote",
+      entityId: "soul-quote-0001",
+      payload: { id: "soul-quote-0001", text: "Keep going.", createdAt: 1_784_275_200_000 },
+      deleted: false,
+      revision: 0,
+      clientUpdatedAt: "2026-07-22T12:00:00.000Z",
+      serverUpdatedAt: null,
+      deviceId: "desktop-soul-source-0001"
+    };
+
+    expect((await jsonRequest("/v1/devices", { name: "Windows", platform: "windows" }, sourceHeaders)).status).toBe(200);
+    expect((await jsonRequest("/v1/devices", { name: "Mac", platform: "macos" }, destinationHeaders)).status).toBe(200);
+    const push = await jsonRequest("/v1/sync/push", {
+      mutations: [{ mutationId: "mutation-soul-quote-0001", baseRevision: 0, record }]
+    }, sourceHeaders);
+    expect(push.status).toBe(200);
+    expect(await push.json()).toMatchObject({ results: [{ status: "applied", entityType: "soul_quote" }] });
+
+    const pull = await SELF.fetch("https://gateway.test/v1/sync/pull?cursor=0", { headers: destinationHeaders });
+    expect(pull.status).toBe(200);
+    expect(await pull.json()).toMatchObject({
+      records: [{
+        entityType: "soul_quote",
+        entityId: record.entityId,
+        payload: record.payload,
+        deleted: false,
+        revision: 1,
+        deviceId: record.deviceId
+      }]
+    });
+  });
+
   it("previews and commits a first import without losing legacy fields", async () => {
     const account = await register("import");
     const deviceId = "legacy-import-device-01";
