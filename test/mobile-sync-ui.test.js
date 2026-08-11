@@ -17,3 +17,13 @@ test("mobile account page keeps sync management behind the first-sync confirmati
   assert.match(mineView, /firstSyncComplete && conflicts\.length/);
   assert.match(mineView, /v-else-if="firstSyncComplete"/);
 });
+
+test("mobile account page includes version update checking in Mine", () => {
+  assert.match(mineView, /检查更新/);
+  assert.match(mineView, /currentAppVersion/);
+  assert.match(mineView, /checkForAppUpdates/);
+  assert.match(mineView, /installAppUpdate/);
+  assert.match(mineView, /update-card/);
+  assert.match(mineView, /当前已是最新版本/);
+  assert.match(mineView, /Android 会打开安装包下载/);
+});

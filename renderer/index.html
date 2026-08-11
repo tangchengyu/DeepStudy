@@ -560,7 +560,7 @@
           <div>
             <div class="eyebrow">SETTINGS</div>
             <h2 id="planner-settings-title">DeepStudy 设置</h2>
-            <p>统一管理语言、API、AI 助手、好句库与使用教程。</p>
+            <p>统一管理语言、API、AI 助手、好句库、检查更新与使用教程。</p>
           </div>
           <button id="planner-settings-close" class="icon-btn compact" type="button" aria-label="关闭设置">×</button>
         </div>
@@ -571,6 +571,7 @@
             <button class="settings-nav-item" data-settings-section="daily-ai" type="button">每日任务 AI</button>
             <button class="settings-nav-item" data-settings-section="long-ai" type="button">长期任务 AI</button>
             <button class="settings-nav-item" data-settings-section="soul" type="button">灵魂按摩间</button>
+            <button class="settings-nav-item" data-settings-section="updates" type="button">检查更新</button>
             <button class="settings-nav-item" data-settings-section="help" type="button">使用教程</button>
           </nav>
           <div class="settings-content">
@@ -630,6 +631,21 @@
                 </div>
               </form>
               <div id="soul-list" class="soul-list" aria-live="polite"></div>
+            </section>
+            <section class="settings-section" data-section="updates">
+              <h3>检查更新</h3>
+              <p class="settings-help">DeepStudy 会只检查 GitHub Release 中的 master 版本。当前已是最新版本时会直接提示；有新版本时可以下载安装包并启动安装。Windows 会打开新版安装程序，macOS 会打开新版 DMG。</p>
+              <div class="update-panel">
+                <div class="update-version-row">
+                  <span>当前版本</span>
+                  <strong id="app-update-current-version">读取中…</strong>
+                </div>
+                <div id="app-update-result" class="update-result" role="status" aria-live="polite">点击“检查更新”获取 GitHub Release 上的最新版本。</div>
+                <div class="update-actions">
+                  <button id="app-update-check" class="secondary-btn" type="button">检查更新</button>
+                  <button id="app-update-install" class="primary-btn" type="button" hidden>立即更新</button>
+                </div>
+              </div>
             </section>
             <section class="settings-section" data-section="help">
               <h3>使用教程</h3>

@@ -640,6 +640,7 @@ const AppSettings = (() => {
   let dailyConfig = null;
   let longConfig = null;
   let preferences = { language: "zh-CN" };
+  let latestUpdate = null;
   const defaultPrompts = {
     "zh-CN": {
       daily: "请根据我的表达习惯，把目标拆成清晰、短小、可执行的今日任务。如果我没有明确给出足够的高优先级任务，可以按我的默认偏好补充：[PRIORITY] 读书、[PRIORITY] 运动；我可以在设置里改掉这两个默认偏好。",
@@ -668,6 +669,7 @@ const AppSettings = (() => {
       "daily-ai": "每日任务 AI",
       "long-ai": "长期任务 AI",
       soul: "灵魂按摩间",
+      updates: "检查更新",
       help: "使用教程",
     })[section] || "常规与语言";
   }
@@ -778,6 +780,30 @@ const AppSettings = (() => {
     status.textContent = message;
     status.className = `settings-status${kind ? ` ${kind}` : ""}`;
   }
+  function renderUpdateResult(update) {
+    latestUpdate = update || null;
+    const result = $("#app-update-result");
+    const installButton = $("#app-update-install");
+    if (!update) {
+      result.textContent = "点击“检查更新”获取 GitHub Release 上的最新版本。";
+      installButton.hidden = true;
+      return;
+    }
+    if (update.available) {
+      result.textContent = `发现新版本 ${update.latestVersion}：${update.assetName || "安装包"}。点击“立即更新”会下载安装包并打开安装程序。`;
+      installButton.hidden = false;
+      return;
+    }
+    result.textContent = update.message || "当前已是最新版本。";
+    installButton.hidden = true;
+  }
+  async function refreshCurrentVersion() {
+    try {
+      $("#app-update-current-version").textContent = await PlannerBridge.getCurrentVersion();
+    } catch {
+      $("#app-update-current-version").textContent = "无法读取";
+    }
+  }
   function renderSummary(config) {
     $("#planner-config").textContent = `${config.api.model || "未配置"} · API 运行`;
   }
@@ -790,6 +816,7 @@ const AppSettings = (() => {
     preferences = await PlannerBridge.getAppPreferences();
     dailyConfig = await PlannerBridge.getPlannerConfig();
     longConfig = await PlannerBridge.getLongTaskAiConfig();
+    await refreshCurrentVersion();
     renderSummary(dailyConfig);
     populateSavedProfiles();
     $("#app-language-select").value = preferences.language || "zh-CN";
@@ -924,6 +951,42 @@ const AppSettings = (() => {
       $("#api-test").disabled = false;
     }
   }
+  async function checkForUpdates() {
+    $("#app-update-check").disabled = true;
+    $("#app-update-install").hidden = true;
+    $("#app-update-result").textContent = "正在检查 GitHub Release…";
+    setStatus("正在检查更新…");
+    try {
+      const update = await PlannerBridge.checkForUpdates();
+      renderUpdateResult(update);
+      setStatus(update.available ? `发现新版本 ${update.latestVersion}。` : "当前已是最新版本。", update.available ? "success" : "");
+    } catch (error) {
+      latestUpdate = null;
+      $("#app-update-result").textContent = error.message || String(error);
+      setStatus(error.message || String(error), "error");
+    } finally {
+      $("#app-update-check").disabled = false;
+    }
+  }
+  async function installUpdate() {
+    if (!latestUpdate?.available) return;
+    $("#app-update-install").disabled = true;
+    $("#app-update-result").textContent = "正在下载更新安装包，请稍候…";
+    setStatus("正在下载并打开更新安装包…");
+    try {
+      const result = await PlannerBridge.installUpdate();
+      renderUpdateResult(result);
+      $("#app-update-result").textContent = result.opened
+        ? "安装包已打开，请按系统提示完成更新。"
+        : "当前已是最新版本。";
+      setStatus("安装包已打开。", "success");
+    } catch (error) {
+      $("#app-update-result").textContent = error.message || String(error);
+      setStatus(error.message || String(error), "error");
+    } finally {
+      $("#app-update-install").disabled = false;
+    }
+  }
   async function deleteSelectedProfile() {
     const select = $("#api-profile-select");
     const profileId = select.value;
@@ -962,6 +1025,8 @@ const AppSettings = (() => {
   $("#daily-ai-save").addEventListener("click", saveDailyAiConfig);
   $("#long-ai-save-main").addEventListener("click", saveLongAiConfig);
   $("#api-test").addEventListener("click", testApi);
+  $("#app-update-check").addEventListener("click", checkForUpdates);
+  $("#app-update-install").addEventListener("click", installUpdate);
   $("#api-profile-select").addEventListener("change", applySavedProfile);
   $("#api-profile-new").addEventListener("click", () => startNewApiProfile());
   $("#api-profile-delete").addEventListener("click", deleteSelectedProfile);

@@ -12,6 +12,10 @@ const {
   createStateStore,
 } = require("./renderer/desktop-sync-service");
 const { importLocalImage, writeBufferAtomically } = require("./renderer/local-image-import");
+const {
+  RELEASES_API_URL,
+  selectLatestUpdate,
+} = require("./renderer/update-checker");
 
 const APP_USER_MODEL_ID = "com.deepstudy.focus";
 const APP_DATA_DIR_NAME = "deepstudy";
@@ -124,6 +128,7 @@ const DEFAULT_LONG_TASK_USER_PROMPT_EN = "Help me maintain long-term tasks with 
 const APP_PREFERENCES_DEFAULT = { language: "zh-CN" };
 const FREE_API_TUTORIAL_URL = "https://my.feishu.cn/docx/Sr9RdRzFaop9BSxBgcAcdxDonOc";
 const PLANNER_TIMEOUT_MS = 120000;
+const UPDATE_DOWNLOAD_DIR_NAME = "DeepStudy Updates";
 const PORTABLE_ICON_PATH = process.env.PORTABLE_EXECUTABLE_FILE
   ? path.join(path.dirname(process.env.PORTABLE_EXECUTABLE_FILE), "deepstudy.ico")
   : "";
@@ -371,6 +376,69 @@ function openExternalTurnstileVerification(input = {}) {
       }
     });
   });
+}
+
+async function fetchJson(url) {
+  const response = await net.fetch(url, {
+    headers: {
+      accept: "application/vnd.github+json",
+      "user-agent": `DeepStudy/${app.getVersion()} update-checker`,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`检查更新失败：GitHub 返回 HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function checkForUpdates() {
+  const releases = await fetchJson(RELEASES_API_URL);
+  return selectLatestUpdate(releases, {
+    currentVersion: app.getVersion(),
+    platform: process.platform,
+  });
+}
+
+function updateDownloadDirectory() {
+  return path.join(app.getPath("downloads"), UPDATE_DOWNLOAD_DIR_NAME);
+}
+
+function safeUpdateAssetName(assetName) {
+  const baseName = path.basename(String(assetName || "DeepStudy-update"));
+  return baseName.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
+}
+
+async function downloadUpdateAsset(update) {
+  if (!update?.assetUrl || !/^https:\/\//i.test(update.assetUrl)) {
+    throw new Error("没有找到适用于当前设备的更新安装包。");
+  }
+  const response = await net.fetch(update.assetUrl, {
+    headers: { "user-agent": `DeepStudy/${app.getVersion()} updater` },
+  });
+  if (!response.ok) {
+    throw new Error(`下载更新失败：HTTP ${response.status}`);
+  }
+  const directory = updateDownloadDirectory();
+  fs.mkdirSync(directory, { recursive: true });
+  const filePath = path.join(directory, safeUpdateAssetName(update.assetName));
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await fs.promises.writeFile(filePath, buffer);
+  return filePath;
+}
+
+async function installLatestUpdate() {
+  const update = await checkForUpdates();
+  if (!update.available) return { ...update, opened: false, filePath: "" };
+  const filePath = await downloadUpdateAsset(update);
+  const openError = await shell.openPath(filePath);
+  if (openError) throw new Error(`安装包已下载，但打开失败：${openError}`);
+  if (process.platform === "win32") {
+    setTimeout(() => {
+      quitting = true;
+      app.quit();
+    }, 1500).unref?.();
+  }
+  return { ...update, opened: true, filePath };
 }
 
 function collectTextParts(value, output = []) {
@@ -1403,6 +1471,9 @@ ipcMain.handle("planner:get-config", () => publicPlannerSettings());
 ipcMain.handle("app:get-preferences", () => readAppPreferences());
 ipcMain.handle("app:save-preferences", (_event, preferences) => saveAppPreferences(preferences));
 ipcMain.handle("app:test-api-config", (_event, input) => testApiConfiguration(input));
+ipcMain.handle("app:update-current-version", () => app.getVersion());
+ipcMain.handle("app:update-check", () => checkForUpdates());
+ipcMain.handle("app:update-install", () => installLatestUpdate());
 ipcMain.handle("app:open-settings", (_event, section = "general") => {
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
   mainWindow.show();

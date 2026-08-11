@@ -15,6 +15,12 @@ import { GatewayError } from '../services/gatewayClient'
 import { gatewaySettings } from '../services/gatewaySettings'
 import { switchGatewayOrigin } from '../services/gatewaySwitch'
 import type { RemoteImpactPreview, SyncRunStats } from '../services/syncService'
+import {
+  checkForUpdates,
+  currentAppVersion,
+  openUpdateDownload,
+  type UpdateResult,
+} from '../services/updateService'
 
 const gatewayUrl = ref(gatewaySettings.getBaseUrl())
 const gatewayMessage = ref<string | null>(null)
@@ -31,6 +37,9 @@ const resolvingConflictId = ref<string | null>(null)
 const localImportPreview = ref<LocalImportPreview | null>(null)
 const remoteImpactPreview = ref<RemoteImpactPreview | null>(null)
 const importingLocalData = ref(false)
+const updateChecking = ref(false)
+const updateResult = ref<UpdateResult | null>(null)
+const updateMessage = ref('点击检查更新，DeepStudy 会读取 GitHub Release 上的最新 master 版本。')
 
 const account = accountCoordinator.state
 const syncState = mobileSyncService.state
@@ -202,6 +211,29 @@ function openAuth() {
 
 function openTutorial() {
   window.dispatchEvent(new Event('deepstudy:open-mobile-tutorial'))
+}
+
+async function checkForAppUpdates() {
+  updateChecking.value = true
+  updateMessage.value = '正在检查 GitHub Release…'
+  try {
+    const result = await checkForUpdates()
+    updateResult.value = result
+    updateMessage.value = result.available
+      ? `发现新版本 ${result.latestVersion}：${result.assetName || 'Android 安装包'}`
+      : '当前已是最新版本'
+  } catch (error) {
+    updateResult.value = null
+    updateMessage.value = friendlyError(error)
+  } finally {
+    updateChecking.value = false
+  }
+}
+
+function installAppUpdate() {
+  if (!updateResult.value?.assetUrl) return
+  openUpdateDownload(updateResult.value.assetUrl)
+  updateMessage.value = 'Android 会打开安装包下载；下载完成后按系统提示确认安装。'
 }
 
 async function afterSignIn() {
@@ -437,6 +469,30 @@ watch(() => syncState.conflicts, () => {
       <div><span>连接状态</span><strong>{{ syncState.online ? '在线' : '离线' }}</strong></div>
       </section>
 
+      <section class="update-card surface-card" aria-label="版本更新">
+      <div class="update-card-header">
+        <div>
+          <h2>检查更新</h2>
+          <p>当前版本 {{ currentAppVersion }}</p>
+        </div>
+        <strong v-if="updateResult?.latestVersion">最新 {{ updateResult.latestVersion }}</strong>
+      </div>
+      <p class="update-message">{{ updateMessage }}</p>
+      <div class="update-card-actions">
+        <button type="button" :disabled="updateChecking" @click="checkForAppUpdates">
+          {{ updateChecking ? '检查中…' : '检查更新' }}
+        </button>
+        <button
+          v-if="updateResult?.available"
+          type="button"
+          class="secondary-button"
+          @click="installAppUpdate"
+        >
+          立即更新
+        </button>
+      </div>
+      </section>
+
       <section v-if="firstSyncRequired" class="import-card surface-card" aria-label="首次同步本机数据">
       <div>
         <h2>首次同步本机数据</h2>
@@ -609,7 +665,8 @@ watch(() => syncState.conflicts, () => {
 
 .details-card,
 .gateway-card,
-.import-card {
+.import-card,
+.update-card {
   margin-top: 0.9rem;
 }
 
@@ -637,6 +694,61 @@ watch(() => syncState.conflicts, () => {
   max-width: 68%;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+.update-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.update-card-header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.update-card h2,
+.update-card p {
+  margin: 0;
+}
+
+.update-card h2 {
+  font-size: 1rem;
+}
+
+.update-card-header p,
+.update-card-header strong,
+.update-message {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.update-card-header strong {
+  color: var(--accent-strong);
+  white-space: nowrap;
+}
+
+.update-card-actions {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.update-card-actions button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 0.85rem;
+  color: #fff;
+  font-weight: 750;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+}
+
+.update-card-actions .secondary-button {
+  background: var(--surface-muted);
+  color: var(--text-main);
 }
 
 .gateway-card label {

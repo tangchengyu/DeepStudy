@@ -73,3 +73,13 @@ test("Electron smoke tests can use an explicit isolated userData path", () => {
   assert.match(main, /Refusing to use a filesystem root as test userData/);
   assert.match(main, /process\.env\.DEEPSTUDY_TEST_EXIT_AFTER_MS/);
 });
+
+test("desktop updater exposes version check and install through narrow IPC channels", () => {
+  for (const channel of ["app:update-current-version", "app:update-check", "app:update-install"]) {
+    assert.match(main, new RegExp(`ipcMain\\.handle\\(\\s*["']${channel}["']`), `main handler ${channel}`);
+    assert.match(preload, new RegExp(`ipcRenderer\\.invoke\\(\\s*["']${channel}["']`), `preload invocation ${channel}`);
+  }
+  assert.match(main, /selectLatestUpdate/);
+  assert.match(main, /downloadUpdateAsset/);
+  assert.doesNotMatch(preload, /github\.com\/repos|Authorization/i);
+});

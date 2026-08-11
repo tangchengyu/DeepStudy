@@ -2524,6 +2524,41 @@ button:disabled {
   font-size: 12px;
   line-height: 1.55;
 }
+.update-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.update-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.update-version-row strong {
+  color: var(--text);
+  font-size: 16px;
+}
+.update-result {
+  min-height: 44px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .saved-credential {
   display: flex;
   align-items: center;

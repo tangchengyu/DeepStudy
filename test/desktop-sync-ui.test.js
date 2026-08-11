@@ -122,6 +122,19 @@ test("desktop sync refreshes local UI without forcing navigation back to the gat
   assert.match(appScript, /Reflections\.reloadFromStorage/);
 });
 
+test("desktop settings include a clear update-check panel", () => {
+  assert.match(html, /data-settings-section="updates"/);
+  assert.match(html, /data-section="updates"/);
+  assert.match(html, /id="app-update-current-version"/);
+  assert.match(html, /id="app-update-check"/);
+  assert.match(html, /id="app-update-install"/);
+  assert.match(appScript, /function renderUpdateResult/);
+  assert.match(appScript, /PlannerBridge\.checkForUpdates/);
+  assert.match(appScript, /PlannerBridge\.installUpdate/);
+  assert.match(css, /\.update-panel/);
+  assert.match(tutorialScript, /检查更新/);
+});
+
 test("focus and rest timers publish claim, throttled updates, and release without implicit takeover", () => {
   assert.ok(html.indexOf('src="timer-sync-runtime.js"') < html.indexOf('src="app.js"'));
   assert.match(appScript, /deepstudy:timer-publish/);

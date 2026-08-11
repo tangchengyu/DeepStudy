@@ -22,6 +22,9 @@ test("forwards planner calls when Electron preload is available", async () => {
     getAppPreferences: async () => ({ language: "zh-CN" }),
     saveAppPreferences: async (value) => value,
     testApiConfig: async (value) => ({ ok: true, value }),
+    getCurrentVersion: async () => "1.2.41",
+    checkForUpdates: async () => ({ available: false }),
+    installUpdate: async () => ({ opened: false }),
     openAppSettings: async (section) => ({ section }),
     openFreeApiTutorial: async () => true,
     chatWithPlanner: async () => ({ content: "ok" }),
@@ -36,6 +39,9 @@ test("forwards planner calls when Electron preload is available", async () => {
   assert.deepEqual(await bridge.getAppPreferences(), { language: "zh-CN" });
   assert.deepEqual(await bridge.saveAppPreferences({ language: "en-US" }), { language: "en-US" });
   assert.deepEqual(await bridge.testApiConfig({ model: "test" }), { ok: true, value: { model: "test" } });
+  assert.equal(await bridge.getCurrentVersion(), "1.2.41");
+  assert.deepEqual(await bridge.checkForUpdates(), { available: false });
+  assert.deepEqual(await bridge.installUpdate(), { opened: false });
   assert.deepEqual(await bridge.openAppSettings("long-ai"), { section: "long-ai" });
   assert.equal(await bridge.openFreeApiTutorial(), true);
   assert.deepEqual(calls, [{ mode: "api" }]);
