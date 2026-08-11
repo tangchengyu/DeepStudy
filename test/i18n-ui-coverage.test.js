@@ -35,7 +35,7 @@ test("dynamic focus, rest, and habit content uses translated copy", () => {
 test("language changes rerender dynamic app views", () => {
   assert.match(i18nJs, /deepstudy:language-changed/);
   assert.match(appJs, /addEventListener\("deepstudy:language-changed",\s*refreshLocaleSensitiveViews\)/);
-  assert.match(appJs, /return \{ addTasks, getTasks, render \}/);
+  assert.match(appJs, /return \{ addTasks, getTasks, reloadFromStorage, render \}/);
 });
 
 test("white-noise popover is promoted to the root overlay layer", () => {

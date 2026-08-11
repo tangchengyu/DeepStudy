@@ -128,6 +128,51 @@ describe('connectivity-aware sync service', () => {
     database.close()
   })
 
+  it('notifies visible views after remote records are applied locally', async () => {
+    const database = databaseForTest()
+    const repository = createSyncRepository(database, {
+      createDeviceId: () => 'android-device-notify',
+      createMutationId: () => 'mutation-notify-0001',
+    })
+    const listener = vi.fn()
+    window.addEventListener('deepstudy:sync-data-changed', listener)
+    const client = {
+      registerDevice: vi.fn(async () => ({ ok: true as const })),
+      push: vi.fn(),
+      pull: vi.fn(async () => ({
+        records: [{
+          entityType: 'daily_task' as const,
+          entityId: 'remote-delete',
+          payload: { id: 'remote-delete', text: '123' },
+          deleted: true,
+          revision: 4,
+          clientUpdatedAt: 1_000,
+          serverUpdatedAt: 2_000,
+          deviceId: 'desktop-device',
+        }],
+        cursor: 4,
+        hasMore: false,
+      })),
+      conflicts: vi.fn(async () => ({ conflicts: [] })),
+      resolveConflict: vi.fn(),
+    }
+    const service = createSyncService({
+      repository,
+      client,
+      connectivity: { isOnline: () => true, subscribe: () => () => undefined },
+      delay: async () => undefined,
+    })
+
+    await service.syncNow()
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'deepstudy:sync-data-changed',
+      detail: expect.objectContaining({ source: 'sync-now', applied: 1 }),
+    }))
+    window.removeEventListener('deepstudy:sync-data-changed', listener)
+    database.close()
+  })
+
   it('previews remote account impact without applying records or advancing the cursor', async () => {
     const database = databaseForTest()
     const repository = createSyncRepository(database, {

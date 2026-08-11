@@ -113,6 +113,15 @@ test("renderer loads the durable continuous synchronization runtime", () => {
   assert.match(script, /createContinuousSync/);
 });
 
+test("desktop sync refreshes local UI without forcing navigation back to the gate", () => {
+  assert.doesNotMatch(script, /window\.location\.reload/);
+  assert.match(script, /deepstudy:sync-data-changed/);
+  assert.match(appScript, /deepstudy:sync-data-changed/);
+  assert.match(appScript, /DailyPlan\.reloadFromStorage/);
+  assert.match(appScript, /SoulQuotes\.reloadFromStorage/);
+  assert.match(appScript, /Reflections\.reloadFromStorage/);
+});
+
 test("focus and rest timers publish claim, throttled updates, and release without implicit takeover", () => {
   assert.ok(html.indexOf('src="timer-sync-runtime.js"') < html.indexOf('src="app.js"'));
   assert.match(appScript, /deepstudy:timer-publish/);

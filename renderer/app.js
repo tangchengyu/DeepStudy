@@ -256,12 +256,16 @@ const TimeAudit = (() => {
 })();
 
 const DailyPlan = (() => {
-  let state = readJSON(KEYS.dailyPlan, { date: todayKey(), tasks: [] });
-  if (state.date !== todayKey() || !Array.isArray(state.tasks))
-    state = { date: todayKey(), tasks: [] };
-  state.tasks.forEach((task, index) => {
-    if (!Number.isFinite(Number(task.order))) task.order = index;
-  });
+  function readState() {
+    const next = readJSON(KEYS.dailyPlan, { date: todayKey(), tasks: [] });
+    if (next.date !== todayKey() || !Array.isArray(next.tasks))
+      return { date: todayKey(), tasks: [] };
+    next.tasks.forEach((task, index) => {
+      if (!Number.isFinite(Number(task.order))) task.order = index;
+    });
+    return next;
+  }
+  let state = readState();
   let saveTimer = null;
   const save = () => {
     clearTimeout(saveTimer);
@@ -335,6 +339,11 @@ const DailyPlan = (() => {
   }
   function getTasks() {
     return state.tasks.map((x) => ({ ...x }));
+  }
+  function reloadFromStorage() {
+    state = readState();
+    save();
+    render();
   }
   function orderedTasks() {
     return [...state.tasks].sort(
@@ -621,7 +630,7 @@ const DailyPlan = (() => {
   });
   window.electronAPI?.syncDailyPlan({ date: state.date, tasks: state.tasks }).catch(() => {});
   render();
-  return { addTasks, getTasks, render };
+  return { addTasks, getTasks, reloadFromStorage, render };
 })();
 
 const AppSettings = (() => {
@@ -1286,6 +1295,13 @@ const SoulQuotes = (() => {
       list.append(row);
     });
   }
+  function reloadFromStorage() {
+    quotes = load();
+    clearForm();
+    renderDefaultLibraryButton();
+    renderGateQuote(quoteText.textContent);
+    renderList();
+  }
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1329,7 +1345,7 @@ const SoulQuotes = (() => {
   renderDefaultLibraryButton();
   renderGateQuote();
   renderList();
-  return { fitGateQuote: scheduleGateQuoteFit };
+  return { fitGateQuote: scheduleGateQuoteFit, reloadFromStorage };
 })();
 
 const AudioControls = (() => {
@@ -2612,6 +2628,18 @@ const Reflections = (() => {
     syncCompletedTasks(DailyPlan.getTasks());
     render();
   }
+  function reloadFromStorage() {
+    items = readJSON(KEYS.reflections, []);
+    selectedIds.clear();
+    if (!items.some((item) => item.id === editingId)) editingId = null;
+    if (!editingId) {
+      const today = items.find(
+        (item) => item.date === todayKey() && !item.kind?.startsWith("completed-task"),
+      );
+      input.value = today?.content || "";
+    }
+    render();
+  }
 
   const selectedIds = new Set();
 
@@ -2782,8 +2810,16 @@ const Reflections = (() => {
   );
   if (today) input.value = today.content;
   render();
-  return { syncCompletedTasks, syncCompletedLongTask, removeCompletedLongTask };
+  return { syncCompletedTasks, syncCompletedLongTask, removeCompletedLongTask, reloadFromStorage };
 })();
+
+window.addEventListener("deepstudy:sync-data-changed", () => {
+  DailyPlan.reloadFromStorage();
+  TimeAudit.render();
+  DistractionList.render();
+  SoulQuotes.reloadFromStorage();
+  Reflections.reloadFromStorage();
+});
 
 function setupStopwatch() {
   let running = false,

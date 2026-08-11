@@ -250,8 +250,11 @@
     return true;
   }
 
-  function reloadAfterApply() {
-    setTimeout(() => window.location.reload(), 800);
+  function notifySyncApplied({ closeModal = false } = {}) {
+    window.dispatchEvent(new CustomEvent("deepstudy:sync-data-changed", {
+      detail: { source: "account-sync" },
+    }));
+    if (closeModal && mayCloseRecoveryNotice()) modal.hidden = true;
   }
 
   async function action(button, work, successText, options = {}) {
@@ -381,7 +384,7 @@
             resolution: "keep_remote",
             operationId: `desktop:resolve:${conflict.id}:keep_remote`,
           })), "冲突已解决。");
-          if (result) { await continuousSync.syncOnce(); await refreshConflicts(); }
+          if (result) { await continuousSync.syncOnce(); notifySyncApplied(); await refreshConflicts(); }
         }),
         conflictButton("保留本机", "primary-btn", async (event) => {
           const mutationId = `desktop:resolve:${conflict.id}:keep_local`;
@@ -391,7 +394,7 @@
             operationId: mutationId,
             expectedRemoteRevision: Number(conflict.remote?.revision) || 0,
           })), "本机版本已保存到云端。");
-          if (result) { await continuousSync.syncOnce(); await refreshConflicts(); }
+          if (result) { await continuousSync.syncOnce(); notifySyncApplied(); await refreshConflicts(); }
         }),
       );
       item.append(summary, versions, actions);
@@ -507,7 +510,7 @@
     if (result) {
       confirmImport.disabled = true;
       previewResult.textContent = `已应用 ${result.apply.appliedRecords} 条；本地备份编号：${result.apply.backupId}`;
-      reloadAfterApply();
+      notifySyncApplied();
       continuousSync.start();
     }
   });
@@ -517,7 +520,7 @@
     });
     if (result) {
       previewResult.textContent = `同步完成：上传 ${result.mutations || 0} 条，拉取核对 ${result.records?.length || 0} 条。`;
-      reloadAfterApply();
+      notifySyncApplied({ closeModal: true });
     }
   });
   byId("sync-conflicts").addEventListener("click", async (event) => {
@@ -527,7 +530,7 @@
     const backupId = byId("sync-backup-id").value.trim();
     if (!backupId) return setStatus("请输入备份编号。", true);
     const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.restoreBackup(backupId)), "备份已恢复并完成读取校验。");
-    if (result) reloadAfterApply();
+    if (result) notifySyncApplied();
   });
   byId("sync-takeover").addEventListener("click", async (event) => {
     const result = await action(event.currentTarget, () => controller.takeOverAndContinue(), "已接管远端计时器。");

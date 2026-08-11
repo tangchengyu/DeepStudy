@@ -103,6 +103,11 @@ function emptyRunStats(status: SyncRunStats['status']): SyncRunStats {
   }
 }
 
+function notifySyncDataChanged(detail: Record<string, unknown>) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  window.dispatchEvent(new CustomEvent('deepstudy:sync-data-changed', { detail }))
+}
+
 export function createSyncService(options: SyncServiceOptions) {
   const delay = options.delay ?? defaultDelay
   const now = options.now ?? (() => Date.now())
@@ -255,6 +260,14 @@ export function createSyncService(options: SyncServiceOptions) {
     await refreshState()
     stats.pending = state.pending
     stats.conflicts = state.conflicts
+    if (stats.applied || stats.pullConflicts) {
+      notifySyncDataChanged({
+        source: 'sync-now',
+        pulled: stats.pulled,
+        applied: stats.applied,
+        conflicts: stats.conflicts,
+      })
+    }
     return stats
   }
 
@@ -498,6 +511,7 @@ export function createSyncService(options: SyncServiceOptions) {
         }
       }
       await refreshState()
+      notifySyncDataChanged({ source: 'conflict-resolution', resolution })
       return { ok: true, resolution }
     },
     start() {

@@ -36,14 +36,20 @@ async function loadToday() {
 
 onMounted(async () => {
   await loadToday()
+  window.addEventListener('deepstudy:sync-data-changed', onSyncDataChanged)
   dateInterval = setInterval(() => {
     if (localDateKey() !== loadedDateKey) void loadToday()
   }, 60_000)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('deepstudy:sync-data-changed', onSyncDataChanged)
   if (dateInterval) clearInterval(dateInterval)
 })
+
+function onSyncDataChanged() {
+  void loadToday()
+}
 
 async function createTask() {
   const text = newTaskText.value.trim()

@@ -145,6 +145,25 @@ describe('Today task flow', () => {
     expect(wrapper.text()).toContain('新日期任务')
   })
 
+  it('reloads the visible task list after account sync writes remote changes', async () => {
+    const repository = repositoryWith()
+    vi.mocked(repository.listForDate)
+      .mockResolvedValueOnce([task({ text: '123' })])
+      .mockResolvedValueOnce([])
+    const wrapper = mount(TodayView, {
+      global: { provide: { [dailyTaskRepositoryKey as symbol]: repository } },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('123')
+
+    window.dispatchEvent(new CustomEvent('deepstudy:sync-data-changed'))
+    await flushPromises()
+
+    expect(repository.listForDate).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('123')
+    expect(wrapper.text()).toContain('今天还没有任务')
+  })
+
   it('shows a save error without discarding the local editor text', async () => {
     const repository = repositoryWith()
     vi.mocked(repository.create).mockRejectedValueOnce(new Error('disk full'))
