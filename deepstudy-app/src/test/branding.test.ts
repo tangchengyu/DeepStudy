@@ -14,6 +14,21 @@ function readBinary(path: string) {
   return readFileSync(path, 'binary')
 }
 
+function pngSize(path: string) {
+  const data = readBinary(path)
+  expect(data.slice(1, 4)).toBe('PNG')
+  return [readUint32(data, 16), readUint32(data, 20)]
+}
+
+function readUint32(data: string, offset: number) {
+  return (
+    (data.charCodeAt(offset) << 24) |
+    (data.charCodeAt(offset + 1) << 16) |
+    (data.charCodeAt(offset + 2) << 8) |
+    data.charCodeAt(offset + 3)
+  ) >>> 0
+}
+
 describe('DeepStudy mobile branding', () => {
   it('uses the desktop DeepStudy green and gold theme instead of the old purple mobile palette', () => {
     const appStyles = readText(resolve(projectRoot, 'src/styles.css'))
@@ -28,12 +43,10 @@ describe('DeepStudy mobile branding', () => {
     expect(launcherBackground).toContain('#F3F7F2')
   })
 
-  it('ships the desktop alarm-clock icon as the Android launcher icon', () => {
-    const desktopClockIcon = readBinary(resolve(projectRoot, 'src/assets/deepstudy-clock-icon.png'))
-    const androidLauncherIcon = readBinary(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png'))
-    const androidLauncherForeground = readBinary(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png'))
-
-    expect(androidLauncherIcon).toBe(desktopClockIcon)
-    expect(androidLauncherForeground).toBe(desktopClockIcon)
+  it('ships density-specific Android launcher icons with an adaptive foreground', () => {
+    expect(pngSize(resolve(projectRoot, 'src/assets/deepstudy-clock-icon.png'))).toEqual([512, 512])
+    expect(pngSize(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png'))).toEqual([192, 192])
+    expect(pngSize(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png'))).toEqual([192, 192])
+    expect(pngSize(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png'))).toEqual([432, 432])
   })
 })
