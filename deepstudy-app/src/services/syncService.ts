@@ -126,6 +126,7 @@ export function createSyncService(options: SyncServiceOptions) {
     promise: Promise<SyncRunStats>
   } | null = null
   let unsubscribe: (() => void) | null = null
+  let unsubscribeOutbox: (() => void) | null = null
   let generation = 0
 
   async function refreshState() {
@@ -151,6 +152,17 @@ export function createSyncService(options: SyncServiceOptions) {
       }
     }
     throw lastError
+  }
+
+  function subscribeOutboxChanges() {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      return () => undefined
+    }
+    const listener = () => {
+      void refreshState().catch(() => undefined)
+    }
+    window.addEventListener('deepstudy:sync-outbox-changed', listener)
+    return () => window.removeEventListener('deepstudy:sync-outbox-changed', listener)
   }
 
   async function storeConflict(mutation: PendingMutation, result: PushConflictResult) {
@@ -515,6 +527,7 @@ export function createSyncService(options: SyncServiceOptions) {
       return { ok: true, resolution }
     },
     start() {
+      if (!unsubscribeOutbox) unsubscribeOutbox = subscribeOutboxChanges()
       if (unsubscribe) return
       void refreshState()
       unsubscribe = options.connectivity.subscribe((online) => {
@@ -527,6 +540,8 @@ export function createSyncService(options: SyncServiceOptions) {
       generation += 1
       unsubscribe?.()
       unsubscribe = null
+      unsubscribeOutbox?.()
+      unsubscribeOutbox = null
     },
   }
 }

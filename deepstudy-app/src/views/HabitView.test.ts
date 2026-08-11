@@ -141,4 +141,25 @@ describe('Habit reflection and audit view', () => {
     expect(wrapper.text()).toContain('2026-07-24')
     expect((wrapper.get('#today-reflection').element as HTMLTextAreaElement).value).toBe('新日期')
   })
+
+  it('reloads reflection history when sync writes remote records into local storage', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 23, 9, 0, 0))
+    const repository = repositoryWith()
+    vi.mocked(repository.listGrouped)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ date: '2026-07-23', entries: [entry({ content: '1234' })] }])
+    const wrapper = mount(HabitView, {
+      global: { provide: { [reflectionRepositoryKey as symbol]: repository } },
+    })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('1234')
+
+    window.dispatchEvent(new CustomEvent('deepstudy:sync-data-changed'))
+    await flushPromises()
+
+    expect(repository.listGrouped).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('1234')
+    expect((wrapper.get('#today-reflection').element as HTMLTextAreaElement).value).toBe('1234')
+  })
 })

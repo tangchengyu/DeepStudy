@@ -71,6 +71,10 @@ async function load() {
   }
 }
 
+function handleSyncDataChanged() {
+  void load()
+}
+
 async function saveToday() {
   if (busy.value) return
   busy.value = true
@@ -144,6 +148,7 @@ async function removeEntry(entry: ReflectionEntry) {
 
 onMounted(() => {
   void load()
+  window.addEventListener('deepstudy:sync-data-changed', handleSyncDataChanged)
   dateInterval = setInterval(() => {
     const nextToday = localDateKey(new Date())
     if (nextToday === today.value) return
@@ -153,6 +158,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('deepstudy:sync-data-changed', handleSyncDataChanged)
   if (dateInterval) clearInterval(dateInterval)
 })
 </script>

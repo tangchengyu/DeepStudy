@@ -49,4 +49,16 @@ describe('DeepStudy mobile branding', () => {
     expect(pngSize(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png'))).toEqual([192, 192])
     expect(pngSize(resolve(projectRoot, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png'))).toEqual([432, 432])
   })
+
+  it('keeps mobile headings and quadrant cards compact enough for narrow phones', () => {
+    const appStyles = readText(resolve(projectRoot, 'src/styles.css'))
+    const longBoard = readText(resolve(projectRoot, 'src/views/LongBoardView.vue'))
+
+    expect(appStyles).toContain('font-size: clamp(1.55rem, 6.2vw, 2.05rem);')
+    expect(appStyles).toContain('line-height: 1.22;')
+    expect(appStyles).toContain('font-size: 0.8rem;')
+    expect(longBoard).toContain('font-size: 0.78rem;')
+    expect(longBoard).toContain('grid-template-columns: 1.45rem minmax(0, 1fr) auto;')
+    expect(longBoard).toContain('padding: 0.9rem 0.7rem;')
+  })
 })

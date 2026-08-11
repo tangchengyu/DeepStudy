@@ -2645,7 +2645,9 @@ const Reflections = (() => {
 
   function groupItemsByDate() {
     const groups = new Map();
-    [...items].sort((a, b) => a.date.localeCompare(b.date) || (b.updatedAt - a.updatedAt)).forEach((item) => {
+    [...items].sort((a, b) => (
+      String(b.date || "").localeCompare(String(a.date || "")) || (b.updatedAt - a.updatedAt)
+    )).forEach((item) => {
       if (!groups.has(item.date)) groups.set(item.date, []);
       groups.get(item.date).push(item);
     });

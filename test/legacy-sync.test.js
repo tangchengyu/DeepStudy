@@ -148,6 +148,29 @@ test("pulled records are backed up before writes, verified, and leave original k
   assert.deepEqual(quotes.find((item) => item.id === "quote-remote"), records[2].payload);
 });
 
+test("pulled reflection tombstones remove the matching desktop reflection entry", () => {
+  const stores = emptyStores();
+  stores[LEGACY_STORAGE_KEYS.reflection] = JSON.stringify([
+    { id: "manual-1234", date: "2026-08-11", content: "1234", kind: "manual", updatedAt: 10 },
+    { id: "keep-me", date: "2026-08-10", content: "保留", kind: "manual", updatedAt: 9 },
+  ]);
+  const planned = require("../renderer/legacy-sync").planPulledWrites({
+    rawStores: stores,
+    longTasks: [],
+    records: [{
+      entityType: "reflection",
+      entityId: "manual-1234",
+      payload: { id: "manual-1234" },
+      deleted: true,
+      revision: 4,
+    }],
+  });
+
+  assert.deepEqual(JSON.parse(planned.localStores[LEGACY_STORAGE_KEYS.reflection]), [
+    { id: "keep-me", date: "2026-08-10", content: "保留", kind: "manual", updatedAt: 9 },
+  ]);
+});
+
 test("failed readback restores all LocalStorage values and the durable backup", async () => {
   const stores = emptyStores();
   const storage = memoryStorage(stores);

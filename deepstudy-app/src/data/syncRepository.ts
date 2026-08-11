@@ -57,6 +57,11 @@ function sameRecordContent(left: SyncRecordEnvelope, right: SyncRecordEnvelope) 
   return left.deleted === right.deleted && canonicalJson(left.payload) === canonicalJson(right.payload)
 }
 
+function notifyOutboxChanged(detail: Record<string, unknown>) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  window.dispatchEvent(new CustomEvent('deepstudy:sync-outbox-changed', { detail }))
+}
+
 export interface SyncRecordEnvelope {
   key: string
   entityType: SyncEntityType
@@ -251,7 +256,7 @@ export function createSyncRepository(
     const scopeKey = activeScope()
     const timestamp = resolvedOptions.now()
 
-    return database.transaction(
+    const mutations = await database.transaction(
       'rw',
       database.metadata,
       database.syncRecords,
@@ -301,6 +306,10 @@ export function createSyncRepository(
         return mutations
       }
     )
+    if (mutations.length) {
+      notifyOutboxChanged({ scopeKey, pendingAdded: mutations.length })
+    }
+    return mutations
   }
 
   async function enqueue(

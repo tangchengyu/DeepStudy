@@ -173,6 +173,38 @@ describe('connectivity-aware sync service', () => {
     database.close()
   })
 
+  it('refreshes the shared pending count when local edits enter the outbox', async () => {
+    const database = databaseForTest()
+    let mutationSequence = 0
+    const repository = createSyncRepository(database, {
+      createDeviceId: () => 'android-device-live-pending',
+      createMutationId: () => `mutation-live-pending-${++mutationSequence}`,
+    })
+    const service = createSyncService({
+      repository,
+      client: {
+        registerDevice: vi.fn(),
+        push: vi.fn(),
+        pull: vi.fn(),
+        conflicts: vi.fn(),
+        resolveConflict: vi.fn(),
+      },
+      connectivity: { isOnline: () => true, subscribe: () => () => undefined },
+      delay: async () => undefined,
+    })
+    service.start()
+    await service.refreshState()
+    expect(service.state.pending).toBe(0)
+
+    await repository.enqueueUpsert('daily_task', 'local-change', { text: 'APP 新增计划' })
+    await vi.waitFor(() => {
+      expect(service.state.pending).toBe(1)
+    })
+
+    service.stop()
+    database.close()
+  })
+
   it('previews remote account impact without applying records or advancing the cursor', async () => {
     const database = databaseForTest()
     const repository = createSyncRepository(database, {

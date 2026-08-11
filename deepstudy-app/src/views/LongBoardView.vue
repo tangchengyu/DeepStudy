@@ -75,22 +75,25 @@ onMounted(async () => {
 }
 
 .page-heading {
-  align-items: end;
+  align-items: flex-start;
   display: flex;
+  gap: 0.8rem;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.05rem;
 }
 
 .page-heading h1 {
-  font-size: clamp(1.85rem, 8vw, 2.4rem);
-  letter-spacing: -0.04em;
+  font-size: clamp(1.65rem, 7vw, 2.2rem);
+  letter-spacing: 0;
+  line-height: 1.15;
   margin: 0.15rem 0 0;
 }
 
 .eyebrow,
 .page-caption {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
   margin: 0;
 }
 
@@ -101,7 +104,7 @@ onMounted(async () => {
 }
 
 .page-caption {
-  max-width: 8rem;
+  max-width: 9.5rem;
   text-align: right;
 }
 
@@ -124,7 +127,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 1rem 0.85rem;
+  padding: 0.9rem 0.7rem;
   text-decoration: none;
 }
 
@@ -136,14 +139,15 @@ onMounted(async () => {
 .quadrant-card__header {
   align-items: center;
   display: grid;
-  gap: 0.4rem;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  grid-template-columns: 1.45rem minmax(0, 1fr) auto;
 }
 
 .quadrant-card__header h2 {
-  font-size: 0.88rem;
-  line-height: 1.2;
+  font-size: 0.78rem;
+  line-height: 1.25;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .quadrant-card__numeral {
@@ -153,10 +157,10 @@ onMounted(async () => {
   color: #fff;
   display: inline-flex;
   font-family: Georgia, serif;
-  font-size: 0.72rem;
-  height: 1.55rem;
+  font-size: 0.68rem;
+  height: 1.45rem;
   justify-content: center;
-  width: 1.55rem;
+  width: 1.45rem;
 }
 
 .quadrant-card__count {
@@ -182,19 +186,19 @@ onMounted(async () => {
 
 .quadrant-preview {
   display: grid;
-  gap: 0.78rem;
+  gap: 0.68rem;
   list-style: none;
-  margin: 1rem 0 0;
+  margin: 0.85rem 0 0;
   padding: 0;
 }
 
 .quadrant-preview li {
   align-items: start;
   display: grid;
-  font-size: 0.83rem;
-  gap: 0.55rem;
+  font-size: 0.78rem;
+  gap: 0.45rem;
   grid-template-columns: auto minmax(0, 1fr);
-  line-height: 1.35;
+  line-height: 1.34;
 }
 
 .preview-checkbox {
