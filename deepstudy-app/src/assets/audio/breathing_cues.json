@@ -1,0 +1,2515 @@
+{
+  "box": {
+    "playbackRate": 1,
+    "groupLabel": "轮",
+    "groupTotal": 3,
+    "audio": "4-4-4-4.MP3",
+    "duration": 696.24,
+    "cues": [
+      {
+        "start": 0.0,
+        "end": 4.0,
+        "label": "腹式呼吸",
+        "scale": 1.0,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 0.2
+      },
+      {
+        "start": 4.0,
+        "end": 8.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 8.0,
+        "end": 12.0,
+        "label": "舒适坐躺",
+        "scale": 0.96,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 8.2
+      },
+      {
+        "start": 12.0,
+        "end": 16.0,
+        "label": "跟随呼吸",
+        "scale": 0.96,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 16.0,
+        "end": 20.0,
+        "label": "闭目静养",
+        "scale": 0.92,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 16.2
+      },
+      {
+        "start": 20.0,
+        "end": 24.0,
+        "label": "跟随呼吸",
+        "scale": 0.92,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 24.0,
+        "end": 28.0,
+        "label": "鼻吸嘴呼",
+        "scale": 1.08,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 24.2
+      },
+      {
+        "start": 28.0,
+        "end": 32.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 32.0,
+        "end": 36.0,
+        "label": "深吸缓呼",
+        "scale": 1.16,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 32.2
+      },
+      {
+        "start": 36.0,
+        "end": 40.0,
+        "label": "跟随呼吸",
+        "scale": 1.16,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 40.0,
+        "end": 44.0,
+        "label": "身体由紧",
+        "scale": 1.08,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 40.2
+      },
+      {
+        "start": 44.0,
+        "end": 48.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 48.0,
+        "end": 52.0,
+        "label": "渐至松爽",
+        "scale": 0.94,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 48.2
+      },
+      {
+        "start": 52.0,
+        "end": 56.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 56.0,
+        "end": 60.0,
+        "label": "局部放松",
+        "scale": 0.9,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 56.2
+      },
+      {
+        "start": 60.0,
+        "end": 64.0,
+        "label": "跟随呼吸",
+        "scale": 0.9,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 64.0,
+        "end": 68.0,
+        "label": "整体放松",
+        "scale": 0.86,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 64.2
+      },
+      {
+        "start": 68.0,
+        "end": 72.0,
+        "label": "跟随呼吸",
+        "scale": 0.86,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 72.0,
+        "end": 76.0,
+        "label": "感知呼吸",
+        "scale": 1.02,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 72.2
+      },
+      {
+        "start": 76.0,
+        "end": 80.0,
+        "label": "跟随呼吸",
+        "scale": 1.02,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 80.0,
+        "end": 84.0,
+        "label": "美景远方",
+        "scale": 1.1,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 80.2
+      },
+      {
+        "start": 84.0,
+        "end": 88.0,
+        "label": "跟随呼吸",
+        "scale": 1.1,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 88.0,
+        "end": 92.0,
+        "label": "吸气伸展",
+        "scale": 1.18,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 88.2
+      },
+      {
+        "start": 92.0,
+        "end": 96.0,
+        "label": "跟随呼吸",
+        "scale": 1.18,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 96.0,
+        "end": 100.0,
+        "label": "呼气松绑",
+        "scale": 0.9,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 96.2
+      },
+      {
+        "start": 100.0,
+        "end": 104.0,
+        "label": "跟随呼吸",
+        "scale": 0.9,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 104.0,
+        "end": 108.0,
+        "label": "从上到下",
+        "scale": 0.98,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 104.2
+      },
+      {
+        "start": 108.0,
+        "end": 112.0,
+        "label": "跟随呼吸",
+        "scale": 0.98,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 112.0,
+        "end": 116.0,
+        "label": "扫描全身",
+        "scale": 0.94,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 112.2
+      },
+      {
+        "start": 116.0,
+        "end": 120.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 120.0,
+        "end": 124.0,
+        "label": "意念轻转",
+        "scale": 1.03,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 120.2
+      },
+      {
+        "start": 124.0,
+        "end": 128.0,
+        "label": "跟随呼吸",
+        "scale": 1.03,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 128.0,
+        "end": 132.0,
+        "label": "协调通畅",
+        "scale": 1.08,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 128.2
+      },
+      {
+        "start": 132.0,
+        "end": 136.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 136.0,
+        "end": 140.0,
+        "label": "头脑散热",
+        "scale": 0.94,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 136.2
+      },
+      {
+        "start": 140.0,
+        "end": 144.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 144.0,
+        "end": 148.0,
+        "label": "四肢发烫",
+        "scale": 1.06,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 144.2
+      },
+      {
+        "start": 148.0,
+        "end": 152.0,
+        "label": "跟随呼吸",
+        "scale": 1.06,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 152.0,
+        "end": 156.0,
+        "label": "吸气紧张",
+        "scale": 1.18,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 152.2
+      },
+      {
+        "start": 156.0,
+        "end": 160.0,
+        "label": "跟随呼吸",
+        "scale": 1.18,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 160.0,
+        "end": 164.0,
+        "label": "呼气释放",
+        "scale": 0.88,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 160.2
+      },
+      {
+        "start": 164.0,
+        "end": 168.0,
+        "label": "跟随呼吸",
+        "scale": 0.88,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 168.0,
+        "end": 172.0,
+        "label": "三至五轮",
+        "scale": 1.04,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 168.2
+      },
+      {
+        "start": 172.0,
+        "end": 176.0,
+        "label": "跟随呼吸",
+        "scale": 1.04,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 176.0,
+        "end": 180.0,
+        "label": "神清气爽",
+        "scale": 1.1,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 176.2
+      },
+      {
+        "start": 180.0,
+        "end": 184.0,
+        "label": "跟随呼吸",
+        "scale": 1.1,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 184.0,
+        "end": 188.0,
+        "label": "感知身体",
+        "scale": 1.0,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 184.2
+      },
+      {
+        "start": 188.0,
+        "end": 192.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 192.0,
+        "end": 196.0,
+        "label": "情绪涟漪",
+        "scale": 0.96,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 192.2
+      },
+      {
+        "start": 196.0,
+        "end": 200.0,
+        "label": "跟随呼吸",
+        "scale": 0.96,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 200.0,
+        "end": 204.0,
+        "label": "事物对象",
+        "scale": 0.98,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 200.2
+      },
+      {
+        "start": 204.0,
+        "end": 208.0,
+        "label": "跟随呼吸",
+        "scale": 0.98,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 208.0,
+        "end": 212.0,
+        "label": "脑中泛起",
+        "scale": 0.94,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 208.2
+      },
+      {
+        "start": 212.0,
+        "end": 216.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 216.0,
+        "end": 220.0,
+        "label": "两眼之间",
+        "scale": 1.0,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 216.2
+      },
+      {
+        "start": 220.0,
+        "end": 224.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 224.0,
+        "end": 228.0,
+        "label": "心念齐聚",
+        "scale": 0.94,
+        "group": 1,
+        "step": "narration",
+        "voiceStart": 224.2
+      },
+      {
+        "start": 228.0,
+        "end": 232.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 1,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 232.0,
+        "end": 236.0,
+        "label": "腹式呼吸",
+        "scale": 1.0,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 232.2
+      },
+      {
+        "start": 236.0,
+        "end": 240.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 240.0,
+        "end": 244.0,
+        "label": "舒适坐躺",
+        "scale": 0.96,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 240.2
+      },
+      {
+        "start": 244.0,
+        "end": 248.0,
+        "label": "跟随呼吸",
+        "scale": 0.96,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 248.0,
+        "end": 252.0,
+        "label": "闭目静养",
+        "scale": 0.92,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 248.2
+      },
+      {
+        "start": 252.0,
+        "end": 256.0,
+        "label": "跟随呼吸",
+        "scale": 0.92,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 256.0,
+        "end": 260.0,
+        "label": "鼻吸嘴呼",
+        "scale": 1.08,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 256.2
+      },
+      {
+        "start": 260.0,
+        "end": 264.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 264.0,
+        "end": 268.0,
+        "label": "深吸缓呼",
+        "scale": 1.16,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 264.2
+      },
+      {
+        "start": 268.0,
+        "end": 272.0,
+        "label": "跟随呼吸",
+        "scale": 1.16,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 272.0,
+        "end": 276.0,
+        "label": "身体由紧",
+        "scale": 1.08,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 272.2
+      },
+      {
+        "start": 276.0,
+        "end": 280.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 280.0,
+        "end": 284.0,
+        "label": "渐至松爽",
+        "scale": 0.94,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 280.2
+      },
+      {
+        "start": 284.0,
+        "end": 288.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 288.0,
+        "end": 292.0,
+        "label": "局部放松",
+        "scale": 0.9,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 288.2
+      },
+      {
+        "start": 292.0,
+        "end": 296.0,
+        "label": "跟随呼吸",
+        "scale": 0.9,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 296.0,
+        "end": 300.0,
+        "label": "整体放松",
+        "scale": 0.86,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 296.2
+      },
+      {
+        "start": 300.0,
+        "end": 304.0,
+        "label": "跟随呼吸",
+        "scale": 0.86,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 304.0,
+        "end": 308.0,
+        "label": "感知呼吸",
+        "scale": 1.02,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 304.2
+      },
+      {
+        "start": 308.0,
+        "end": 312.0,
+        "label": "跟随呼吸",
+        "scale": 1.02,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 312.0,
+        "end": 316.0,
+        "label": "美景远方",
+        "scale": 1.1,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 312.2
+      },
+      {
+        "start": 316.0,
+        "end": 320.0,
+        "label": "跟随呼吸",
+        "scale": 1.1,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 320.0,
+        "end": 324.0,
+        "label": "吸气伸展",
+        "scale": 1.18,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 320.2
+      },
+      {
+        "start": 324.0,
+        "end": 328.0,
+        "label": "跟随呼吸",
+        "scale": 1.18,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 328.0,
+        "end": 332.0,
+        "label": "呼气松绑",
+        "scale": 0.9,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 328.2
+      },
+      {
+        "start": 332.0,
+        "end": 336.0,
+        "label": "跟随呼吸",
+        "scale": 0.9,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 336.0,
+        "end": 340.0,
+        "label": "从上到下",
+        "scale": 0.98,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 336.2
+      },
+      {
+        "start": 340.0,
+        "end": 344.0,
+        "label": "跟随呼吸",
+        "scale": 0.98,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 344.0,
+        "end": 348.0,
+        "label": "扫描全身",
+        "scale": 0.94,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 344.2
+      },
+      {
+        "start": 348.0,
+        "end": 352.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 352.0,
+        "end": 356.0,
+        "label": "意念轻转",
+        "scale": 1.03,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 352.2
+      },
+      {
+        "start": 356.0,
+        "end": 360.0,
+        "label": "跟随呼吸",
+        "scale": 1.03,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 360.0,
+        "end": 364.0,
+        "label": "协调通畅",
+        "scale": 1.08,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 360.2
+      },
+      {
+        "start": 364.0,
+        "end": 368.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 368.0,
+        "end": 372.0,
+        "label": "头脑散热",
+        "scale": 0.94,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 368.2
+      },
+      {
+        "start": 372.0,
+        "end": 376.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 376.0,
+        "end": 380.0,
+        "label": "四肢发烫",
+        "scale": 1.06,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 376.2
+      },
+      {
+        "start": 380.0,
+        "end": 384.0,
+        "label": "跟随呼吸",
+        "scale": 1.06,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 384.0,
+        "end": 388.0,
+        "label": "吸气紧张",
+        "scale": 1.18,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 384.2
+      },
+      {
+        "start": 388.0,
+        "end": 392.0,
+        "label": "跟随呼吸",
+        "scale": 1.18,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 392.0,
+        "end": 396.0,
+        "label": "呼气释放",
+        "scale": 0.88,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 392.2
+      },
+      {
+        "start": 396.0,
+        "end": 400.0,
+        "label": "跟随呼吸",
+        "scale": 0.88,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 400.0,
+        "end": 404.0,
+        "label": "三至五轮",
+        "scale": 1.04,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 400.2
+      },
+      {
+        "start": 404.0,
+        "end": 408.0,
+        "label": "跟随呼吸",
+        "scale": 1.04,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 408.0,
+        "end": 412.0,
+        "label": "神清气爽",
+        "scale": 1.1,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 408.2
+      },
+      {
+        "start": 412.0,
+        "end": 416.0,
+        "label": "跟随呼吸",
+        "scale": 1.1,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 416.0,
+        "end": 420.0,
+        "label": "感知身体",
+        "scale": 1.0,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 416.2
+      },
+      {
+        "start": 420.0,
+        "end": 424.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 424.0,
+        "end": 428.0,
+        "label": "情绪涟漪",
+        "scale": 0.96,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 424.2
+      },
+      {
+        "start": 428.0,
+        "end": 432.0,
+        "label": "跟随呼吸",
+        "scale": 0.96,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 432.0,
+        "end": 436.0,
+        "label": "事物对象",
+        "scale": 0.98,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 432.2
+      },
+      {
+        "start": 436.0,
+        "end": 440.0,
+        "label": "跟随呼吸",
+        "scale": 0.98,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 440.0,
+        "end": 444.0,
+        "label": "脑中泛起",
+        "scale": 0.94,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 440.2
+      },
+      {
+        "start": 444.0,
+        "end": 448.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 448.0,
+        "end": 452.0,
+        "label": "两眼之间",
+        "scale": 1.0,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 448.2
+      },
+      {
+        "start": 452.0,
+        "end": 456.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 456.0,
+        "end": 460.0,
+        "label": "心念齐聚",
+        "scale": 0.94,
+        "group": 2,
+        "step": "narration",
+        "voiceStart": 456.2
+      },
+      {
+        "start": 460.0,
+        "end": 464.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 2,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 464.0,
+        "end": 468.0,
+        "label": "腹式呼吸",
+        "scale": 1.0,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 464.2
+      },
+      {
+        "start": 468.0,
+        "end": 472.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 472.0,
+        "end": 476.0,
+        "label": "舒适坐躺",
+        "scale": 0.96,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 472.2
+      },
+      {
+        "start": 476.0,
+        "end": 480.0,
+        "label": "跟随呼吸",
+        "scale": 0.96,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 480.0,
+        "end": 484.0,
+        "label": "闭目静养",
+        "scale": 0.92,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 480.2
+      },
+      {
+        "start": 484.0,
+        "end": 488.0,
+        "label": "跟随呼吸",
+        "scale": 0.92,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 488.0,
+        "end": 492.0,
+        "label": "鼻吸嘴呼",
+        "scale": 1.08,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 488.2
+      },
+      {
+        "start": 492.0,
+        "end": 496.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 496.0,
+        "end": 500.0,
+        "label": "深吸缓呼",
+        "scale": 1.16,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 496.2
+      },
+      {
+        "start": 500.0,
+        "end": 504.0,
+        "label": "跟随呼吸",
+        "scale": 1.16,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 504.0,
+        "end": 508.0,
+        "label": "身体由紧",
+        "scale": 1.08,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 504.2
+      },
+      {
+        "start": 508.0,
+        "end": 512.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 512.0,
+        "end": 516.0,
+        "label": "渐至松爽",
+        "scale": 0.94,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 512.2
+      },
+      {
+        "start": 516.0,
+        "end": 520.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 520.0,
+        "end": 524.0,
+        "label": "局部放松",
+        "scale": 0.9,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 520.2
+      },
+      {
+        "start": 524.0,
+        "end": 528.0,
+        "label": "跟随呼吸",
+        "scale": 0.9,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 528.0,
+        "end": 532.0,
+        "label": "整体放松",
+        "scale": 0.86,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 528.2
+      },
+      {
+        "start": 532.0,
+        "end": 536.0,
+        "label": "跟随呼吸",
+        "scale": 0.86,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 536.0,
+        "end": 540.0,
+        "label": "感知呼吸",
+        "scale": 1.02,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 536.2
+      },
+      {
+        "start": 540.0,
+        "end": 544.0,
+        "label": "跟随呼吸",
+        "scale": 1.02,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 544.0,
+        "end": 548.0,
+        "label": "美景远方",
+        "scale": 1.1,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 544.2
+      },
+      {
+        "start": 548.0,
+        "end": 552.0,
+        "label": "跟随呼吸",
+        "scale": 1.1,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 552.0,
+        "end": 556.0,
+        "label": "吸气伸展",
+        "scale": 1.18,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 552.2
+      },
+      {
+        "start": 556.0,
+        "end": 560.0,
+        "label": "跟随呼吸",
+        "scale": 1.18,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 560.0,
+        "end": 564.0,
+        "label": "呼气松绑",
+        "scale": 0.9,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 560.2
+      },
+      {
+        "start": 564.0,
+        "end": 568.0,
+        "label": "跟随呼吸",
+        "scale": 0.9,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 568.0,
+        "end": 572.0,
+        "label": "从上到下",
+        "scale": 0.98,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 568.2
+      },
+      {
+        "start": 572.0,
+        "end": 576.0,
+        "label": "跟随呼吸",
+        "scale": 0.98,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 576.0,
+        "end": 580.0,
+        "label": "扫描全身",
+        "scale": 0.94,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 576.2
+      },
+      {
+        "start": 580.0,
+        "end": 584.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 584.0,
+        "end": 588.0,
+        "label": "意念轻转",
+        "scale": 1.03,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 584.2
+      },
+      {
+        "start": 588.0,
+        "end": 592.0,
+        "label": "跟随呼吸",
+        "scale": 1.03,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 592.0,
+        "end": 596.0,
+        "label": "协调通畅",
+        "scale": 1.08,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 592.2
+      },
+      {
+        "start": 596.0,
+        "end": 600.0,
+        "label": "跟随呼吸",
+        "scale": 1.08,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 600.0,
+        "end": 604.0,
+        "label": "头脑散热",
+        "scale": 0.94,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 600.2
+      },
+      {
+        "start": 604.0,
+        "end": 608.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 608.0,
+        "end": 612.0,
+        "label": "四肢发烫",
+        "scale": 1.06,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 608.2
+      },
+      {
+        "start": 612.0,
+        "end": 616.0,
+        "label": "跟随呼吸",
+        "scale": 1.06,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 616.0,
+        "end": 620.0,
+        "label": "吸气紧张",
+        "scale": 1.18,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 616.2
+      },
+      {
+        "start": 620.0,
+        "end": 624.0,
+        "label": "跟随呼吸",
+        "scale": 1.18,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 624.0,
+        "end": 628.0,
+        "label": "呼气释放",
+        "scale": 0.88,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 624.2
+      },
+      {
+        "start": 628.0,
+        "end": 632.0,
+        "label": "跟随呼吸",
+        "scale": 0.88,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 632.0,
+        "end": 636.0,
+        "label": "三至五轮",
+        "scale": 1.04,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 632.2
+      },
+      {
+        "start": 636.0,
+        "end": 640.0,
+        "label": "跟随呼吸",
+        "scale": 1.04,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 640.0,
+        "end": 644.0,
+        "label": "神清气爽",
+        "scale": 1.1,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 640.2
+      },
+      {
+        "start": 644.0,
+        "end": 648.0,
+        "label": "跟随呼吸",
+        "scale": 1.1,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 648.0,
+        "end": 652.0,
+        "label": "感知身体",
+        "scale": 1.0,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 648.2
+      },
+      {
+        "start": 652.0,
+        "end": 656.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 656.0,
+        "end": 660.0,
+        "label": "情绪涟漪",
+        "scale": 0.96,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 656.2
+      },
+      {
+        "start": 660.0,
+        "end": 664.0,
+        "label": "跟随呼吸",
+        "scale": 0.96,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 664.0,
+        "end": 668.0,
+        "label": "事物对象",
+        "scale": 0.98,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 664.2
+      },
+      {
+        "start": 668.0,
+        "end": 672.0,
+        "label": "跟随呼吸",
+        "scale": 0.98,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 672.0,
+        "end": 676.0,
+        "label": "脑中泛起",
+        "scale": 0.94,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 672.2
+      },
+      {
+        "start": 676.0,
+        "end": 680.0,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 680.0,
+        "end": 684.0,
+        "label": "两眼之间",
+        "scale": 1.0,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 680.2
+      },
+      {
+        "start": 684.0,
+        "end": 688.0,
+        "label": "跟随呼吸",
+        "scale": 1.0,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      },
+      {
+        "start": 688.0,
+        "end": 692.0,
+        "label": "心念齐聚",
+        "scale": 0.94,
+        "group": 3,
+        "step": "narration",
+        "voiceStart": 688.2
+      },
+      {
+        "start": 692.0,
+        "end": 696.24,
+        "label": "跟随呼吸",
+        "scale": 0.94,
+        "group": 3,
+        "step": "space",
+        "countdown": true
+      }
+    ]
+  },
+  "wim": {
+    "playbackRate": 1,
+    "groupLabel": "组",
+    "groupTotal": 3,
+    "audio": "wim_hof_3groups_v3_faster_22_24_final_320k.mp3",
+    "duration": 358.03,
+    "cues": [
+      {
+        "start": 0.0,
+        "end": 2.5,
+        "label": "请保持坐姿或躺姿",
+        "scale": 1.0,
+        "group": 1,
+        "step": "instruction"
+      },
+      {
+        "start": 2.5,
+        "end": 5.3,
+        "label": "下面开始第一组",
+        "scale": 1.08,
+        "group": 1,
+        "step": "group-start"
+      },
+      {
+        "start": 5.3,
+        "end": 6.3,
+        "label": "准备",
+        "scale": 1.0,
+        "group": 1,
+        "step": "silence",
+        "countdown": true
+      },
+      {
+        "start": 6.3,
+        "end": 8.5,
+        "label": "爆发式深呼吸准备",
+        "scale": 1.08,
+        "group": 1,
+        "step": "instruction"
+      },
+      {
+        "start": 8.5,
+        "end": 9.5,
+        "label": "一",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 9.5,
+        "end": 10.5,
+        "label": "二",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 10.5,
+        "end": 11.5,
+        "label": "三",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 11.5,
+        "end": 12.5,
+        "label": "四",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 12.5,
+        "end": 13.5,
+        "label": "五",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 13.5,
+        "end": 14.5,
+        "label": "六",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 14.5,
+        "end": 15.5,
+        "label": "七",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 15.5,
+        "end": 16.5,
+        "label": "八",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 16.5,
+        "end": 17.5,
+        "label": "九",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 17.5,
+        "end": 18.5,
+        "label": "十",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 18.5,
+        "end": 19.5,
+        "label": "十一",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 19.5,
+        "end": 20.5,
+        "label": "十二",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 20.5,
+        "end": 21.5,
+        "label": "十三",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 21.5,
+        "end": 22.5,
+        "label": "十四",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 22.5,
+        "end": 23.5,
+        "label": "十五",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 23.5,
+        "end": 24.5,
+        "label": "十六",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 24.5,
+        "end": 25.5,
+        "label": "十七",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 25.5,
+        "end": 26.5,
+        "label": "十八",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 26.5,
+        "end": 27.5,
+        "label": "十九",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 27.5,
+        "end": 28.5,
+        "label": "二十",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 28.5,
+        "end": 29.5,
+        "label": "二一",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 29.5,
+        "end": 30.5,
+        "label": "二二",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 30.5,
+        "end": 31.5,
+        "label": "二三",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 31.5,
+        "end": 32.5,
+        "label": "二四",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 32.5,
+        "end": 33.5,
+        "label": "二五",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 33.5,
+        "end": 34.5,
+        "label": "二六",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 34.5,
+        "end": 35.5,
+        "label": "二七",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 35.5,
+        "end": 36.5,
+        "label": "二八",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 36.5,
+        "end": 37.5,
+        "label": "二九",
+        "scale": 1.18,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 37.5,
+        "end": 38.5,
+        "label": "三十",
+        "scale": 0.9,
+        "group": 1,
+        "step": "count"
+      },
+      {
+        "start": 38.5,
+        "end": 41.0,
+        "label": "现在闭气六十秒",
+        "scale": 0.92,
+        "group": 1,
+        "step": "instruction"
+      },
+      {
+        "start": 41.0,
+        "end": 101.0,
+        "label": "闭气六十秒",
+        "scale": 0.86,
+        "group": 1,
+        "step": "hold",
+        "countdown": true
+      },
+      {
+        "start": 101.0,
+        "end": 103.5,
+        "label": "现在深吸憋气十五秒",
+        "scale": 1.16,
+        "group": 1,
+        "step": "instruction"
+      },
+      {
+        "start": 103.5,
+        "end": 118.5,
+        "label": "深吸憋气十五秒",
+        "scale": 1.18,
+        "group": 1,
+        "step": "hold",
+        "countdown": true
+      },
+      {
+        "start": 118.5,
+        "end": 121.0,
+        "label": "现在大口呼出",
+        "scale": 0.86,
+        "group": 1,
+        "step": "instruction"
+      },
+      {
+        "start": 121.0,
+        "end": 123.8,
+        "label": "下面开始第二组",
+        "scale": 1.08,
+        "group": 2,
+        "step": "group-start"
+      },
+      {
+        "start": 123.8,
+        "end": 124.8,
+        "label": "准备",
+        "scale": 1.0,
+        "group": 2,
+        "step": "silence",
+        "countdown": true
+      },
+      {
+        "start": 124.8,
+        "end": 127.0,
+        "label": "爆发式深呼吸准备",
+        "scale": 1.08,
+        "group": 2,
+        "step": "instruction"
+      },
+      {
+        "start": 127.0,
+        "end": 128.0,
+        "label": "一",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 128.0,
+        "end": 129.0,
+        "label": "二",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 129.0,
+        "end": 130.0,
+        "label": "三",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 130.0,
+        "end": 131.0,
+        "label": "四",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 131.0,
+        "end": 132.0,
+        "label": "五",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 132.0,
+        "end": 133.0,
+        "label": "六",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 133.0,
+        "end": 134.0,
+        "label": "七",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 134.0,
+        "end": 135.0,
+        "label": "八",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 135.0,
+        "end": 136.0,
+        "label": "九",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 136.0,
+        "end": 137.0,
+        "label": "十",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 137.0,
+        "end": 138.0,
+        "label": "十一",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 138.0,
+        "end": 139.0,
+        "label": "十二",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 139.0,
+        "end": 140.0,
+        "label": "十三",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 140.0,
+        "end": 141.0,
+        "label": "十四",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 141.0,
+        "end": 142.0,
+        "label": "十五",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 142.0,
+        "end": 143.0,
+        "label": "十六",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 143.0,
+        "end": 144.0,
+        "label": "十七",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 144.0,
+        "end": 145.0,
+        "label": "十八",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 145.0,
+        "end": 146.0,
+        "label": "十九",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 146.0,
+        "end": 147.0,
+        "label": "二十",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 147.0,
+        "end": 148.0,
+        "label": "二一",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 148.0,
+        "end": 149.0,
+        "label": "二二",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 149.0,
+        "end": 150.0,
+        "label": "二三",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 150.0,
+        "end": 151.0,
+        "label": "二四",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 151.0,
+        "end": 152.0,
+        "label": "二五",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 152.0,
+        "end": 153.0,
+        "label": "二六",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 153.0,
+        "end": 154.0,
+        "label": "二七",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 154.0,
+        "end": 155.0,
+        "label": "二八",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 155.0,
+        "end": 156.0,
+        "label": "二九",
+        "scale": 1.18,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 156.0,
+        "end": 157.0,
+        "label": "三十",
+        "scale": 0.9,
+        "group": 2,
+        "step": "count"
+      },
+      {
+        "start": 157.0,
+        "end": 159.5,
+        "label": "现在闭气六十秒",
+        "scale": 0.92,
+        "group": 2,
+        "step": "instruction"
+      },
+      {
+        "start": 159.5,
+        "end": 219.5,
+        "label": "闭气六十秒",
+        "scale": 0.86,
+        "group": 2,
+        "step": "hold",
+        "countdown": true
+      },
+      {
+        "start": 219.5,
+        "end": 222.0,
+        "label": "现在深吸憋气十五秒",
+        "scale": 1.16,
+        "group": 2,
+        "step": "instruction"
+      },
+      {
+        "start": 222.0,
+        "end": 237.0,
+        "label": "深吸憋气十五秒",
+        "scale": 1.18,
+        "group": 2,
+        "step": "hold",
+        "countdown": true
+      },
+      {
+        "start": 237.0,
+        "end": 239.5,
+        "label": "现在大口呼出",
+        "scale": 0.86,
+        "group": 2,
+        "step": "instruction"
+      },
+      {
+        "start": 239.5,
+        "end": 242.3,
+        "label": "下面开始第三组",
+        "scale": 1.08,
+        "group": 3,
+        "step": "group-start"
+      },
+      {
+        "start": 242.3,
+        "end": 243.3,
+        "label": "准备",
+        "scale": 1.0,
+        "group": 3,
+        "step": "silence",
+        "countdown": true
+      },
+      {
+        "start": 243.3,
+        "end": 245.5,
+        "label": "爆发式深呼吸准备",
+        "scale": 1.08,
+        "group": 3,
+        "step": "instruction"
+      },
+      {
+        "start": 245.5,
+        "end": 246.5,
+        "label": "一",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 246.5,
+        "end": 247.5,
+        "label": "二",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 247.5,
+        "end": 248.5,
+        "label": "三",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 248.5,
+        "end": 249.5,
+        "label": "四",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 249.5,
+        "end": 250.5,
+        "label": "五",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 250.5,
+        "end": 251.5,
+        "label": "六",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 251.5,
+        "end": 252.5,
+        "label": "七",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 252.5,
+        "end": 253.5,
+        "label": "八",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 253.5,
+        "end": 254.5,
+        "label": "九",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 254.5,
+        "end": 255.5,
+        "label": "十",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 255.5,
+        "end": 256.5,
+        "label": "十一",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 256.5,
+        "end": 257.5,
+        "label": "十二",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 257.5,
+        "end": 258.5,
+        "label": "十三",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 258.5,
+        "end": 259.5,
+        "label": "十四",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 259.5,
+        "end": 260.5,
+        "label": "十五",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 260.5,
+        "end": 261.5,
+        "label": "十六",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 261.5,
+        "end": 262.5,
+        "label": "十七",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 262.5,
+        "end": 263.5,
+        "label": "十八",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 263.5,
+        "end": 264.5,
+        "label": "十九",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 264.5,
+        "end": 265.5,
+        "label": "二十",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 265.5,
+        "end": 266.5,
+        "label": "二一",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 266.5,
+        "end": 267.5,
+        "label": "二二",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 267.5,
+        "end": 268.5,
+        "label": "二三",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 268.5,
+        "end": 269.5,
+        "label": "二四",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 269.5,
+        "end": 270.5,
+        "label": "二五",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 270.5,
+        "end": 271.5,
+        "label": "二六",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 271.5,
+        "end": 272.5,
+        "label": "二七",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 272.5,
+        "end": 273.5,
+        "label": "二八",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 273.5,
+        "end": 274.5,
+        "label": "二九",
+        "scale": 1.18,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 274.5,
+        "end": 275.5,
+        "label": "三十",
+        "scale": 0.9,
+        "group": 3,
+        "step": "count"
+      },
+      {
+        "start": 275.5,
+        "end": 278.0,
+        "label": "现在闭气六十秒",
+        "scale": 0.92,
+        "group": 3,
+        "step": "instruction"
+      },
+      {
+        "start": 278.0,
+        "end": 338.0,
+        "label": "闭气六十秒",
+        "scale": 0.86,
+        "group": 3,
+        "step": "hold",
+        "countdown": true
+      },
+      {
+        "start": 338.0,
+        "end": 340.5,
+        "label": "现在深吸憋气十五秒",
+        "scale": 1.16,
+        "group": 3,
+        "step": "instruction"
+      },
+      {
+        "start": 340.5,
+        "end": 355.5,
+        "label": "深吸憋气十五秒",
+        "scale": 1.18,
+        "group": 3,
+        "step": "hold",
+        "countdown": true
+      },
+      {
+        "start": 355.5,
+        "end": 358.03,
+        "label": "现在大口呼出",
+        "scale": 0.86,
+        "group": 3,
+        "step": "instruction"
+      }
+    ]
+  }
+}

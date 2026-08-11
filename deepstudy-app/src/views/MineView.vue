@@ -200,6 +200,10 @@ function openAuth() {
   if (!siteKey.value) void loadGatewayConfig()
 }
 
+function openTutorial() {
+  window.dispatchEvent(new Event('deepstudy:open-mobile-tutorial'))
+}
+
 async function afterSignIn() {
   authVisible.value = false
   localImportPreview.value = null
@@ -471,6 +475,9 @@ watch(() => syncState.conflicts, () => {
       <p v-if="actionMessage" class="action-message" role="status">{{ actionMessage }}</p>
 
       <section class="action-list" aria-label="账号与同步操作">
+      <button type="button" aria-label="打开使用教程" @click="openTutorial">
+        <span>使用教程</span><small>查看新手引导</small>
+      </button>
       <button v-if="!signedIn" type="button" @click="openAuth">
         <span>登录或注册</span><small>用户名与密码</small>
       </button>

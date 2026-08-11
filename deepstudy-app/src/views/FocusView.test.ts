@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { reactive } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FocusTimerService, LocalTimerState } from '../services/focusTimerService'
 import { focusTimerServiceKey } from '../services/focusTimerServiceContext'
 import FocusView from './FocusView.vue'
@@ -87,6 +87,43 @@ function mountFocus(service = fakeTimer()) {
   }
 }
 
+function stubAudio() {
+  const players: Array<{
+    src: string
+    loop: boolean
+    paused: boolean
+    volume: number
+    playbackRate: number
+    currentTime: number
+    play: ReturnType<typeof vi.fn>
+    pause: ReturnType<typeof vi.fn>
+  }> = []
+  vi.stubGlobal('Audio', class {
+    src: string
+    loop = false
+    paused = true
+    volume = 1
+    playbackRate = 1
+    currentTime = 0
+    onended: (() => void) | null = null
+    constructor(src: string) {
+      this.src = src
+      players.push(this)
+    }
+    play = vi.fn(async () => {
+      this.paused = false
+    })
+    pause = vi.fn(() => {
+      this.paused = true
+    })
+  })
+  return players
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('focus timer screen', () => {
   it('exposes usable focus, rest, duration, and timer controls', () => {
     const { wrapper } = mountFocus()
@@ -95,6 +132,53 @@ describe('focus timer screen', () => {
     expect(wrapper.get('button[aria-label="切换到休息模式"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('input[aria-label="计时分钟数"]').attributes()).toMatchObject({ min: '1', max: '240' })
     expect(wrapper.get('button[aria-label="开始计时"]').text()).toContain('开始专注')
+  })
+
+  it('uses a compact desktop-style segmented mode switcher', () => {
+    const { wrapper } = mountFocus()
+
+    expect(wrapper.get('[data-testid="focus-mode-segments"]').classes()).toContain('mode-segments')
+    expect(wrapper.findAll('.mode-card')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="timer-card"]').exists()).toBe(true)
+  })
+
+  it('plays the same built-in white noise tracks with rate and volume controls', async () => {
+    const players = stubAudio()
+    const { wrapper } = mountFocus()
+
+    await wrapper.get('button[aria-label="打开我的白噪音"]').trigger('click')
+    expect(wrapper.text()).toContain('木鱼白噪音')
+    expect(wrapper.text()).toContain('雨声白噪音')
+
+    await wrapper.get('button[aria-label="播放 木鱼白噪音"]').trigger('click')
+    await flushPromises()
+    expect(players).toHaveLength(1)
+    expect(players[0].src).toContain('muyu')
+    expect(players[0].loop).toBe(true)
+    expect(players[0].play).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('button[data-noise-rate="1.5"]').trigger('click')
+    expect(players[0].playbackRate).toBe(1.5)
+
+    await wrapper.get('input[aria-label="白噪音音量"]').setValue('40')
+    expect(players[0].volume).toBeCloseTo(0.4)
+  })
+
+  it('shows desktop-matched breathing practice in rest mode', async () => {
+    const players = stubAudio()
+    const service = fakeTimer({ local: localTimer({ mode: 'rest', workType: 'rest', plannedMs: 15 * 60_000, remainingMs: 15 * 60_000 }) })
+    const { wrapper } = mountFocus(service)
+
+    expect(wrapper.text()).toContain('呼吸练习')
+    await wrapper.get('button[aria-label="打开呼吸练习"]').trigger('click')
+    expect(wrapper.text()).toContain('4-4-4-4 腹式呼吸')
+    expect(wrapper.text()).toContain('冰人呼吸法')
+
+    await wrapper.get('button[aria-label="开始 4-4-4-4 腹式呼吸"]').trigger('click')
+    await flushPromises()
+    expect(players[0].src).toContain('4-4-4-4')
+    expect(players[0].play).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="breathing-stage"]').text()).toContain('语音同步')
   })
 
   it('switches mode, applies a 1–240 minute duration, and starts from labelled controls', async () => {
