@@ -122,6 +122,27 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
       deferredPullRecords: [],
     };
   }
+  function rebindPendingMutationDeviceIds(state) {
+    const deviceId = typeof state?.deviceId === "string" ? state.deviceId : "";
+    if (deviceId.length < 8 || !state?.scopes || typeof state.scopes !== "object") return state;
+    let changed = false;
+    const scopes = {};
+    for (const [scopeKey, scope] of Object.entries(state.scopes)) {
+      const outbox = Array.isArray(scope?.outbox) ? scope.outbox : null;
+      if (!outbox) {
+        scopes[scopeKey] = scope;
+        continue;
+      }
+      const reboundOutbox = outbox.map((mutation) => {
+        if (!mutation?.record || typeof mutation.record !== "object"
+          || mutation.record.deviceId === deviceId) return mutation;
+        changed = true;
+        return { ...mutation, record: { ...mutation.record, deviceId } };
+      });
+      scopes[scopeKey] = changed ? { ...scope, outbox: reboundOutbox } : scope;
+    }
+    return changed ? { ...state, scopes } : state;
+  }
   let cached;
   function parseState(target) {
     const stored = JSON.parse(fs.readFileSync(target, "utf8"));
@@ -144,10 +165,13 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
   function read() {
     if (cached) return { ...cached };
     try {
-      cached = parseState(filePath);
+      const parsed = parseState(filePath);
+      cached = rebindPendingMutationDeviceIds(parsed);
+      if (cached !== parsed) atomicWriteJson(fs, filePath, cached);
     } catch {
       try {
-        cached = parseState(`${filePath}.bak`);
+        const parsed = parseState(`${filePath}.bak`);
+        cached = rebindPendingMutationDeviceIds(parsed);
         // Promotion is best-effort. The verified backup remains authoritative if
         // the process or filesystem fails while replacing a corrupt primary.
         try { atomicWriteJson(fs, filePath, cached, { preserveExistingBackup: true }); } catch {}

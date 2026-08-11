@@ -122,6 +122,37 @@ test("durable scoped outbox merges entity edits, retains tombstones, and survive
   });
 });
 
+test("startup rebinds legacy pending mutations to the current device ID", async () => {
+  const { createStateStore } = require(MODULE_PATH);
+  await withTempDir((directory) => {
+    const filePath = path.join(directory, "sync-device.json");
+    const first = createStateStore({ fs, filePath, createDeviceId: () => "desktop-original-device" });
+    const scope = first.activateScope({ gatewayUrl: "https://gateway.example", username: "alice" });
+    first.queueMutations(scope.scopeKey, [{
+      mutationId: "desktop:legacy-mutation",
+      baseRevision: 1,
+      record: {
+        entityType: "soul_quote",
+        entityId: "quote-1",
+        payload: { id: "quote-1", text: "Preserve this quote." },
+        deleted: true,
+        deviceId: "desktop-original-device",
+      },
+    }]);
+
+    const legacyState = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    legacyState.deviceId = "desktop-recovered-device";
+    fs.writeFileSync(filePath, JSON.stringify(legacyState), "utf8");
+
+    const restored = createStateStore({ fs, filePath, createDeviceId: () => "unexpected-device" });
+    const recoveredMutation = restored.readScope(scope.scopeKey).outbox[0];
+    assert.equal(recoveredMutation.record.deviceId, "desktop-recovered-device");
+    assert.equal(recoveredMutation.record.entityType, "soul_quote");
+    assert.equal(recoveredMutation.record.deleted, true);
+    assert.equal(JSON.parse(fs.readFileSync(filePath, "utf8")).scopes[scope.scopeKey].outbox[0].record.deviceId, "desktop-recovered-device");
+  });
+});
+
 test("outbox records and cursors are isolated by normalized gateway origin and account", async () => {
   const { createStateStore } = require(MODULE_PATH);
   await withTempDir((directory) => {
