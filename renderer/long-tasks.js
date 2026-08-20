@@ -210,8 +210,50 @@ function markdownTextSelectionRange() {
   return { startLine: start.line, startOffset: start.offset, endLine: end.line, endOffset: end.offset };
 }
 
+function closestMarkdownLineForSelectionNode(node) {
+  const editor = $("#task-detail-notes");
+  const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+  const line = element?.closest?.(".markdown-line");
+  return line?.closest("#task-detail-notes") === editor ? line : null;
+}
+
+function rawOffsetForSelectionPoint(line, node, offset) {
+  const domRange = document.createRange();
+  domRange.selectNodeContents(line);
+  try {
+    domRange.setEnd(node, offset);
+  } catch {
+    return null;
+  }
+  const displayOffset = domRange.toString().length;
+  if (line.classList.contains("editing")) {
+    return Math.min(line.textContent.length, Math.max(0, displayOffset));
+  }
+  return displayOffsetToRawOffset(line.dataset.raw || "", displayOffset);
+}
+
+function nativeMarkdownTextSelectionRange() {
+  const selection = window.getSelection?.();
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
+  const nativeRange = selection.getRangeAt(0);
+  const startLine = closestMarkdownLineForSelectionNode(nativeRange.startContainer);
+  const endLine = closestMarkdownLineForSelectionNode(nativeRange.endContainer);
+  if (!startLine || !endLine) return null;
+  const startLineIndex = markdownLineIndex(startLine);
+  const endLineIndex = markdownLineIndex(endLine);
+  if (startLineIndex < 0 || endLineIndex < 0) return null;
+  const startOffset = rawOffsetForSelectionPoint(startLine, nativeRange.startContainer, nativeRange.startOffset);
+  const endOffset = rawOffsetForSelectionPoint(endLine, nativeRange.endContainer, nativeRange.endOffset);
+  if (startOffset === null || endOffset === null) return null;
+  return { startLine: startLineIndex, startOffset, endLine: endLineIndex, endOffset };
+}
+
+function currentMarkdownTextSelectionRange() {
+  return nativeMarkdownTextSelectionRange() || markdownTextSelectionRange();
+}
+
 function markdownSelectedLineRange() {
-  const textRange = markdownTextSelectionRange();
+  const textRange = currentMarkdownTextSelectionRange();
   if (textRange) return { start: textRange.startLine, end: textRange.endLine };
   const selected = selectedMarkdownLines();
   if (!selected.length) return null;
@@ -250,7 +292,7 @@ function setNoteLines(lines, caret) {
 }
 
 function replaceMarkdownSelectionWithText(text) {
-  const range = markdownTextSelectionRange();
+  const range = currentMarkdownTextSelectionRange();
   if (!range) return false;
   finishAllMarkdownLineEdits();
   pushNoteUndoSnapshot();
@@ -261,6 +303,9 @@ function replaceMarkdownSelectionWithText(text) {
 }
 
 function selectedMarkdownText() {
+  const selection = window.getSelection?.();
+  const nativeRange = nativeMarkdownTextSelectionRange();
+  if (nativeRange) return selection.toString();
   const range = markdownTextSelectionRange();
   if (!range) return "";
   return LongTaskUtils.selectedNoteText(markdownLineElements().map((line) => (
@@ -269,6 +314,7 @@ function selectedMarkdownText() {
 }
 
 function handleMarkdownClipboardSelection(event, cut = false) {
+  if (event.defaultPrevented) return false;
   const text = selectedMarkdownText();
   if (!text) return false;
   event.preventDefault();
@@ -523,7 +569,6 @@ function createMarkdownLine(raw = "") {
 
   line.addEventListener("mousedown", (event) => {
     if (event.button !== 0) return;
-    if (!line.classList.contains("editing")) event.preventDefault();
     beginMarkdownLineSelection(line, event);
   });
   line.addEventListener("click", (event) => {
@@ -1134,7 +1179,7 @@ $("#task-detail-notes").addEventListener("keydown", (event) => {
     restoreNoteSnapshot();
     return;
   }
-  const textRange = markdownTextSelectionRange();
+  const textRange = currentMarkdownTextSelectionRange();
   if (textRange) {
     if (event.key === "Tab") {
       event.preventDefault();
@@ -1207,7 +1252,7 @@ $("#task-detail-notes").addEventListener("paste", (event) => {
     alert(tr("imageImportFailed"));
     return;
   }
-  if (markdownTextSelectionRange()) {
+  if (currentMarkdownTextSelectionRange()) {
     event.preventDefault();
     replaceMarkdownSelectionWithText(event.clipboardData.getData("text/plain"));
     return;
@@ -1221,6 +1266,12 @@ $("#task-detail-notes").addEventListener("copy", (event) => {
   handleMarkdownClipboardSelection(event);
 });
 $("#task-detail-notes").addEventListener("cut", (event) => {
+  handleMarkdownClipboardSelection(event, true);
+});
+document.addEventListener("copy", (event) => {
+  handleMarkdownClipboardSelection(event);
+});
+document.addEventListener("cut", (event) => {
   handleMarkdownClipboardSelection(event, true);
 });
 $("#task-detail-notes").addEventListener("dragover", (event) => {
