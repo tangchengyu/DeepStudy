@@ -491,7 +491,6 @@ function endMarkdownLineSelection(event) {
     if (selected.length && range && (range.startLine !== range.endLine || range.startOffset !== range.endOffset)) {
       finishAllMarkdownLineEdits();
       syncNativeMarkdownSelection();
-      selected[0]?.focus();
       requestAnimationFrame(syncNativeMarkdownSelection);
     }
     else clearMarkdownLineSelection();
@@ -572,7 +571,7 @@ function createMarkdownLine(raw = "") {
     beginMarkdownLineSelection(line, event);
   });
   line.addEventListener("click", (event) => {
-    if (line.classList.contains("editing") || markdownSelectionState.dragging || selectedMarkdownLines().length > 1) return;
+    if (line.classList.contains("editing") || markdownSelectionState.dragging || markdownTextSelectionRange() || selectedMarkdownLines().length > 1) return;
     startMarkdownLineEdit(line, rawCaretOffsetFromPoint(line, event.clientX, event.clientY));
   });
   line.addEventListener("dblclick", (event) => {
