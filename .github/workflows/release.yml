@@ -1,0 +1,68 @@
+name: Release desktop builds
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to update, for example v1.2.10
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: npm run pack:win
+            artifact: dist/*.exe*
+          - os: macos-latest
+            script: npm run pack:mac
+            artifact: dist/*.dmg*
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build desktop package
+        run: ${{ matrix.script }}
+
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.release_tag || github.ref_name }}
+          REPO: ${{ github.repository }}
+          ARTIFACT_GLOB: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG_NAME" --repo "$REPO" >/dev/null 2>&1 || \
+            gh release create "$TAG_NAME" --repo "$REPO" --title "DeepStudy $TAG_NAME" --notes "Desktop builds for DeepStudy."
+          shopt -s nullglob
+          files=( $ARTIFACT_GLOB )
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No assets matched $ARTIFACT_GLOB" >&2
+            exit 1
+          fi
+          gh release upload "$TAG_NAME" "${files[@]}" --repo "$REPO" --clobber
