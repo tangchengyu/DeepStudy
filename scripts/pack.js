@@ -1,7 +1,5 @@
 // Helper script to run electron-builder with Chinese mirrors
 const { spawn, execSync } = require('child_process');
-const path = require('path');
-const fs = require('fs');
 
 // Auto-cleanup: kill zombie processes and old dist/ before building
 try {
@@ -17,16 +15,15 @@ try {
 process.env.ELECTRON_MIRROR = process.env.ELECTRON_MIRROR || 'https://npmmirror.com/mirrors/electron/';
 process.env.ELECTRON_BUILDER_BINARIES_MIRROR = process.env.ELECTRON_BUILDER_BINARIES_MIRROR || 'https://npmmirror.com/mirrors/electron-builder-binaries/';
 
-const builderPath = path.join(__dirname, '..', 'node_modules', '.bin', 'electron-builder');
+const builderCliPath = require.resolve('electron-builder/out/cli/cli.js');
 const args = process.argv.slice(2);
 
 console.log('Electron Mirror:', process.env.ELECTRON_MIRROR);
 console.log('Builder Binaries Mirror:', process.env.ELECTRON_BUILDER_BINARIES_MIRROR);
 console.log('Running electron-builder with args:', args.join(' '));
 
-const child = spawn(builderPath, args, {
+const child = spawn(process.execPath, [builderCliPath, ...args], {
   stdio: 'inherit',
-  shell: true,
   env: process.env,
 });
 

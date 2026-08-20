@@ -260,6 +260,23 @@ function replaceMarkdownSelectionWithText(text) {
   return true;
 }
 
+function selectedMarkdownText() {
+  const range = markdownTextSelectionRange();
+  if (!range) return "";
+  return LongTaskUtils.selectedNoteText(markdownLineElements().map((line) => (
+    line.classList.contains("editing") ? line.textContent.replace(/\u00a0/g, " ") : line.dataset.raw || ""
+  )), range);
+}
+
+function handleMarkdownClipboardSelection(event, cut = false) {
+  const text = selectedMarkdownText();
+  if (!text) return false;
+  event.preventDefault();
+  event.clipboardData.setData("text/plain", text);
+  if (cut) replaceMarkdownSelectionWithText("");
+  return true;
+}
+
 function mergeMarkdownLineBackward(line) {
   const index = markdownLineIndex(line);
   if (index <= 0) return false;
@@ -1199,6 +1216,12 @@ $("#task-detail-notes").addEventListener("paste", (event) => {
   event.preventDefault();
   pushNoteUndoSnapshot();
   pasteIntoMarkdownLine(line, event.clipboardData.getData("text/plain"));
+});
+$("#task-detail-notes").addEventListener("copy", (event) => {
+  handleMarkdownClipboardSelection(event);
+});
+$("#task-detail-notes").addEventListener("cut", (event) => {
+  handleMarkdownClipboardSelection(event, true);
 });
 $("#task-detail-notes").addEventListener("dragover", (event) => {
   if (!transferHasFiles(event.dataTransfer)) return;

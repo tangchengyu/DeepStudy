@@ -223,6 +223,14 @@ test("renders partial note selections at text precision instead of whole-row hig
   assert.match(css, /\.markdown-line\.selected\.partial-selected\s*\{/);
 });
 
+test("supports exact copy and cut for non-editing note selections", () => {
+  assert.match(longTasksJs, /function selectedMarkdownText\(\)/);
+  assert.match(longTasksJs, /addEventListener\("copy"/);
+  assert.match(longTasksJs, /addEventListener\("cut"/);
+  assert.match(longTasksJs, /clipboardData\.setData\("text\/plain", text\)/);
+  assert.match(longTasksJs, /replaceMarkdownSelectionWithText\(""\)/);
+});
+
 test("Enter splitting commits only the text before the caret to the current note line", () => {
   assert.match(longTasksJs, /const \[before, after\] = LongTaskUtils\.splitNoteLineAtOffset\(text, offset\)/);
   assert.match(longTasksJs, /line\.textContent = before;\s*line\.dataset\.raw = before;\s*finishMarkdownLineEdit\(line\);/s);
