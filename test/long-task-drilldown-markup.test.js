@@ -242,6 +242,12 @@ test("lets the browser create precise native selections inside rendered note par
   assert.match(css, /\.markdown-line\s*\{[^}]*user-select:\s*text/s);
 });
 
+test("keeps a dragged note text selection highlighted after mouseup", () => {
+  assert.match(longTasksJs, /line\.classList\.contains\("editing"\) \|\| markdownSelectionState\.dragging \|\| markdownTextSelectionRange\(\) \|\| selectedMarkdownLines\(\)\.length > 1/);
+  assert.doesNotMatch(longTasksJs, /selected\[0\]\?\.focus\(\)/);
+  assert.match(longTasksJs, /requestAnimationFrame\(syncNativeMarkdownSelection\)/);
+});
+
 test("Enter splitting commits only the text before the caret to the current note line", () => {
   assert.match(longTasksJs, /const \[before, after\] = LongTaskUtils\.splitNoteLineAtOffset\(text, offset\)/);
   assert.match(longTasksJs, /line\.textContent = before;\s*line\.dataset\.raw = before;\s*finishMarkdownLineEdit\(line\);/s);
