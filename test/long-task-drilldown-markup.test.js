@@ -209,7 +209,7 @@ test("supports single-click positioning, drag selection, and Tab indentation for
 
 test("starts cross-line note drag selection from the active editing line", () => {
   assert.doesNotMatch(longTasksJs, /event\.button !== 0 \|\| line\.classList\.contains\("editing"\)/);
-  assert.match(longTasksJs, /if \(!line\.classList\.contains\("editing"\)\) event\.preventDefault\(\)/);
+  assert.doesNotMatch(longTasksJs, /line\.classList\.contains\("editing"\)\) event\.preventDefault\(\)/);
   assert.match(longTasksJs, /if \(line\.classList\.contains\("editing"\)\) return caretOffsetFromPoint\(line, x, y\)/);
 });
 
@@ -225,10 +225,21 @@ test("renders partial note selections at text precision instead of whole-row hig
 
 test("supports exact copy and cut for non-editing note selections", () => {
   assert.match(longTasksJs, /function selectedMarkdownText\(\)/);
+  assert.match(longTasksJs, /function nativeMarkdownTextSelectionRange\(\)/);
   assert.match(longTasksJs, /addEventListener\("copy"/);
   assert.match(longTasksJs, /addEventListener\("cut"/);
+  assert.match(longTasksJs, /document\.addEventListener\("copy"/);
+  assert.match(longTasksJs, /document\.addEventListener\("cut"/);
+  assert.match(longTasksJs, /selection\.toString\(\)/);
   assert.match(longTasksJs, /clipboardData\.setData\("text\/plain", text\)/);
   assert.match(longTasksJs, /replaceMarkdownSelectionWithText\(""\)/);
+});
+
+test("lets the browser create precise native selections inside rendered note paragraphs", () => {
+  assert.doesNotMatch(longTasksJs, /if \(!line\.classList\.contains\("editing"\)\) event\.preventDefault\(\)/);
+  assert.match(longTasksJs, /line\.addEventListener\("mousedown", \(event\) => \{\s*if \(event\.button !== 0\) return;\s*beginMarkdownLineSelection\(line, event\);/s);
+  assert.match(css, /\.task-detail-notes-editor\s*\{[^}]*user-select:\s*text/s);
+  assert.match(css, /\.markdown-line\s*\{[^}]*user-select:\s*text/s);
 });
 
 test("Enter splitting commits only the text before the caret to the current note line", () => {
