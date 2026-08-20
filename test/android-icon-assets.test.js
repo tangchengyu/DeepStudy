@@ -6,6 +6,7 @@ const zlib = require("node:zlib");
 
 const root = path.resolve(__dirname, "..");
 const res = path.join(root, "deepstudy-app", "android", "app", "src", "main", "res");
+const focusView = fs.readFileSync(path.join(root, "deepstudy-app", "src", "views", "FocusView.vue"), "utf8");
 
 function readPng(filePath) {
   const buffer = fs.readFileSync(filePath);
@@ -108,4 +109,10 @@ test("Android adaptive launcher foreground leaves safe transparent padding", () 
   assert.ok(bounds.top >= margin, `top foreground margin ${bounds.top}px should be at least ${margin}px`);
   assert.ok(png.width - 1 - bounds.right >= margin, "right foreground margin is too small");
   assert.ok(png.height - 1 - bounds.bottom >= margin, "bottom foreground margin is too small");
+});
+
+test("mobile focus white-noise imports use tracked audio assets", () => {
+  assert.match(focusView, /assets\/audio\/muyu\.wav\?url/);
+  assert.match(focusView, /assets\/audio\/rain\.wav\?url/);
+  assert.doesNotMatch(focusView, /assets\/audio\/(?:muyu|rain)\.mp3\?url/);
 });
