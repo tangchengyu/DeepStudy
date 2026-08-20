@@ -16,6 +16,7 @@ const {
   parseObsidianImagePath,
   replaceNoteSelection,
   resolveLongTaskView,
+  selectedNoteText,
   splitNoteLineAtOffset,
 } = require("../renderer/long-task-utils");
 
@@ -79,6 +80,18 @@ test("deletes a partial multi-line note selection", () => {
       endOffset: 0,
     }, ""),
     { lines: ["123456789"], caret: { line: 0, offset: 6 } },
+  );
+});
+
+test("copies only the exact selected note text across lines", () => {
+  assert.equal(
+    selectedNoteText(["alpha", "middle", "omega"], {
+      startLine: 0,
+      startOffset: 2,
+      endLine: 2,
+      endOffset: 3,
+    }),
+    "pha\nmiddle\nome",
   );
 });
 

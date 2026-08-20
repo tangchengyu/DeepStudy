@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const pkg = require("../package.json");
+const packScript = fs.readFileSync(path.join(root, "scripts", "pack.js"), "utf8");
 
 function pngDimensions(filePath) {
   const data = fs.readFileSync(filePath);
@@ -27,4 +28,10 @@ test("packaging PNG icon names match their real dimensions", () => {
       [size, size],
     );
   }
+});
+
+test("pack script invokes electron-builder through node for paths with spaces", () => {
+  assert.match(packScript, /require\.resolve\(['"]electron-builder\/out\/cli\/cli\.js['"]\)/);
+  assert.match(packScript, /spawn\(process\.execPath,\s*\[builderCliPath,\s*\.\.\.args\]/);
+  assert.doesNotMatch(packScript, /shell:\s*true/);
 });
