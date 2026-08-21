@@ -50,6 +50,7 @@ function repositoryWith(tasks: LongTask[]): LongTaskRepository {
     reopen: vi.fn(async () => true),
     moveToQuadrant: vi.fn(async () => true),
     remove: vi.fn(async () => true),
+    readLongTaskImageDataUrl: vi.fn(async () => null),
   }
 }
 
@@ -161,6 +162,31 @@ describe('long task drill-down', () => {
     expect(notes.element.textContent).toBe(task.notes)
     expect(notes.find('img').exists()).toBe(false)
     expect(notes.classes()).toContain('task-notes')
+  })
+
+  it('renders synced deepstudy image notes as images without executing arbitrary markup', async () => {
+    const imageTask = {
+      ...task,
+      notes: '![粘贴的图片](deepstudy-image://pasted.png)\n<img src=x onerror=alert(1)>',
+    }
+    const repository = {
+      ...repositoryWith([imageTask]),
+      readLongTaskImageDataUrl: vi.fn(async (id: string) => (
+        id === 'pasted.png' ? 'data:image/png;base64,aW1n' : null
+      )),
+    } as LongTaskRepository & { readLongTaskImageDataUrl: (id: string) => Promise<string | null> }
+    const wrapper = mount(LongTaskDetailView, {
+      props: {
+        quadrantId: 'not-important-not-urgent',
+        taskId: 'task-with-notes',
+      },
+      global: global(repository),
+    })
+    await flushPromises()
+
+    const notes = wrapper.get('[data-testid="task-notes"]')
+    expect(notes.find('img').attributes('src')).toBe('data:image/png;base64,aW1n')
+    expect(notes.text()).toContain('<img src=x onerror=alert(1)>')
   })
 
   it('edits title notes plannedAt and moves a task without replacing its identity', async () => {

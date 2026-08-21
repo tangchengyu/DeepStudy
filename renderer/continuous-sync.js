@@ -24,10 +24,22 @@
     return `desktop:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 12)}`;
   }
 
+  function referencedImageIds(records) {
+    const ids = new Set();
+    for (const record of records) {
+      if (record.entityType !== "long_task" || record.deleted) continue;
+      for (const match of String(record.payload?.notes || "").matchAll(/deepstudy-image:\/\/([^\s)]+)/g)) {
+        if (match[1]) ids.add(match[1]);
+      }
+    }
+    return ids;
+  }
+
   function buildMutations(records, state) {
     const current = new Map(records.map((record) => [identity(record), record]));
     const known = new Map((state.records || []).map((record) => [identity(record), record]));
     const pending = new Map((state.outbox || []).map((mutation) => [identity(mutation.record), mutation]));
+    const referencedImages = referencedImageIds(records);
     const mutations = [];
     for (const [key, record] of current) {
       const previous = pending.get(key)?.record || known.get(key);
@@ -40,6 +52,7 @@
     }
     for (const [key, previous] of known) {
       if (previous.deleted || current.has(key) || pending.has(key)) continue;
+      if (previous.entityType === "long_task_image_chunk" && referencedImages.has(previous.payload?.imageId)) continue;
       mutations.push({
         mutationId: mutationId(),
         baseRevision: Math.max(0, Number(state.revisions?.[key] ?? previous.revision ?? 0) || 0),

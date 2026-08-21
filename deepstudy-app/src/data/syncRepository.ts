@@ -3,6 +3,7 @@ import Dexie, { type EntityTable } from 'dexie'
 export const supportedEntityTypes = [
   'daily_task',
   'long_task',
+  'long_task_image_chunk',
   'focus_session',
   'mode_event',
   'time_audit',

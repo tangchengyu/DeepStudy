@@ -106,7 +106,35 @@
     });
   }
 
-  function buildLegacyRecords({ rawStores, longTasks, deviceId }) {
+  function longTaskImageChunkRecords(chunks, deviceId) {
+    if (!Array.isArray(chunks)) return [];
+    return chunks.map((chunk, index) => {
+      if (!chunk || typeof chunk !== "object" || Array.isArray(chunk)) {
+        throw new LegacySnapshotError(`长期任务图片分片 ${index + 1} 结构无效。`, "INVALID_LEGACY_SHAPE");
+      }
+      const imageId = typeof chunk.imageId === "string" ? chunk.imageId.trim() : "";
+      const chunkIndex = Number(chunk.index);
+      const total = Number(chunk.total);
+      if (!imageId || !Number.isSafeInteger(chunkIndex) || chunkIndex < 0
+        || !Number.isSafeInteger(total) || total <= 0 || chunkIndex >= total
+        || typeof chunk.data !== "string") {
+        throw new LegacySnapshotError(`长期任务图片分片 ${index + 1} 结构无效。`, "INVALID_LEGACY_SHAPE");
+      }
+      return {
+        entityType: "long_task_image_chunk",
+        entityId: `${imageId}:${chunkIndex}`,
+        payload: clone(chunk),
+        deleted: false,
+        revision: 0,
+        clientUpdatedAt: itemTimestamp(chunk),
+        serverUpdatedAt: null,
+        deviceId,
+        legacySourceId: `long-task-images:${imageId}`,
+      };
+    });
+  }
+
+  function buildLegacyRecords({ rawStores, longTasks, longTaskImageChunks = [], deviceId }) {
     if (typeof deviceId !== "string" || deviceId.length < 8) {
       throw new LegacySnapshotError("桌面设备编号无效。", "INVALID_DEVICE_ID");
     }
@@ -117,6 +145,7 @@
       entityType: "long_task",
       key: "long-tasks.json",
     }, deviceId);
+    records.push(...longTaskImageChunkRecords(longTaskImageChunks, deviceId));
     const daily = parseStore(
       LEGACY_STORAGE_KEYS.dailyTask,
       rawStores[LEGACY_STORAGE_KEYS.dailyTask],
@@ -159,7 +188,12 @@
         attempts: attempt,
         fingerprint: captured.fingerprint,
         rawStores: after,
-        records: buildLegacyRecords({ rawStores: after, longTasks: captured.tasks, deviceId }),
+        records: buildLegacyRecords({
+          rawStores: after,
+          longTasks: captured.tasks,
+          longTaskImageChunks: captured.longTaskImageChunks,
+          deviceId,
+        }),
       };
     }
     throw new LegacySnapshotError(
@@ -208,6 +242,9 @@
   function planPulledWrites({ rawStores, longTasks, records, profileReplace = false }) {
     const validRecords = Array.isArray(records) ? records.filter((record) => record && typeof record === "object") : [];
     const longRecords = validRecords.filter((record) => record.entityType === "long_task");
+    const longTaskImageChunks = validRecords
+      .filter((record) => record.entityType === "long_task_image_chunk" && !record.deleted)
+      .map((record) => clone(record.payload));
     const plannedLongTasks = mergeArray(profileReplace ? [] : longTasks, longRecords, {
       entityType: "long_task",
       key: "long-tasks.json",
@@ -253,7 +290,7 @@
         descriptor,
       ));
     }
-    return { longTasks: plannedLongTasks, localStores };
+    return { longTasks: plannedLongTasks, longTaskImageChunks, localStores };
   }
 
   async function applyPulledSnapshot({
@@ -283,7 +320,7 @@
     let longTasksWritten = false;
     let localWritesStarted = false;
     try {
-      await writeLongTasks(planned.longTasks, backup.backupId);
+      await writeLongTasks(planned.longTasks, backup.backupId, planned.longTaskImageChunks);
       longTasksWritten = true;
       if (!sameRawStores(originalStores, readRawStores(storage))) {
         await restoreBackup(backup.backupId);

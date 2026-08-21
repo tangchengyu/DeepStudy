@@ -130,6 +130,60 @@ test("an already-known tombstone does not generate another tombstone forever", (
   assert.deepEqual(mutations, []);
 });
 
+test("missing local image files do not tombstone chunks that are still referenced by notes", () => {
+  const knownTask = {
+    entityType: "long_task",
+    entityId: "task-with-image",
+    payload: { id: "task-with-image", notes: "![粘贴的图片](deepstudy-image://pasted.png)" },
+    deleted: false,
+    revision: 2,
+  };
+  const knownChunk = {
+    entityType: "long_task_image_chunk",
+    entityId: "pasted.png:0",
+    payload: { imageId: "pasted.png", index: 0, total: 1, data: "aW1n" },
+    deleted: false,
+    revision: 2,
+  };
+
+  const mutations = require("../renderer/continuous-sync").buildMutations([knownTask], {
+    records: [knownTask, knownChunk],
+    revisions: {
+      "long_task\u0000task-with-image": 2,
+      "long_task_image_chunk\u0000pasted.png:0": 2,
+    },
+    outbox: [],
+  });
+
+  assert.equal(mutations.some((mutation) => mutation.record.entityType === "long_task_image_chunk"), false);
+});
+
+test("unreferenced image chunks are tombstoned after the task no longer references them", () => {
+  const knownChunk = {
+    entityType: "long_task_image_chunk",
+    entityId: "stale.png:0",
+    payload: { imageId: "stale.png", index: 0, total: 1, data: "aW1n" },
+    deleted: false,
+    revision: 2,
+  };
+
+  const mutations = require("../renderer/continuous-sync").buildMutations([], {
+    records: [knownChunk],
+    revisions: { "long_task_image_chunk\u0000stale.png:0": 2 },
+    outbox: [],
+  });
+
+  assert.deepEqual(mutations.map((mutation) => ({
+    entityType: mutation.record.entityType,
+    entityId: mutation.record.entityId,
+    deleted: mutation.record.deleted,
+  })), [{
+    entityType: "long_task_image_chunk",
+    entityId: "stale.png:0",
+    deleted: true,
+  }]);
+});
+
 test("a scope switch after local apply rolls the old account data back when pull commit is rejected", async () => {
   const remote = { entityType: "reflection", entityId: "alice-only", payload: { id: "alice-only", notes: "private" }, deleted: false, revision: 1 };
   const rolledBack = [];

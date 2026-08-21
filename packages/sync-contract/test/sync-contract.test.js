@@ -34,6 +34,7 @@ test('record validation accepts every supported entity type', () => {
   assert.deepEqual([...SUPPORTED_ENTITY_TYPES], [
     'daily_task',
     'long_task',
+    'long_task_image_chunk',
     'focus_session',
     'mode_event',
     'time_audit',

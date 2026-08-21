@@ -63,6 +63,7 @@ export interface LongTaskRepository {
   reopen(id: string): Promise<boolean>
   moveToQuadrant(id: string, quadrantId: QuadrantId): Promise<boolean>
   remove(id: string): Promise<boolean>
+  readLongTaskImageDataUrl(id: string): Promise<string | null>
 }
 
 export interface LongTaskRepositoryOptions extends Partial<SyncRepositoryOptions> {
@@ -86,6 +87,23 @@ function isQuadrantId(value: unknown): value is QuadrantId {
     || value === 'important-not-urgent'
     || value === 'urgent-not-important'
     || value === 'not-important-not-urgent'
+}
+
+function safeImageId(value: string) {
+  const id = value.trim()
+  return /^[A-Za-z0-9._-]+\.(png|jpe?g|gif|webp|bmp)$/i.test(id) ? id : ''
+}
+
+function imageTypeFromId(id: string) {
+  const extension = id.split('.').pop()?.toLowerCase()
+  return ({
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    bmp: 'image/bmp',
+  } as Record<string, string>)[extension || ''] ?? 'application/octet-stream'
 }
 
 export function createLongTaskRepository(
@@ -200,6 +218,23 @@ export function createLongTaskRepository(
       if (!current || current.deleted) return false
       await sync.enqueueDelete('long_task', id)
       return true
+    },
+    async readLongTaskImageDataUrl(id) {
+      const imageId = safeImageId(id)
+      if (!imageId) return null
+      const records = await sync.listRecords('long_task_image_chunk')
+      const chunks = records
+        .map((record) => record.payload)
+        .filter((payload) => payload.imageId === imageId)
+        .sort((left, right) => Number(left.index) - Number(right.index))
+      const total = Number(chunks[0]?.total)
+      if (!Number.isSafeInteger(total) || total <= 0 || chunks.length < total) return null
+      const selected = chunks.slice(0, total)
+      if (selected.some((chunk, index) => Number(chunk.index) !== index
+        || Number(chunk.total) !== total
+        || typeof chunk.data !== 'string')) return null
+      const type = typeof selected[0].type === 'string' ? selected[0].type : imageTypeFromId(imageId)
+      return `data:${type};base64,${selected.map((chunk) => chunk.data).join('')}`
     },
   }
 }

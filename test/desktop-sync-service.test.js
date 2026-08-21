@@ -552,3 +552,54 @@ test("legacy backup stores original long-task bytes and can restore the test pro
     assert.equal(fs.readFileSync(longTasksFilePath, "utf8"), original);
   });
 });
+
+test("legacy backup captures referenced long-task images and restores pulled chunks", async () => {
+  const { createLegacyBackupStore } = require(MODULE_PATH);
+  await withTempDir(async (directory) => {
+    const longTasksFilePath = path.join(directory, "long-tasks.json");
+    const imagesDir = path.join(directory, "long-task-images");
+    fs.mkdirSync(imagesDir, { recursive: true });
+    fs.writeFileSync(longTasksFilePath, JSON.stringify({
+      version: 1,
+      tasks: [{
+        id: "with-image",
+        title: "图片任务",
+        notes: "![粘贴的图片](deepstudy-image://local.png)",
+      }],
+    }), "utf8");
+    fs.writeFileSync(path.join(imagesDir, "local.png"), Buffer.from("local"));
+
+    const backups = createLegacyBackupStore({ fs, userDataPath: directory, longTasksFilePath });
+    const captured = backups.captureLongTasks();
+    assert.deepEqual(captured.longTaskImageChunks, [{
+      imageId: "local.png",
+      index: 0,
+      total: 1,
+      type: "image/png",
+      size: 5,
+      data: Buffer.from("local").toString("base64"),
+    }]);
+
+    const backup = backups.createBackup({
+      version: 1,
+      localStores: { "mytimer.dailyPlan.v1": "{\"date\":\"2026-07-23\",\"tasks\":[]}" },
+      longTasksFingerprint: captured.fingerprint,
+    });
+    backups.writeLongTasks([{
+      ...captured.tasks[0],
+      notes: "![粘贴的图片](deepstudy-image://remote.jpg)",
+    }], backup.backupId, [{
+      imageId: "remote.jpg",
+      index: 0,
+      total: 1,
+      type: "image/jpeg",
+      size: 6,
+      data: Buffer.from("remote").toString("base64"),
+    }]);
+
+    assert.equal(fs.readFileSync(path.join(imagesDir, "remote.jpg"), "utf8"), "remote");
+    backups.restoreBackup(backup.backupId);
+    assert.equal(fs.readFileSync(path.join(imagesDir, "local.png"), "utf8"), "local");
+    assert.equal(fs.existsSync(path.join(imagesDir, "remote.jpg")), false);
+  });
+});

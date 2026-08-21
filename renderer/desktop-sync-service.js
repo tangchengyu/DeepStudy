@@ -327,6 +327,8 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
 
 function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
   const backupRoot = path.join(userDataPath, "sync-backups");
+  const longTaskImagesPath = path.join(userDataPath, "long-task-images");
+  const imageChunkDataLength = 32 * 1024;
   const emptyDocument = { version: 1, tasks: [] };
 
   function readSource() {
@@ -342,6 +344,13 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
     return crypto.createHash("sha256").update(bytes).digest("hex");
   }
 
+  function fingerprintProfile(sourceBytes, chunks = []) {
+    const hash = crypto.createHash("sha256").update(sourceBytes);
+    hash.update("\nlong-task-images\n");
+    for (const chunk of chunks) hash.update(JSON.stringify(chunk));
+    return hash.digest("hex");
+  }
+
   function parseTasks(bytes) {
     const document = JSON.parse(bytes.toString("utf8"));
     if (!document || typeof document !== "object" || !Array.isArray(document.tasks)) {
@@ -350,12 +359,121 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
     return document;
   }
 
+  function imageExtension(name = "") {
+    const extension = path.extname(String(name || "")).slice(1).toLowerCase();
+    return new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]).has(extension)
+      ? (extension === "jpeg" ? "jpg" : extension)
+      : "";
+  }
+
+  function imageTypeFromId(id = "") {
+    return {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      bmp: "image/bmp",
+    }[path.extname(String(id || "")).slice(1).toLowerCase()] || "application/octet-stream";
+  }
+
+  function safeImageName(id) {
+    const fileName = String(id || "").trim();
+    if (!fileName || path.basename(fileName) !== fileName || !imageExtension(fileName)) return "";
+    return fileName;
+  }
+
+  function longTaskImageIds(tasks) {
+    const ids = new Set();
+    for (const task of Array.isArray(tasks) ? tasks : []) {
+      for (const match of String(task?.notes || "").matchAll(/deepstudy-image:\/\/([^\s)]+)/g)) {
+        const id = safeImageName(match[1]);
+        if (id) ids.add(id);
+      }
+    }
+    return [...ids].sort();
+  }
+
+  function imageChunksForTasks(tasks) {
+    const chunks = [];
+    for (const imageId of longTaskImageIds(tasks)) {
+      const target = path.join(longTaskImagesPath, imageId);
+      let bytes;
+      try {
+        bytes = fs.readFileSync(target);
+      } catch (error) {
+        if (error?.code === "ENOENT") continue;
+        throw error;
+      }
+      const data = bytes.toString("base64");
+      const total = Math.max(1, Math.ceil(data.length / imageChunkDataLength));
+      for (let index = 0; index < total; index += 1) {
+        chunks.push({
+          imageId,
+          index,
+          total,
+          type: imageTypeFromId(imageId),
+          size: bytes.length,
+          data: data.slice(index * imageChunkDataLength, (index + 1) * imageChunkDataLength),
+        });
+      }
+    }
+    return chunks;
+  }
+
+  function copyDirectory(source, target) {
+    fs.rmSync(target, { recursive: true, force: true });
+    if (!fs.existsSync(source)) return false;
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.cpSync(source, target, { recursive: true });
+    return true;
+  }
+
+  function writeImageChunks(chunks = []) {
+    const byImage = new Map();
+    for (const chunk of Array.isArray(chunks) ? chunks : []) {
+      const imageId = safeImageName(chunk?.imageId);
+      if (!imageId || typeof chunk.data !== "string") continue;
+      const index = Number(chunk.index);
+      const total = Number(chunk.total);
+      if (!Number.isSafeInteger(index) || index < 0 || !Number.isSafeInteger(total) || total <= 0 || index >= total) continue;
+      if (!byImage.has(imageId)) byImage.set(imageId, []);
+      byImage.get(imageId)[index] = { ...chunk, imageId, index, total };
+    }
+    fs.mkdirSync(longTaskImagesPath, { recursive: true });
+    for (const [imageId, imageChunks] of byImage) {
+      const total = Number(imageChunks.find(Boolean)?.total) || 0;
+      if (!total || imageChunks.length < total || imageChunks.slice(0, total).some((chunk) => !chunk || chunk.total !== total)) {
+        continue;
+      }
+      const data = imageChunks.slice(0, total).map((chunk) => chunk.data).join("");
+      const bytes = Buffer.from(data, "base64");
+      if (Number(imageChunks[0].size) && bytes.length !== Number(imageChunks[0].size)) continue;
+      const target = path.join(longTaskImagesPath, imageId);
+      const temporary = `${target}.tmp`;
+      fs.writeFileSync(temporary, bytes);
+      fs.rmSync(target, { force: true });
+      fs.renameSync(temporary, target);
+    }
+  }
+
+  function removeUnreferencedImages(tasks) {
+    if (!fs.existsSync(longTaskImagesPath)) return;
+    const referenced = new Set(longTaskImageIds(tasks));
+    for (const entry of fs.readdirSync(longTaskImagesPath, { withFileTypes: true })) {
+      if (!entry.isFile() || !safeImageName(entry.name) || referenced.has(entry.name)) continue;
+      fs.rmSync(path.join(longTaskImagesPath, entry.name), { force: true });
+    }
+  }
+
   function captureLongTasks() {
     const source = readSource();
     const document = parseTasks(source.bytes);
+    const longTaskImageChunks = imageChunksForTasks(document.tasks);
     return {
       tasks: document.tasks,
-      fingerprint: fingerprint(source.bytes),
+      longTaskImageChunks,
+      fingerprint: fingerprintProfile(source.bytes, longTaskImageChunks),
       existed: source.existed,
     };
   }
@@ -383,7 +501,8 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
     },
     createBackup(snapshot = {}) {
       const source = readSource();
-      const currentFingerprint = fingerprint(source.bytes);
+      const current = parseTasks(source.bytes);
+      const currentFingerprint = fingerprintProfile(source.bytes, imageChunksForTasks(current.tasks));
       if (snapshot.longTasksFingerprint !== currentFingerprint) {
         throw new Error("long-tasks.json changed before the backup was created.");
       }
@@ -394,6 +513,7 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
       const directory = resolveBackup(backupId);
       fs.mkdirSync(directory, { recursive: true });
       fs.writeFileSync(path.join(directory, "long-tasks.json"), source.bytes, { mode: 0o600 });
+      const imagesExisted = copyDirectory(longTaskImagesPath, path.join(directory, "long-task-images"));
       atomicWriteJson(fs, path.join(directory, "local-storage.json"), {
         version: 1,
         stores: snapshot.localStores,
@@ -404,6 +524,7 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
         createdAt: Date.now(),
         longTasksExisted: source.existed,
         longTasksFingerprint: currentFingerprint,
+        longTaskImagesExisted: imagesExisted,
         status: "ready",
       });
       return { backupId, path: directory };
@@ -411,17 +532,19 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
     readLongTasks() {
       return captureLongTasks().tasks;
     },
-    writeLongTasks(tasks, backupId) {
+    writeLongTasks(tasks, backupId, longTaskImageChunks = []) {
       if (!Array.isArray(tasks)) throw new TypeError("Long tasks must be an array.");
       const { directory, manifest } = requireBackup(backupId);
       if (manifest.status && manifest.status !== "ready") throw new Error("该备份编号已经使用，不能重复写入。");
       const source = readSource();
-      if (fingerprint(source.bytes) !== manifest.longTasksFingerprint) {
+      const current = parseTasks(source.bytes);
+      if (fingerprintProfile(source.bytes, imageChunksForTasks(current.tasks)) !== manifest.longTasksFingerprint) {
         throw new Error("long-tasks.json 在备份后发生变化；已停止写入，请重新预览。");
       }
-      const current = parseTasks(source.bytes);
       atomicWriteJson(fs, path.join(directory, "manifest.json"), { ...manifest, status: "applying" });
       atomicWriteJson(fs, longTasksFilePath, { ...current, tasks });
+      writeImageChunks(longTaskImageChunks);
+      removeUnreferencedImages(tasks);
       atomicWriteJson(fs, path.join(directory, "manifest.json"), { ...manifest, status: "consumed", consumedAt: Date.now() });
       return tasks;
     },
@@ -436,6 +559,11 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
         fs.copyFileSync(path.join(directory, "long-tasks.json"), longTasksFilePath);
       } else {
         fs.rmSync(longTasksFilePath, { force: true });
+      }
+      if (manifest.longTaskImagesExisted) {
+        copyDirectory(path.join(directory, "long-task-images"), longTaskImagesPath);
+      } else {
+        fs.rmSync(longTaskImagesPath, { recursive: true, force: true });
       }
       return { restored: true, backupId, localStores: localStorageBackup.stores };
     },

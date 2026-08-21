@@ -21,10 +21,39 @@ const editNotes = ref('')
 const editPlannedAt = ref('')
 const editQuadrant = ref<QuadrantId>(props.quadrantId)
 const backQuadrant = computed(() => task.value?.quadrantId ?? props.quadrantId)
+const noteBlocks = ref<Array<
+  | { type: 'text'; text: string; key: string }
+  | { type: 'image'; src: string; alt: string; key: string }
+>>([])
 
 onMounted(async () => {
   task.value = await repository.get(props.taskId)
+  await refreshNoteBlocks()
 })
+
+async function refreshNoteBlocks() {
+  const notes = task.value?.notes ?? ''
+  const lines = notes.split(/\r?\n/)
+  const blocks: typeof noteBlocks.value = []
+  for (const [index, line] of lines.entries()) {
+    const image = line.trim().match(/^!\[([^\]]*)\]\((data:image\/[^)]+|deepstudy-image:\/\/[A-Za-z0-9._-]+)\)$/)
+    if (image) {
+      const src = image[2].startsWith('deepstudy-image://')
+        ? await repository.readLongTaskImageDataUrl(image[2].slice('deepstudy-image://'.length))
+        : image[2]
+      if (src) {
+        blocks.push({ type: 'image', src, alt: image[1] || '粘贴的图片', key: `image-${index}` })
+        continue
+      }
+    }
+    blocks.push({
+      type: 'text',
+      text: `${line}${index < lines.length - 1 ? '\n' : ''}`,
+      key: `text-${index}`,
+    })
+  }
+  noteBlocks.value = blocks
+}
 
 function startEdit() {
   if (!task.value) return
@@ -65,6 +94,7 @@ async function saveEdit() {
       plannedAt: editPlannedAt.value.trim() || null,
       quadrantId: editQuadrant.value,
     }
+    await refreshNoteBlocks()
     editing.value = false
   } catch {
     saveError.value = '保存失败，编辑内容已保留，请重试。'
@@ -145,7 +175,14 @@ async function removeTask() {
         <span class="detail-checkbox" aria-hidden="true" />
         <h1>{{ task.title }}</h1>
       </div>
-      <p v-if="task.notes" class="task-notes" data-testid="task-notes" v-text="task.notes" />
+      <div v-if="task.notes" class="task-notes" data-testid="task-notes">
+        <template v-for="block in noteBlocks" :key="block.key">
+          <figure v-if="block.type === 'image'" class="task-note-image">
+            <img :src="block.src" :alt="block.alt">
+          </figure>
+          <span v-else>{{ block.text }}</span>
+        </template>
+      </div>
       <p v-else class="task-notes task-notes--empty">还没有添加备注。</p>
       <dl class="task-meta">
         <template v-if="task.plannedAt != null && task.plannedAt !== ''">
@@ -322,6 +359,18 @@ async function removeTask() {
   margin: 2rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.task-note-image {
+  margin: 0.8rem 0;
+}
+
+.task-note-image img {
+  border: 1px solid var(--border-soft);
+  border-radius: 0.8rem;
+  display: block;
+  height: auto;
+  max-width: 100%;
 }
 
 .task-notes--empty,

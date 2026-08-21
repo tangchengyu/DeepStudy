@@ -213,7 +213,7 @@ describe('offline-first sync repository', () => {
     upgraded.close()
   })
 
-  it('stores all eight sync entity types and enqueues durable mutations', async () => {
+  it('stores all nine sync entity types and enqueues durable mutations', async () => {
     const database = createSyncDatabase(testDatabaseName())
     const repository = deterministicRepository(database)
 
@@ -225,6 +225,7 @@ describe('offline-first sync repository', () => {
     expect(supportedEntityTypes).toEqual([
       'daily_task',
       'long_task',
+      'long_task_image_chunk',
       'focus_session',
       'mode_event',
       'time_audit',
@@ -232,7 +233,7 @@ describe('offline-first sync repository', () => {
       'reflection',
       'soul_quote',
     ])
-    expect(pending).toHaveLength(8)
+    expect(pending).toHaveLength(9)
     expect(pending.every((mutation) => mutation.state === 'pending')).toBe(true)
     expect(pending.every((mutation) => mutation.baseRevision === 0)).toBe(true)
 

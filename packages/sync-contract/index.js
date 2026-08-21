@@ -1,6 +1,7 @@
 export const SUPPORTED_ENTITY_TYPES = Object.freeze([
   'daily_task',
   'long_task',
+  'long_task_image_chunk',
   'focus_session',
   'mode_event',
   'time_audit',

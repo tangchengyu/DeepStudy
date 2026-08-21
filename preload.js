@@ -76,7 +76,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   syncClaimTimer: (input, expected) => ipcRenderer.invoke("sync:timer-claim", input, expected),
   syncReleaseTimer: (input, expected) => ipcRenderer.invoke("sync:timer-release", input, expected),
   syncCreateBackup: (snapshot) => ipcRenderer.invoke("sync:backup-create", snapshot),
-  syncWriteLongTasks: (tasks, backupId) => ipcRenderer.invoke("sync:backup-write-long-tasks", tasks, backupId),
+  syncWriteLongTasks: (tasks, backupId, longTaskImageChunks) => ipcRenderer.invoke("sync:backup-write-long-tasks", tasks, backupId, longTaskImageChunks),
   syncReadLongTasks: () => ipcRenderer.invoke("sync:backup-read-long-tasks"),
   syncRestoreBackup: (backupId) => ipcRenderer.invoke("sync:backup-restore", backupId),
   onOpenDistraction: (callback) => {

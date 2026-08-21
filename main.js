@@ -1437,8 +1437,8 @@ ipcMain.handle("sync:timer-current", (_event, expected) => desktopSyncService.cu
 ipcMain.handle("sync:timer-claim", (_event, input, expected) => desktopSyncService.claimTimer(input, expected));
 ipcMain.handle("sync:timer-release", (_event, input, expected) => desktopSyncService.releaseTimer(input, expected));
 ipcMain.handle("sync:backup-create", (_event, snapshot) => legacyBackupStore.createBackup(snapshot));
-ipcMain.handle("sync:backup-write-long-tasks", (_event, tasks, backupId) => {
-  const result = legacyBackupStore.writeLongTasks(tasks, backupId);
+ipcMain.handle("sync:backup-write-long-tasks", (_event, tasks, backupId, longTaskImageChunks) => {
+  const result = legacyBackupStore.writeLongTasks(tasks, backupId, longTaskImageChunks);
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send("long-tasks:changed", result);
   return result;
 });

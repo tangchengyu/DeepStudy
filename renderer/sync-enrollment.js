@@ -115,7 +115,7 @@
         records,
         captureLongTasks: () => api.syncCaptureLongTasks(),
         createBackup: (snapshot) => api.syncCreateBackup(snapshot),
-        writeLongTasks: (tasks, backupId) => api.syncWriteLongTasks(tasks, backupId),
+        writeLongTasks: (tasks, backupId, longTaskImageChunks) => api.syncWriteLongTasks(tasks, backupId, longTaskImageChunks),
         readLongTasks: () => api.syncReadLongTasks(),
         restoreBackup: (backupId) => api.syncRestoreBackup(backupId),
         profileReplace: options.profileReplace === true,

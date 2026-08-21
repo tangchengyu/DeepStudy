@@ -78,6 +78,44 @@ test("consistent legacy snapshot retries concurrent changes and preserves every 
   assert.deepEqual(daily.payload.customToday, undefined);
 });
 
+test("consistent legacy snapshot publishes referenced long-task image chunks", async () => {
+  const imageChunk = {
+    imageId: "pasted.png",
+    index: 0,
+    total: 1,
+    type: "image/png",
+    size: 4,
+    data: "aW1n",
+  };
+  const snapshot = await collectConsistentSnapshot({
+    storage: memoryStorage(emptyStores()),
+    deviceId: "desktop-device-test",
+    captureLongTasks: async () => ({
+      tasks: [{
+        id: "long-with-image",
+        title: "带图任务",
+        notes: "![粘贴的图片](deepstudy-image://pasted.png)",
+      }],
+      longTaskImageChunks: [imageChunk],
+      fingerprint: "file-with-image",
+    }),
+    verifyLongTasks: async () => ({ unchanged: true }),
+  });
+
+  const imageRecord = snapshot.records.find((record) => record.entityType === "long_task_image_chunk");
+  assert.deepEqual(imageRecord, {
+    entityType: "long_task_image_chunk",
+    entityId: "pasted.png:0",
+    payload: imageChunk,
+    deleted: false,
+    revision: 0,
+    clientUpdatedAt: 0,
+    serverUpdatedAt: null,
+    deviceId: "desktop-device-test",
+    legacySourceId: "long-task-images:pasted.png",
+  });
+});
+
 test("pulled records are backed up before writes, verified, and leave original keys intact", async () => {
   const stores = emptyStores();
   stores[LEGACY_STORAGE_KEYS.reflection] = JSON.stringify([
@@ -87,6 +125,7 @@ test("pulled records are backed up before writes, verified, and leave original k
   const longTasks = [{ id: "long-1", title: "old", notes: "旧\n备注", plannedAt: 11 }];
   const events = [];
   let currentLongTasks = structuredClone(longTasks);
+  let writtenImageChunks = [];
   const records = [
     {
       entityType: "long_task",
@@ -96,6 +135,23 @@ test("pulled records are backed up before writes, verified, and leave original k
       revision: 2,
       clientUpdatedAt: 22,
       serverUpdatedAt: 23,
+      deviceId: "phone-1",
+    },
+    {
+      entityType: "long_task_image_chunk",
+      entityId: "remote.png:0",
+      payload: {
+        imageId: "remote.png",
+        index: 0,
+        total: 1,
+        type: "image/png",
+        size: 6,
+        data: "cmVtb3Rl",
+      },
+      deleted: false,
+      revision: 1,
+      clientUpdatedAt: 26,
+      serverUpdatedAt: 27,
       deviceId: "phone-1",
     },
     {
@@ -130,7 +186,11 @@ test("pulled records are backed up before writes, verified, and leave original k
       assert.deepEqual(snapshot.longTasks, longTasks);
       return { backupId: "backup-1" };
     },
-    writeLongTasks: async (tasks) => { events.push("long-write"); currentLongTasks = structuredClone(tasks); },
+    writeLongTasks: async (tasks, _backupId, imageChunks) => {
+      events.push("long-write");
+      currentLongTasks = structuredClone(tasks);
+      writtenImageChunks = structuredClone(imageChunks);
+    },
     readLongTasks: async () => structuredClone(currentLongTasks),
     restoreBackup: async () => { events.push("restore"); },
   });
@@ -139,13 +199,14 @@ test("pulled records are backed up before writes, verified, and leave original k
   assert.equal(events[0], "backup");
   assert.equal(storage.writes.length, 7);
   assert.deepEqual(currentLongTasks[0], records[0].payload);
+  assert.deepEqual(writtenImageChunks, [records[1].payload]);
   const reflections = JSON.parse(storage.getItem(LEGACY_STORAGE_KEYS.reflection));
   assert.deepEqual(reflections.find((item) => item.id === "reflection-local"), {
     id: "reflection-local", content: "local", unknown: 7,
   });
-  assert.deepEqual(reflections.find((item) => item.id === "reflection-remote"), records[1].payload);
+  assert.deepEqual(reflections.find((item) => item.id === "reflection-remote"), records[2].payload);
   const quotes = JSON.parse(storage.getItem(LEGACY_STORAGE_KEYS.soulQuote));
-  assert.deepEqual(quotes.find((item) => item.id === "quote-remote"), records[2].payload);
+  assert.deepEqual(quotes.find((item) => item.id === "quote-remote"), records[3].payload);
 });
 
 test("pulled reflection tombstones remove the matching desktop reflection entry", () => {
