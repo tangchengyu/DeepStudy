@@ -122,6 +122,11 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
       deferredPullRecords: [],
     };
   }
+  function normalizeMutationDeviceId(mutation, deviceId = read().deviceId) {
+    if (!mutation?.record || typeof mutation.record !== "object"
+      || mutation.record.deviceId === deviceId) return mutation;
+    return { ...mutation, record: { ...mutation.record, deviceId } };
+  }
   function rebindPendingMutationDeviceIds(state) {
     const deviceId = typeof state?.deviceId === "string" ? state.deviceId : "";
     if (deviceId.length < 8 || !state?.scopes || typeof state.scopes !== "object") return state;
@@ -190,7 +195,7 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
     const state = read();
     const scope = state.scopes?.[scopeKey];
     if (!scope) return defaultScope(scopeKey);
-    return {
+    const normalized = {
       ...defaultScope(scopeKey, scope.gatewayOrigin, scope.username),
       ...scope,
       outbox: Array.isArray(scope.outbox) ? scope.outbox : [],
@@ -198,6 +203,13 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
       records: scope.records && typeof scope.records === "object" ? scope.records : {},
       deferredPullRecords: Array.isArray(scope.deferredPullRecords) ? scope.deferredPullRecords : [],
     };
+    const reboundOutbox = normalized.outbox.map((mutation) => normalizeMutationDeviceId(mutation, state.deviceId));
+    if (reboundOutbox.some((mutation, index) => mutation !== normalized.outbox[index])) {
+      const scopes = { ...(state.scopes || {}), [scopeKey]: { ...normalized, outbox: reboundOutbox } };
+      update({ scopes });
+      return { ...normalized, outbox: reboundOutbox };
+    }
+    return normalized;
   }
   function updateScope(scopeKey, patch) {
     const state = read();
@@ -233,7 +245,7 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
       // An edit following an unsent edit keeps the original base revision; a deletion
       // replaces the edit rather than being accidentally discarded as a no-op.
       byIdentity.set(identity, {
-        ...mutation,
+        ...normalizeMutationDeviceId(mutation),
         baseRevision: previous ? previous.baseRevision : mutation.baseRevision,
       });
     }
@@ -855,7 +867,16 @@ function createDesktopSyncService({
       }
     },
     async push(mutations = [], expected = {}) {
-      return (await request("/v1/sync/push", { method: "POST", body: { mutations }, ...expected })).payload;
+      const state = requireBinding(expected);
+      const normalizedMutations = Array.isArray(mutations)
+        ? mutations.map((mutation) => {
+          if (!mutation?.record || typeof mutation.record !== "object") return mutation;
+          return mutation.record.deviceId === state.deviceId
+            ? mutation
+            : { ...mutation, record: { ...mutation.record, deviceId: state.deviceId } };
+        })
+        : mutations;
+      return (await request("/v1/sync/push", { method: "POST", body: { mutations: normalizedMutations }, ...expected })).payload;
     },
     async pull(input = {}) {
       const expected = { expectedScopeKey: input.expectedScopeKey, expectedAuthGeneration: input.expectedAuthGeneration };

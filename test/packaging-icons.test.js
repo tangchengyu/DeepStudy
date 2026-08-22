@@ -16,14 +16,14 @@ function pngDimensions(filePath) {
 }
 
 test("master desktop package uses the next public master version", () => {
-  assert.equal(pkg.version, "1.2.47");
+  assert.equal(pkg.version, "1.2.48");
   assert.doesNotMatch(pkg.version, /local/i);
 });
 
 test("Android pilot package uses the same public version as the desktop app", () => {
   assert.equal(mobilePkg.version, pkg.version);
   assert.match(androidBuildGradle, new RegExp(`versionName "${pkg.version}"`));
-  assert.match(androidBuildGradle, /versionCode 1247/);
+  assert.match(androidBuildGradle, /versionCode 1248/);
 });
 
 test("packaging uses the DeepStudy clock icon on macOS and Windows", () => {

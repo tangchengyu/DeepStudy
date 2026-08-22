@@ -153,6 +153,33 @@ test("startup rebinds legacy pending mutations to the current device ID", async 
   });
 });
 
+test("queueing replaces stale in-memory mutation device IDs before persistence", async () => {
+  const { createStateStore } = require(MODULE_PATH);
+  await withTempDir((directory) => {
+    const store = createStateStore({ fs, filePath: path.join(directory, "sync-device.json"), createDeviceId: () => "desktop-current-device" });
+    const scope = store.activateScope({ gatewayUrl: "https://gateway.example", username: "alice" });
+    store.queueMutations(scope.scopeKey, [{
+      mutationId: "desktop:cached-stale",
+      baseRevision: 2,
+      record: {
+        entityType: "reflection",
+        entityId: "reflection-1",
+        payload: { id: "reflection-1", notes: "local edit" },
+        deleted: false,
+        revision: 2,
+        clientUpdatedAt: 10,
+        serverUpdatedAt: null,
+        deviceId: "desktop-stale-device",
+      },
+    }]);
+
+    const stored = store.readScope(scope.scopeKey).outbox[0];
+    assert.equal(stored.record.deviceId, "desktop-current-device");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(directory, "sync-device.json"), "utf8"))
+      .scopes[scope.scopeKey].outbox[0].record.deviceId, "desktop-current-device");
+  });
+});
+
 test("outbox records and cursors are isolated by normalized gateway origin and account", async () => {
   const { createStateStore } = require(MODULE_PATH);
   await withTempDir((directory) => {
@@ -217,6 +244,45 @@ test("two-phase pull commits cursor and known records atomically only for the ca
     assert.equal(store.readScope(alice.scopeKey).revisions["reflection\u0000r1"], 3);
     store.activateScope({ gatewayUrl: "https://gateway.example", username: "bob" });
     assert.throws(() => store.commitPull({ scopeKey: alice.scopeKey, expectedOldCursor: 4, newCursor: 5, records: [] }), /账号已切换/);
+  });
+});
+
+test("push rebinds stale outgoing mutations to the request device ID", async () => {
+  const { createCredentialStore, createDesktopSyncService, createStateStore } = require(MODULE_PATH);
+  await withTempDir(async (directory) => {
+    const stateStore = createStateStore({ fs, filePath: path.join(directory, "state.json"), createDeviceId: () => "desktop-current-push-device" });
+    const credentialStore = createCredentialStore({ fs, filePath: path.join(directory, "token.json"), platform: "linux", safeStorage: { isEncryptionAvailable: () => false } });
+    const scope = stateStore.activateScope({ gatewayUrl: "https://gateway.example", username: "alice" });
+    credentialStore.saveToken("token-a", scope.scopeKey);
+    let requestBody = null;
+    let requestDevice = "";
+    const service = createDesktopSyncService({
+      credentialStore,
+      stateStore,
+      fetch: async (_url, init) => {
+        requestDevice = init.headers["X-Device-Id"];
+        requestBody = JSON.parse(init.body);
+        return Response.json({ results: [] });
+      },
+    });
+
+    await service.push([{
+      mutationId: "desktop:stale-direct",
+      baseRevision: 1,
+      record: {
+        entityType: "reflection",
+        entityId: "reflection-1",
+        payload: { id: "reflection-1", notes: "cached edit" },
+        deleted: false,
+        revision: 1,
+        clientUpdatedAt: 10,
+        serverUpdatedAt: null,
+        deviceId: "desktop-stale-push-device",
+      },
+    }], { expectedScopeKey: scope.scopeKey, expectedAuthGeneration: stateStore.read().authGeneration });
+
+    assert.equal(requestDevice, "desktop-current-push-device");
+    assert.equal(requestBody.mutations[0].record.deviceId, "desktop-current-push-device");
   });
 });
 
