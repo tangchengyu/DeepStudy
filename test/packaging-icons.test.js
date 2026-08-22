@@ -5,7 +5,9 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const pkg = require("../package.json");
+const mobilePkg = require("../deepstudy-app/package.json");
 const packScript = fs.readFileSync(path.join(root, "scripts", "pack.js"), "utf8");
+const androidBuildGradle = fs.readFileSync(path.join(root, "deepstudy-app", "android", "app", "build.gradle"), "utf8");
 
 function pngDimensions(filePath) {
   const data = fs.readFileSync(filePath);
@@ -14,8 +16,14 @@ function pngDimensions(filePath) {
 }
 
 test("master desktop package uses the next public master version", () => {
-  assert.equal(pkg.version, "1.2.46");
+  assert.equal(pkg.version, "1.2.47");
   assert.doesNotMatch(pkg.version, /local/i);
+});
+
+test("Android pilot package uses the same public version as the desktop app", () => {
+  assert.equal(mobilePkg.version, pkg.version);
+  assert.match(androidBuildGradle, new RegExp(`versionName "${pkg.version}"`));
+  assert.match(androidBuildGradle, /versionCode 1247/);
 });
 
 test("packaging uses the DeepStudy clock icon on macOS and Windows", () => {

@@ -715,40 +715,13 @@ function splitMarkdownLine(line) {
   startMarkdownLineEdit(next, 0);
   saveDetailEdits();
 }
-function insertPlainTextAtCaret(text) {
-  const selection = window.getSelection();
-  if (!selection.rangeCount) return;
-  const range = selection.getRangeAt(0);
-  range.deleteContents();
-  range.insertNode(document.createTextNode(text));
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
-}
 function pasteIntoMarkdownLine(line, text) {
-  const normalized = String(text || "").replace(/\r\n/g, "\n");
-  if (!normalized.includes("\n")) {
-    insertPlainTextAtCaret(normalized);
-    line.dataset.raw = line.textContent.replace(/\u00a0/g, " ");
-    saveDetailEdits();
-    return;
-  }
-  const parts = normalized.split("\n");
-  const current = line.textContent.replace(/\u00a0/g, " ");
-  const offset = caretOffset(line);
-  line.dataset.raw = `${current.slice(0, offset)}${parts.shift()}`;
-  const tail = `${parts.pop() || ""}${current.slice(offset)}`;
-  finishMarkdownLineEdit(line);
-  let anchor = line;
-  parts.forEach((part) => {
-    const next = createMarkdownLine(part);
-    anchor.after(next);
-    anchor = next;
-  });
-  const tailLine = createMarkdownLine(tail);
-  anchor.after(tailLine);
-  tailLine.focus();
-  requestAnimationFrame(() => placeCaretAt(tailLine, 0));
+  const index = markdownLineIndex(line);
+  const lines = markdownLineElements().map((item) => (
+    item === line ? item.textContent.replace(/\u00a0/g, " ") : item.dataset.raw || ""
+  ));
+  const result = LongTaskUtils.insertNoteTextAtLineCaret(lines, index, caretOffset(line), text);
+  setNoteLines(result.lines, result.caret);
   saveDetailEdits();
 }
 const IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/x-ms-bmp"]);

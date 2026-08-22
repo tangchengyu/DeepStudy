@@ -75,6 +75,18 @@
     };
   }
 
+  function insertNoteTextAtLineCaret(lines, lineIndex, offset, text = "") {
+    const source = Array.isArray(lines) && lines.length ? lines.map((line) => String(line || "")) : [""];
+    const index = Math.min(source.length - 1, Math.max(0, Number(lineIndex) || 0));
+    const caretOffset = clampOffset(source[index], offset);
+    return replaceNoteSelection(source, {
+      startLine: index,
+      startOffset: caretOffset,
+      endLine: index,
+      endOffset: caretOffset,
+    }, String(text || "").replace(/\r\n?/g, "\n"));
+  }
+
   function selectedNoteText(lines, selection) {
     const normalized = normalizeNoteSelection(lines, selection);
     const source = normalized.lines;
@@ -337,5 +349,5 @@
     return { mode: "board", quadrant: null, taskId: null, task: null };
   }
 
-  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, imageInsertionLines, indentNoteLines, mergeNoteLineBackward, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, replaceNoteSelection, resolveLongTaskView, selectedNoteText, splitNoteLineAtOffset };
+  return { QUADRANTS, activeTasksForQuadrant, applyPriorityDecision, detailReturnView, dueTasks, extractJson, fallbackAiOperationsFromText, imageInsertionLines, indentNoteLines, insertNoteTextAtLineCaret, mergeNoteLineBackward, newTaskDefaultsForView, nextReminderAt, normalizeAiOperations, normalizeReminder, normalizeTask, parseObsidianImagePath, replaceNoteSelection, resolveLongTaskView, selectedNoteText, splitNoteLineAtOffset };
 });

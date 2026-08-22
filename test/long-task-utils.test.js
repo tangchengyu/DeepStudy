@@ -7,6 +7,7 @@ const {
   detailReturnView,
   fallbackAiOperationsFromText,
   imageInsertionLines,
+  insertNoteTextAtLineCaret,
   indentNoteLines,
   mergeNoteLineBackward,
   newTaskDefaultsForView,
@@ -80,6 +81,20 @@ test("deletes a partial multi-line note selection", () => {
       endOffset: 0,
     }, ""),
     { lines: ["123456789"], caret: { line: 0, offset: 6 } },
+  );
+});
+
+test("inserts multiline pasted note text without dropping the first pasted line", () => {
+  assert.deepEqual(
+    insertNoteTextAtLineCaret([""], 0, 0, "123\n456\n789"),
+    { lines: ["123", "456", "789"], caret: { line: 2, offset: 3 } },
+  );
+});
+
+test("inserts multiline pasted note text at the caret inside an existing line", () => {
+  assert.deepEqual(
+    insertNoteTextAtLineCaret(["abef"], 0, 2, "12\n34"),
+    { lines: ["ab12", "34ef"], caret: { line: 1, offset: 2 } },
   );
 });
 
