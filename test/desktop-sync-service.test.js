@@ -669,3 +669,37 @@ test("legacy backup captures referenced long-task images and restores pulled chu
     assert.equal(fs.existsSync(path.join(imagesDir, "remote.jpg")), false);
   });
 });
+
+test("legacy long-task image restore ignores incomplete chunks without crashing", async () => {
+  const { createLegacyBackupStore } = require(MODULE_PATH);
+  await withTempDir(async (directory) => {
+    const longTasksFilePath = path.join(directory, "long-tasks.json");
+    const imagesDir = path.join(directory, "long-task-images");
+    fs.writeFileSync(longTasksFilePath, JSON.stringify({
+      version: 1,
+      tasks: [{ id: "plain", title: "无图片", notes: "" }],
+    }), "utf8");
+
+    const backups = createLegacyBackupStore({ fs, userDataPath: directory, longTasksFilePath });
+    const captured = backups.captureLongTasks();
+    const backup = backups.createBackup({
+      version: 1,
+      localStores: { "mytimer.dailyPlan.v1": "{\"date\":\"2026-07-23\",\"tasks\":[]}" },
+      longTasksFingerprint: captured.fingerprint,
+    });
+
+    assert.doesNotThrow(() => backups.writeLongTasks([{
+      id: "remote-with-missing-image",
+      title: "缺少图片首片",
+      notes: "![粘贴的图片](deepstudy-image://remote.png)",
+    }], backup.backupId, [{
+      imageId: "remote.png",
+      index: 1,
+      total: 2,
+      type: "image/png",
+      size: 12,
+      data: Buffer.from("second").toString("base64"),
+    }]));
+    assert.equal(fs.existsSync(path.join(imagesDir, "remote.png")), false);
+  });
+});

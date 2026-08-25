@@ -455,12 +455,13 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
     fs.mkdirSync(longTaskImagesPath, { recursive: true });
     for (const [imageId, imageChunks] of byImage) {
       const total = Number(imageChunks.find(Boolean)?.total) || 0;
-      if (!total || imageChunks.length < total || imageChunks.slice(0, total).some((chunk) => !chunk || chunk.total !== total)) {
+      const orderedChunks = Array.from({ length: total }, (_value, index) => imageChunks[index]);
+      if (!total || orderedChunks.some((chunk) => !chunk || chunk.total !== total)) {
         continue;
       }
-      const data = imageChunks.slice(0, total).map((chunk) => chunk.data).join("");
+      const data = orderedChunks.map((chunk) => chunk.data).join("");
       const bytes = Buffer.from(data, "base64");
-      if (Number(imageChunks[0].size) && bytes.length !== Number(imageChunks[0].size)) continue;
+      if (Number(orderedChunks[0].size) && bytes.length !== Number(orderedChunks[0].size)) continue;
       const target = path.join(longTaskImagesPath, imageId);
       const temporary = `${target}.tmp`;
       fs.writeFileSync(temporary, bytes);
