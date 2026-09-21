@@ -1061,6 +1061,14 @@ function detailFieldsMatchTask(task) {
   return Object.keys(fields).every((field) => detailFieldEqual(field, fields[field], task[field]));
 }
 
+function hasUncapturedDetailEdits() {
+  return viewState.mode === "detail"
+    && detailEditorSnapshot?.taskId === viewState.taskId
+    && Object.entries(readDetailFields()).some(([field, value]) => (
+      !detailFieldEqual(field, value, detailEditorSnapshot.fields[field])
+    ));
+}
+
 async function flushDetailSave(taskId) {
   const draft = detailDrafts.get(taskId);
   if (!draft) return;
@@ -1088,6 +1096,7 @@ async function flushDetailSave(taskId) {
   }
   detailDrafts.delete(taskId);
   if (viewState.mode === "detail" && viewState.taskId === taskId) {
+    if (hasUncapturedDetailEdits()) return;
     const current = currentDetailTask();
     if (current && !detailFieldsMatchTask(current)) renderTaskDetail(current);
     $("#task-detail-save-status").textContent = tr("autoSaved");
@@ -1645,11 +1654,7 @@ document.addEventListener("keydown", (event) => {
 api.onLongTasksChanged((next) => {
   // Validation can temporarily prevent an input from entering the save queue.
   // Keep that input just as we keep a queued draft when another device updates.
-  const uncapturedEdits = viewState.mode === "detail"
-    && detailEditorSnapshot?.taskId === viewState.taskId
-    && Object.entries(readDetailFields()).some(([field, value]) => (
-      !detailFieldEqual(field, value, detailEditorSnapshot.fields[field])
-    ));
+  const uncapturedEdits = hasUncapturedDetailEdits();
   tasks = next.map((task) => {
     const draft = detailDrafts.get(task.id);
     return draft ? { ...task, ...draft.saving, ...draft.changes } : task;

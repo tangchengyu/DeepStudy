@@ -183,3 +183,17 @@ test("a received update preserves an incomplete title until it passes validation
   assert.equal(editor.persisted().title, "完成后的标题");
   assert.equal(editor.persisted().notes, "另一台设备的新备注");
 });
+
+test("finishing a queued save preserves subsequent input still failing validation", async () => {
+  const editor = createEditor();
+  editor.editNotes("已排队的备注");
+  editor.editTitle("");
+  editor.editNotes("已排队的备注\n仍在输入的内容");
+  await editor.flush();
+  assert.equal(editor.displayedTitle(), "");
+  assert.equal(editor.displayedNotes(), "已排队的备注\n仍在输入的内容");
+  editor.editTitle("完成后的标题");
+  await editor.flush();
+  assert.equal(editor.persisted().title, "完成后的标题");
+  assert.equal(editor.persisted().notes, "已排队的备注\n仍在输入的内容");
+});
