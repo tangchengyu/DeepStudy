@@ -24,6 +24,20 @@
     return `desktop:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 12)}`;
   }
 
+  function sameUserContent(left, right) {
+    if (!left || !right || left.deleted !== right.deleted) return false;
+    const content = (record) => {
+      const { updatedAt, ...payload } = record.payload || {};
+      return canonical(payload);
+    };
+    return content(left) === content(right);
+  }
+
+  function currentRecord(records, previous) {
+    return records.find(record => identity(record) === identity(previous))
+      || { ...previous, deleted: true, clientUpdatedAt: Date.now() };
+  }
+
   function* mutationBatches(mutations) {
     const encoder = new TextEncoder();
     let batch = [];
@@ -125,6 +139,22 @@
     async function applyResolvedDeferred(deviceId, binding, state) {
       const pending = Array.isArray(state.deferredPullRecords) ? state.deferredPullRecords : [];
       if (!pending.length || typeof api.syncCommitPull !== "function") return state;
+      const guards = state.resolutionGuards || [];
+      let expectedSnapshot;
+      if (guards.length) {
+        const local = await snapshot(deviceId);
+        expectedSnapshot = local;
+        const queued = new Set((state.outbox || []).map(mutation => identity(mutation.record)));
+        const changes = guards.filter(guard => !queued.has(identity(guard.record)))
+          .map(guard => ({ guard, record: currentRecord(local.records, guard.record) }))
+          .filter(({ guard, record }) => !sameUserContent(record, guard.record)
+            && !sameUserContent(record, pending.find(item => identity(item) === identity(record))))
+          .map(({ guard, record }) => ({ mutationId: mutationId(), baseRevision: guard.baseRevision, record }));
+        if (changes.length) {
+          await api.syncOutboxQueue(changes, binding);
+          state = await api.syncOutboxState(binding);
+        }
+      }
       const blocked = new Set((state.outbox || [])
         .map((mutation) => identity(mutation.record)));
       const applicable = pending.filter((record) => !blocked.has(identity(record)));
@@ -133,7 +163,7 @@
       let applied = null;
       try {
         await api.syncOutboxState(binding);
-        applied = await applyPulled(applicable, deviceId);
+        applied = await applyPulled(applicable, deviceId, { expectedSnapshot });
         await api.syncOutboxState(binding);
         await api.syncCommitPull({
           ...binding,
@@ -147,6 +177,28 @@
         throw error;
       }
       return api.syncOutboxState(binding);
+    }
+
+    async function reconcileResolvedConflicts(deviceId, binding, state) {
+      if (typeof api.syncConflictStatus !== "function" || typeof api.syncReconcileConflict !== "function") return state;
+      const blocked = (state.outbox || []).filter(mutation => mutation.blocked && mutation.conflictId);
+      for (const mutation of blocked) {
+        const receipt = await api.syncConflictStatus(mutation.conflictId, binding);
+        if (!["resolved_keep_remote", "resolved_keep_local"].includes(receipt?.status)
+          || !receipt.record || identity(receipt.record) !== identity(mutation.record)) continue;
+        // Read again after the network request: an edit made while waiting must
+        // become a new conflict rather than being discarded with the old one.
+        const local = await snapshot(deviceId);
+        const record = currentRecord(local.records, mutation.record);
+        const changed = !sameUserContent(record, mutation.record) && !sameUserContent(record, receipt.record);
+        await api.syncReconcileConflict({
+          mutationId: mutation.mutationId,
+          receipt,
+          localBaseline: record,
+          replacement: changed ? { mutationId: mutationId(), baseRevision: mutation.baseRevision, record } : null,
+        }, binding);
+      }
+      return blocked.length ? api.syncOutboxState(binding) : state;
     }
 
     async function activateLocalProfile(deviceId, binding, state) {
@@ -222,7 +274,7 @@
       let applied = null;
       if (applicable.length) {
         await api.syncOutboxState(binding);
-        applied = await applyPulled(applicable, deviceId);
+        applied = await applyPulled(applicable, deviceId, { expectedSnapshot: latest });
       }
       try {
         // The binding check and durable commit are deliberately inside the same
@@ -255,6 +307,7 @@
         let state = await api.syncOutboxState(binding);
         state = await activateLocalProfile(status.deviceId, binding, state);
         if (!state?.enrolled) return { skipped: "not-enrolled" };
+        state = await reconcileResolvedConflicts(status.deviceId, binding, state);
         // A keep-remote conflict result must be installed before change
         // detection, otherwise the losing local payload would be queued again.
         state = await applyResolvedDeferred(status.deviceId, binding, state);

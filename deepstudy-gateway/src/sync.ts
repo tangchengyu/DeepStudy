@@ -333,6 +333,22 @@ syncRoutes.get("/sync/conflicts", async (c) => {
   });
 });
 
+// A device may still hold a blocked mutation after another device resolves it.
+// Inspect the exact ID; absence from the capped open-conflict list proves nothing.
+syncRoutes.get("/sync/conflicts/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!/^[A-Za-z0-9._:-]{1,200}$/.test(id)) return c.json({ error: "INVALID_CONFLICT_ID" }, 400);
+  const { id: userId } = sessionUser(c);
+  const conflict = await c.env.DB.prepare(`
+    SELECT status, entity_type, entity_id
+    FROM sync_conflicts WHERE id = ? AND user_id = ?
+  `).bind(id, userId).first<{ status: string; entity_type: string; entity_id: string }>();
+  if (!conflict) return c.json({ id, status: "unknown", record: null });
+  const resolved = ["resolved_keep_remote", "resolved_keep_local"].includes(conflict.status);
+  const record = resolved ? await storedRecord(c.env.DB, userId, conflict.entity_type, conflict.entity_id) : null;
+  return c.json({ id, status: conflict.status, record: record ? publicRecord(record) : null });
+});
+
 syncRoutes.post("/sync/conflicts/:id/resolve", async (c) => {
   const body = await readJsonObject(c);
   const resolution = String(body?.resolution ?? "");

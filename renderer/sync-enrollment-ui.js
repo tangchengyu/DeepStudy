@@ -560,7 +560,12 @@
     });
     if (result) {
       previewResult.textContent = `同步完成：上传 ${result.mutations || 0} 条，拉取核对 ${result.records?.length || 0} 条。`;
-      notifySyncApplied({ closeModal: true });
+      if (result.conflictCount || result.pendingCount) {
+        setStatus(`本机仍有 ${result.pendingCount || 0} 条待上传修改、${result.conflictCount || 0} 条待处理冲突。请查看冲突并比较版本，尚未全部同步完成。`, true);
+        notifySyncApplied();
+      } else {
+        notifySyncApplied({ closeModal: true });
+      }
     }
   });
   byId("sync-conflicts").addEventListener("click", async (event) => {

@@ -119,6 +119,7 @@
         readLongTasks: () => api.syncReadLongTasks(),
         restoreBackup: (backupId) => api.syncRestoreBackup(backupId),
         profileReplace: options.profileReplace === true,
+        expectedSnapshot: options.expectedSnapshot,
       });
     }
 

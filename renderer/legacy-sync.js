@@ -302,9 +302,16 @@
     readLongTasks,
     restoreBackup,
     profileReplace = false,
+    expectedSnapshot,
   }) {
     const originalStores = readRawStores(storage);
     const captured = await captureLongTasks();
+    if (expectedSnapshot && (
+      (expectedSnapshot.fingerprint !== undefined && expectedSnapshot.fingerprint !== captured.fingerprint)
+      || (expectedSnapshot.rawStores && !sameRawStores(expectedSnapshot.rawStores, originalStores))
+    )) {
+      throw new LegacySnapshotError("同步前本机数据已变化，已保留本机修改，请重试。", "LOCAL_CHANGED_BEFORE_APPLY");
+    }
     const backup = await createBackup({
       version: 1,
       createdAt: Date.now(),

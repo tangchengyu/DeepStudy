@@ -292,6 +292,9 @@ function createStateStore({ fs, filePath, createDeviceId = () => `desktop-${cryp
       revisions,
       records: knownRecords,
       deferredPullRecords: Array.isArray(deferredPullRecords) ? deferredPullRecords : [],
+      resolutionGuards: (scope.resolutionGuards || []).filter(guard => !records.some(record => (
+        record.entityType === guard.record.entityType && record.entityId === guard.record.entityId
+      ))),
     };
     update({
       cursor,
@@ -910,6 +913,7 @@ function createDesktopSyncService({
         records: Object.values(scope.records).map((record) => ({ ...record })),
         outbox: scope.outbox.map((mutation) => ({ ...mutation, record: { ...mutation.record } })),
         deferredPullRecords: scope.deferredPullRecords.map((record) => ({ ...record })),
+        resolutionGuards: (scope.resolutionGuards || []).map(guard => ({ ...guard, record: { ...guard.record } })),
       };
     },
     queueOutbox(mutations = [], expected = {}) {
@@ -999,6 +1003,38 @@ function createDesktopSyncService({
     },
     async conflicts(expected = {}) {
       return (await request("/v1/sync/conflicts", expected)).payload;
+    },
+    async conflictStatus(conflictId, expected = {}) {
+      if (!/^[A-Za-z0-9._:-]{1,200}$/.test(String(conflictId || ""))) throw new TypeError("冲突编号无效。");
+      return (await request(`/v1/sync/conflicts/${encodeURIComponent(conflictId)}`, expected)).payload;
+    },
+    reconcileConflict(input, expected = {}) {
+      const scope = activeScope(expected);
+      const { receipt, replacement, localBaseline } = input || {};
+      const matching = scope.outbox.find(mutation => mutation.mutationId === input?.mutationId
+        && mutation.blocked && mutation.conflictId === receipt?.id);
+      if (!matching) return { reconciled: false };
+      const sameEntity = record => record?.entityType === matching.record.entityType && record?.entityId === matching.record.entityId;
+      if (!["resolved_keep_remote", "resolved_keep_local"].includes(receipt?.status)
+        || !sameEntity(receipt.record) || !sameEntity(localBaseline)
+        || (replacement && (!sameEntity(replacement.record) || !replacement.mutationId || replacement.mutationId === matching.mutationId))) {
+        throw new TypeError("冲突恢复信息无效。");
+      }
+      const outbox = scope.outbox.filter(mutation => mutation.mutationId !== matching.mutationId);
+      if (replacement) outbox.push({ ...replacement, baseRevision: matching.baseRevision });
+      const existing = scope.deferredPullRecords.find(sameEntity);
+      const record = existing && Number(existing.revision) > Number(receipt.record.revision) ? existing : receipt.record;
+      // Retire the stale queue entry and retain its download in one durable write.
+      // The guard also protects edits made after a failed writeback or restart.
+      stateStore.updateScope(scope.scopeKey, {
+        outbox,
+        deferredPullRecords: [...scope.deferredPullRecords.filter(item => !sameEntity(item)), record],
+        resolutionGuards: [
+          ...(scope.resolutionGuards || []).filter(guard => !sameEntity(guard.record)),
+          { record: localBaseline, baseRevision: matching.baseRevision },
+        ],
+      });
+      return { reconciled: true };
     },
     async resolveConflict(conflictId, input = {}, expected = {}) {
       if (!/^[A-Za-z0-9._:-]{1,200}$/.test(String(conflictId || ""))) {
