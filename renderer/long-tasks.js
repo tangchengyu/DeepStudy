@@ -14,7 +14,8 @@ let viewState = { mode: "board", quadrant: null, taskId: null };
 let suppressTaskOpenUntil = 0;
 let undoTimer = null;
 let pendingUndoTask = null;
-let detailSaveTimer = null;
+let detailEditorSnapshot = null;
+const detailDrafts = new Map();
 let noteUndoStack = [];
 const localImageUrls = new Map();
 
@@ -1026,6 +1027,7 @@ function renderDetailReminderFields() {
 }
 
 function renderTaskDetail(task) {
+  detailEditorSnapshot = null;
   $("#task-detail-quadrant").textContent = quadrantLabel(task.quadrant);
   $("#task-detail-title").value = task.title;
   renderNotesEditor(task.notes || "");
@@ -1036,33 +1038,87 @@ function renderTaskDetail(task) {
   $("#task-detail-check").checked = false;
   $("#task-detail-check").disabled = false;
   $("#task-detail-save-status").textContent = "";
+  detailEditorSnapshot = { taskId: task.id, fields: readDetailFields() };
+}
+
+function readDetailFields() {
+  return {
+    title: $("#task-detail-title").value.trim(),
+    notes: notesEditorValue(),
+    reminder: readDetailReminder(),
+  };
+}
+
+function detailFieldEqual(field, left, right) {
+  if (field !== "reminder") return left === right;
+  const editable = (value = {}) => [value.kind, value.at, value.time, value.weekdays, value.enabled];
+  return JSON.stringify(editable(left)) === JSON.stringify(editable(right));
+}
+
+function detailFieldsMatchTask(task) {
+  if (detailEditorSnapshot?.taskId !== task.id) return false;
+  const fields = readDetailFields();
+  return Object.keys(fields).every((field) => detailFieldEqual(field, fields[field], task[field]));
+}
+
+async function flushDetailSave(taskId) {
+  const draft = detailDrafts.get(taskId);
+  if (!draft) return;
+  clearTimeout(draft.timer);
+  draft.timer = null;
+  if (draft.saving) return;
+  const task = tasks.find((item) => item.id === taskId && item.status === "active");
+  if (!task) { detailDrafts.delete(taskId); return; }
+  draft.saving = { ...draft.changes };
+  draft.changes = {};
+  let saved = false;
+  try {
+    await api.saveLongTask({ ...task, ...draft.saving });
+    saved = true;
+  } catch (error) {
+    draft.changes = { ...draft.saving, ...draft.changes };
+    if (viewState.taskId === taskId) $("#task-detail-save-status").textContent = error.message;
+  } finally {
+    draft.saving = null;
+  }
+  if (!saved) return;
+  if (Object.keys(draft.changes).length) {
+    if (!draft.timer) draft.timer = setTimeout(() => flushDetailSave(taskId), 500);
+    return;
+  }
+  detailDrafts.delete(taskId);
+  if (viewState.mode === "detail" && viewState.taskId === taskId) {
+    const current = currentDetailTask();
+    if (current && !detailFieldsMatchTask(current)) renderTaskDetail(current);
+    $("#task-detail-save-status").textContent = tr("autoSaved");
+  }
 }
 
 function saveDetailEdits() {
   const task = currentDetailTask();
-  if (!task) return;
-  const title = $("#task-detail-title").value.trim();
-  const notes = notesEditorValue();
-  const reminder = readDetailReminder();
-  if (!title) {
+  if (!task || detailEditorSnapshot?.taskId !== task.id) return;
+  const fields = readDetailFields();
+  if (!fields.title) {
     $("#task-detail-save-status").textContent = tr("taskNameRequired");
     return;
   }
-  const reminderError = validateDetailReminder(reminder, task);
+  const reminderError = validateDetailReminder(fields.reminder, task);
   $("#task-detail-reminder-error").textContent = reminderError;
   if (reminderError) return;
+  const changes = Object.fromEntries(Object.entries(fields).filter(([field, value]) => (
+    !detailFieldEqual(field, value, detailEditorSnapshot.fields[field])
+  )));
+  if (!Object.keys(changes).length) return;
+  detailEditorSnapshot = { taskId: task.id, fields };
+  const draft = detailDrafts.get(task.id) || { changes: {}, saving: null, timer: null };
+  Object.assign(draft.changes, changes);
+  detailDrafts.set(task.id, draft);
+  const { title, notes, reminder } = { ...task, ...draft.saving, ...draft.changes };
   Object.assign(task, { title, notes, reminder, updatedAt: Date.now() });
   $("#task-detail-reminder-summary").textContent = detailReminderSummary(reminder);
   $("#task-detail-save-status").textContent = tr("autoSaving");
-  clearTimeout(detailSaveTimer);
-  detailSaveTimer = setTimeout(async () => {
-    try {
-      await api.saveLongTask(task);
-      $("#task-detail-save-status").textContent = tr("autoSaved");
-    } catch (error) {
-      $("#task-detail-save-status").textContent = error.message;
-    }
-  }, 500);
+  clearTimeout(draft.timer);
+  draft.timer = setTimeout(() => flushDetailSave(task.id), 500);
 }
 
 function render() {
@@ -1587,9 +1643,20 @@ document.addEventListener("keydown", (event) => {
 });
 
 api.onLongTasksChanged((next) => {
-  tasks = next;
-  if (viewState.mode === "detail" && isDetailEditorFocused() && currentDetailTask()) {
-    return;
+  // Validation can temporarily prevent an input from entering the save queue.
+  // Keep that input just as we keep a queued draft when another device updates.
+  const uncapturedEdits = viewState.mode === "detail"
+    && detailEditorSnapshot?.taskId === viewState.taskId
+    && Object.entries(readDetailFields()).some(([field, value]) => (
+      !detailFieldEqual(field, value, detailEditorSnapshot.fields[field])
+    ));
+  tasks = next.map((task) => {
+    const draft = detailDrafts.get(task.id);
+    return draft ? { ...task, ...draft.saving, ...draft.changes } : task;
+  });
+  if (viewState.mode === "detail" && currentDetailTask()) {
+    if (uncapturedEdits || detailDrafts.has(viewState.taskId)) return;
+    if (isDetailEditorFocused() && detailFieldsMatchTask(currentDetailTask())) return;
   }
   render();
 }); api.acknowledgeReminders(); reload();
