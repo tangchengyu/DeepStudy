@@ -30,6 +30,8 @@ interface SyncServiceOptions {
   deviceName?: () => string
   platform?: () => string
   createMutationId?: () => string
+  autoSyncDelayMs?: number
+  pollIntervalMs?: number
 }
 
 export interface SyncState {
@@ -39,6 +41,7 @@ export interface SyncState {
   pending: number
   conflicts: number
   error: string | null
+  nextRetryAt: number | null
 }
 
 export interface SyncRunStats {
@@ -67,8 +70,28 @@ function defaultDelay(milliseconds: number) {
 }
 
 function retryable(error: unknown) {
+  if (error instanceof GatewayError && /^SYNC_(DAILY_|STORAGE_LIMIT)/.test(error.code)) return false
   return error instanceof TypeError
-    || (error instanceof GatewayError && (error.status === 429 || error.status >= 500))
+    || (error instanceof GatewayError && (error.code === 'NETWORK_TIMEOUT' || error.status === 429 || error.status >= 500))
+}
+
+function pushBatch(pending: PendingMutation[]) {
+  const batch: PendingMutation[] = []
+  const keys = new Set<string>()
+  let bytes = 32
+  for (const mutation of pending) {
+    if (keys.has(mutation.recordKey)) continue
+    const { key: _key, scopeKey: _scopeKey, ...record } = mutation.record
+    const size = new TextEncoder().encode(JSON.stringify({
+      mutationId: mutation.mutationId, baseRevision: mutation.baseRevision, record,
+    })).length + 1
+    if (batch.length && bytes + size > 900_000) break
+    batch.push(mutation)
+    keys.add(mutation.recordKey)
+    bytes += size
+    if (batch.length === 5) break
+  }
+  return batch
 }
 
 function normalizeRecord(record: RemoteSyncRecord, scopeKey: string): SyncRecordEnvelope {
@@ -119,6 +142,7 @@ export function createSyncService(options: SyncServiceOptions) {
     pending: 0,
     conflicts: 0,
     error: null,
+    nextRetryAt: null,
   })
   let currentSync: {
     scopeKey: string
@@ -128,13 +152,46 @@ export function createSyncService(options: SyncServiceOptions) {
   let unsubscribe: (() => void) | null = null
   let unsubscribeOutbox: (() => void) | null = null
   let generation = 0
+  let started = false
+  let autoTimer: ReturnType<typeof setTimeout> | null = null
+  let automaticRequested = false
+  let automaticBlocked = false
+  let failures = 0
+  let unsubscribeForeground: (() => void) | null = null
+
+  function isVisible() {
+    return typeof document === 'undefined' || document.visibilityState !== 'hidden'
+  }
+
+  function clearAutoTimer() {
+    if (autoTimer !== null) clearTimeout(autoTimer)
+    autoTimer = null
+  }
+
+  function scheduleAutomaticSync(milliseconds = options.autoSyncDelayMs ?? 750) {
+    if (!started || automaticBlocked || !options.connectivity.isOnline() || !isVisible()) return
+    if (currentSync) {
+      automaticRequested = true
+    }
+    clearAutoTimer()
+    const wait = Math.max(milliseconds, (state.nextRetryAt ?? 0) - now())
+    autoTimer = setTimeout(() => {
+      autoTimer = null
+      if (started && isVisible() && options.connectivity.isOnline()) {
+        void service.syncNow().catch(() => undefined)
+      }
+    }, wait)
+  }
 
   async function refreshState() {
+    const scopeKey = options.repository.getActiveScope()
+    const refreshGeneration = generation
     const [lastSyncAt, pending, conflicts] = await Promise.all([
       options.repository.getMetadata('lastSyncAt'),
       options.repository.pendingCount(),
       options.repository.conflictCount(),
     ])
+    if (scopeKey !== options.repository.getActiveScope() || refreshGeneration !== generation) return
     state.lastSyncAt = lastSyncAt ? Number(lastSyncAt) : null
     state.pending = pending
     state.conflicts = conflicts
@@ -148,6 +205,7 @@ export function createSyncService(options: SyncServiceOptions) {
       } catch (error) {
         lastError = error
         if (!retryable(error) || attempt === 2 || !options.connectivity.isOnline()) throw error
+        if (error instanceof GatewayError && error.retryAfterSeconds) throw error
         await delay(250 * (2 ** attempt))
       }
     }
@@ -158,8 +216,11 @@ export function createSyncService(options: SyncServiceOptions) {
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
       return () => undefined
     }
-    const listener = () => {
+    const listener = (event: Event) => {
+      const scopeKey = (event as CustomEvent<{ scopeKey?: string }>).detail?.scopeKey
+      if (scopeKey && scopeKey !== options.repository.getActiveScope()) return
       void refreshState().catch(() => undefined)
+      scheduleAutomaticSync()
     }
     window.addEventListener('deepstudy:sync-outbox-changed', listener)
     return () => window.removeEventListener('deepstudy:sync-outbox-changed', listener)
@@ -218,22 +279,26 @@ export function createSyncService(options: SyncServiceOptions) {
 
     while (true) {
       assertCurrentRun()
-      const mutation = (await options.repository.listPushableMutations())[0]
-      if (!mutation) break
-      const response = await withRetry(() => options.client.push(deviceId, [mutation]))
+      const batch = pushBatch(await options.repository.listPushableMutations())
+      if (!batch.length) break
+      const response = await withRetry(() => options.client.push(deviceId, batch))
       assertCurrentRun()
-      const result = response.results.find((item) => item.mutationId === mutation.mutationId)
-      if (!result) throw new Error(`Gateway did not acknowledge ${mutation.mutationId}`)
-      if (result.status === 'applied') {
-        await options.repository.acknowledgeMutation(mutation.mutationId, {
-          revision: result.revision,
-          serverUpdatedAt: result.serverUpdatedAt,
-        })
-        stats.pushed += 1
-      } else {
-        await storeConflict(mutation, result)
-        stats.pushConflicts += 1
+      for (const mutation of batch) {
+        assertCurrentRun()
+        const result = response.results.find((item) => item.mutationId === mutation.mutationId)
+        if (!result) throw new Error(`Gateway did not acknowledge ${mutation.mutationId}`)
+        if (result.status === 'applied') {
+          await options.repository.acknowledgeMutation(mutation.mutationId, {
+            revision: result.revision,
+            serverUpdatedAt: result.serverUpdatedAt,
+          })
+          stats.pushed += 1
+        } else {
+          await storeConflict(mutation, result)
+          stats.pushConflicts += 1
+        }
       }
+      await refreshState()
     }
 
     let cursor = await options.repository.getCursor()
@@ -248,10 +313,12 @@ export function createSyncService(options: SyncServiceOptions) {
         if (!await options.repository.hasOpenConflict(normalized.key)) {
           const result = await options.repository.applyRemoteRecord(normalized)
           if (result.status === 'applied') stats.applied += 1
-          else stats.pullConflicts += 1
+          else if (result.status === 'conflict') stats.pullConflicts += 1
         }
       }
-      cursor = String(pulled.cursor)
+      const nextCursor = String(pulled.cursor)
+      if (pulled.hasMore && nextCursor === (cursor ?? '0')) throw new Error('SYNC_CURSOR_STALLED')
+      cursor = nextCursor
       assertCurrentRun()
       await options.repository.setCursor(cursor)
       hasMore = pulled.hasMore
@@ -269,6 +336,9 @@ export function createSyncService(options: SyncServiceOptions) {
     assertCurrentRun()
     await options.repository.setMetadata('lastSyncAt', String(completedAt))
     state.phase = 'idle'
+    state.nextRetryAt = null
+    failures = 0
+    automaticBlocked = false
     await refreshState()
     stats.pending = state.pending
     stats.conflicts = state.conflicts
@@ -400,7 +470,7 @@ export function createSyncService(options: SyncServiceOptions) {
     })
   }
 
-  return {
+  const service = {
     state,
     refreshState,
     async previewRemoteImpact(): Promise<RemoteImpactPreview> {
@@ -437,22 +507,47 @@ export function createSyncService(options: SyncServiceOptions) {
       }
       return preview
     },
-    async syncNow() {
+    async syncNow(): Promise<SyncRunStats> {
       const scopeKey = options.repository.getActiveScope()
+      const requestedGeneration = generation
       if (currentSync?.scopeKey === scopeKey && currentSync.generation === generation) {
         return currentSync.promise
       }
       if (currentSync) await currentSync.promise.catch(() => undefined)
+      options.repository.assertActiveScope(scopeKey)
+      if (requestedGeneration !== generation) throw new Error('SYNC_CANCELLED')
+      if (currentSync?.scopeKey === scopeKey && currentSync.generation === generation) {
+        return currentSync.promise
+      }
       const runGeneration = generation
+      clearAutoTimer()
+      automaticRequested = false
       let promise!: Promise<SyncRunStats>
       promise = performSync(scopeKey, runGeneration).catch(async (error) => {
+        if (generation !== runGeneration || options.repository.getActiveScope() !== scopeKey) throw error
         state.phase = options.connectivity.isOnline() ? 'error' : 'offline'
         state.online = options.connectivity.isOnline()
         state.error = error instanceof Error ? error.message : String(error)
+        failures += 1
+        automaticBlocked = !retryable(error)
+        if (error instanceof GatewayError && /^SYNC_DAILY_/.test(error.code)) {
+          automaticBlocked = false
+          const tomorrow = new Date(now())
+          tomorrow.setUTCHours(24, 1, 0, 0)
+          state.nextRetryAt = error.retryAfterSeconds
+            ? now() + error.retryAfterSeconds * 1_000 : tomorrow.getTime()
+        } else {
+          const retryDelay = error instanceof GatewayError && error.retryAfterSeconds
+            ? error.retryAfterSeconds * 1_000 : Math.min(300_000, 30_000 * 2 ** (failures - 1))
+          state.nextRetryAt = automaticBlocked ? null : now() + retryDelay
+        }
         await refreshState()
         throw error
       }).finally(() => {
         if (currentSync?.promise === promise) currentSync = null
+        if (generation === runGeneration) {
+          scheduleAutomaticSync(automaticRequested ? (options.autoSyncDelayMs ?? 750) : (options.pollIntervalMs ?? 60_000))
+        }
       })
       currentSync = { scopeKey, generation: runGeneration, promise }
       return promise
@@ -527,23 +622,54 @@ export function createSyncService(options: SyncServiceOptions) {
       return { ok: true, resolution }
     },
     start() {
+      if (started) return
+      started = true
+      automaticBlocked = false
       if (!unsubscribeOutbox) unsubscribeOutbox = subscribeOutboxChanges()
       if (unsubscribe) return
-      void refreshState()
+      void refreshState().catch(() => undefined)
       unsubscribe = options.connectivity.subscribe((online) => {
         state.online = online
-        if (online) void this.syncNow().catch(() => undefined)
-        else state.phase = 'offline'
+        if (online) scheduleAutomaticSync(0)
+        else {
+          clearAutoTimer()
+          state.phase = 'offline'
+        }
       })
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const foreground = () => {
+          if (isVisible()) scheduleAutomaticSync(0)
+          else clearAutoTimer()
+        }
+        document.addEventListener('visibilitychange', foreground)
+        window.addEventListener('focus', foreground)
+        unsubscribeForeground = () => {
+          document.removeEventListener('visibilitychange', foreground)
+          window.removeEventListener('focus', foreground)
+        }
+      }
+      state.online = options.connectivity.isOnline()
+      if (!state.online) state.phase = 'offline'
+      scheduleAutomaticSync()
     },
     stop() {
+      started = false
       generation += 1
+      clearAutoTimer()
+      unsubscribeForeground?.()
+      unsubscribeForeground = null
       unsubscribe?.()
       unsubscribe = null
       unsubscribeOutbox?.()
       unsubscribeOutbox = null
+      failures = 0
+      automaticBlocked = false
+      state.nextRetryAt = null
+      state.error = null
+      state.phase = options.connectivity.isOnline() ? 'idle' : 'offline'
     },
   }
+  return service
 }
 
 export type SyncService = ReturnType<typeof createSyncService>

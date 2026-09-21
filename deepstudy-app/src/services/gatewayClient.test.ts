@@ -2,6 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createGatewayClient } from './gatewayClient'
 
 describe('gateway client', () => {
+  it('preserves the server Retry-After header for automatic quota backoff', async () => {
+    const client = createGatewayClient({
+      getBaseUrl: () => 'https://gateway.example.test',
+      tokenStorage: { read: async () => 'token', save: async () => undefined, clear: async () => undefined },
+      fetchFn: async () => Response.json({ error: 'SYNC_DAILY_READ_LIMIT' }, {
+        status: 503, headers: { 'Retry-After': '3600' },
+      }),
+    })
+    await expect(client.pull('device-1', null)).rejects.toMatchObject({
+      code: 'SYNC_DAILY_READ_LIMIT', retryAfterSeconds: 3600,
+    })
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()

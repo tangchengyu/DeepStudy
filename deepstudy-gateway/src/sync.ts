@@ -4,6 +4,8 @@ import { readJsonObject } from "./http";
 import { requiredDeviceId, sessionUser } from "./session";
 
 const MAX_MUTATIONS = 20;
+// Accept older clients' larger queues, but acknowledge only a safe prefix.
+const MUTATIONS_PER_REQUEST = 5;
 const MAX_SYNC_PUSH_BYTES = 900_000;
 const RESOLUTION_LEASE_MS = 5 * 60_000;
 
@@ -247,10 +249,10 @@ syncRoutes.post("/sync/push", async (c) => {
   if (mutations.some((mutation) => !mutation)) return c.json({ error: "INVALID_MUTATION" }, 400);
   const { id: userId } = sessionUser(c);
   const results: Record<string, unknown>[] = [];
-  for (const mutation of mutations as MutationInput[]) {
+  for (const mutation of mutations.slice(0, MUTATIONS_PER_REQUEST) as MutationInput[]) {
     results.push(await applyMutation(c.env.DB, userId, deviceId, mutation));
   }
-  return c.json({ results });
+  return c.json({ results, hasMore: mutations.length > results.length });
 });
 
 syncRoutes.get("/sync/pull", async (c) => {
@@ -279,10 +281,10 @@ syncRoutes.get("/sync/pull", async (c) => {
            r.client_updated_at, r.server_updated_at, r.device_id,
            r.legacy_source_id, latest.sequence
     FROM latest
-    JOIN sync_records r
-      ON r.user_id = ?
-     AND r.entity_type = latest.entity_type
-     AND r.entity_id = latest.entity_id
+    CROSS JOIN sync_records r
+    WHERE r.user_id = ?
+      AND r.entity_type = latest.entity_type
+      AND r.entity_id = latest.entity_id
     ORDER BY latest.sequence ASC
   `).bind(userId, cursor, limit, userId).all<StoredRecord & { sequence: number }>();
   const rows = result.results ?? [];

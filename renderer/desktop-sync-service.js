@@ -584,12 +584,13 @@ function createLegacyBackupStore({ fs, userDataPath, longTasksFilePath }) {
 }
 
 class GatewayRequestError extends Error {
-  constructor(message, { status = 0, code = "GATEWAY_ERROR", details = null } = {}) {
+  constructor(message, { status = 0, code = "GATEWAY_ERROR", details = null, retryAfterSeconds = 0 } = {}) {
     super(message);
     this.name = "GatewayRequestError";
     this.status = status;
     this.code = code;
     this.details = details;
+    this.retryAfterSeconds = Math.max(0, Number(retryAfterSeconds) || 0);
   }
 }
 
@@ -691,6 +692,7 @@ function createDesktopSyncService({
       headers.Authorization = `Bearer ${capturedToken}`;
     }
     let response;
+    let text = "";
     const timeoutMs = Math.max(1000, Number(requestTimeoutMs) || 60000);
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -701,6 +703,7 @@ function createDesktopSyncService({
         ...(controller ? { signal: controller.signal } : {}),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
+      text = await response.text();
     } catch (error) {
       if (controller?.signal.aborted || error?.name === "AbortError") {
         throw new GatewayRequestError("同步服务请求超时，请检查网络后重试。", { code: "NETWORK_TIMEOUT" });
@@ -710,18 +713,22 @@ function createDesktopSyncService({
       if (timeout) clearTimeout(timeout);
     }
     let payload = null;
-    const text = await response.text();
     if (text) {
       try { payload = JSON.parse(text); }
       catch { payload = { message: text.slice(0, 500) }; }
     }
     if (!response.ok) {
+      const retryAfter = response.headers.get("Retry-After");
+      const headerDelay = retryAfter && !Number.isFinite(Number(retryAfter))
+        ? Math.ceil((Date.parse(retryAfter) - Date.now()) / 1000)
+        : Number(retryAfter);
+      const retryAfterSeconds = Math.max(0, Number(payload?.retryAfterSeconds) || 0, Number(headerDelay) || 0);
       if (response.status === 401 && authenticated) {
         clearAuthIfCurrent(expected, capturedToken);
       }
       throw new GatewayRequestError(
         payload?.message || payload?.error || `同步服务返回 HTTP ${response.status}`,
-        { status: response.status, code: payload?.error || "GATEWAY_ERROR", details: payload },
+        { status: response.status, code: payload?.error || "GATEWAY_ERROR", details: payload, retryAfterSeconds },
       );
     }
     requireBinding(expected, { requireScope: authenticated });

@@ -9,6 +9,94 @@ function storageWithFocusSession(session) {
   return { getItem: (key) => values.get(key) ?? null };
 }
 
+test("large UTF-8 records are split by bytes as well as item count", async () => {
+  const records = Array.from({ length: 7 }, (_, index) => ({
+    entityType: "long_task", entityId: `large-${index}`, payload: { notes: "文".repeat(80000) },
+    deleted: false, revision: 0, clientUpdatedAt: 1, serverUpdatedAt: null, deviceId: "byte-test-device",
+  }));
+  let outbox = [];
+  const batches = [];
+  const sync = createContinuousSync({
+    api: {
+      syncStatus: async () => ({ signedIn: true, deviceId: "byte-test-device" }),
+      syncOutboxState: async () => ({ enrolled: true, cursor: 0, records, revisions: {}, outbox }),
+      syncOutboxQueue: async (mutations) => { outbox = mutations; },
+      syncPush: async (mutations) => {
+        assert.ok(Buffer.byteLength(JSON.stringify({ mutations }), "utf8") <= 900000);
+        batches.push(mutations.length);
+        return { results: mutations.map((mutation) => ({ mutationId: mutation.mutationId, status: "applied" })) };
+      },
+      syncOutboxSettle: async (results) => { outbox = outbox.filter((mutation) => !results.some((result) => result.mutationId === mutation.mutationId)); },
+      syncPull: async () => ({ records: [], cursor: 0, hasMore: false }),
+    },
+    legacySync: { collectConsistentSnapshot: async () => ({ records }) },
+  });
+  outbox = records.map((record, index) => ({ mutationId: `large-mutation-${index}`, baseRevision: 0, record }));
+  await sync.syncOnce();
+  assert.deepEqual(batches, [3, 3, 1]);
+  assert.equal(outbox.length, 0);
+});
+
+test("offline deletion replaces an unsent creation without resurrecting it", () => {
+  const pending = {
+    mutationId: "offline:create", baseRevision: 0,
+    record: { entityType: "reflection", entityId: "draft", deleted: false, payload: { notes: "draft" }, revision: 0 },
+  };
+  const mutations = require("../renderer/continuous-sync").buildMutations([], { records: [], revisions: {}, outbox: [pending] });
+  assert.equal(mutations.length, 1);
+  assert.equal(mutations[0].record.deleted, true);
+  assert.equal(mutations[0].record.entityId, "draft");
+  assert.equal(mutations[0].baseRevision, 0);
+  assert.notEqual(mutations[0].mutationId, pending.mutationId);
+});
+
+test("offline deletion replaces an unsent edit using its original base revision", () => {
+  const record = { entityType: "reflection", entityId: "entry", deleted: false, payload: { notes: "before" }, revision: 4 };
+  const pending = { mutationId: "offline:edit", baseRevision: 4, record: { ...record, payload: { notes: "after" } } };
+  const mutations = require("../renderer/continuous-sync").buildMutations([], { records: [record], revisions: { "reflection\u0000entry": 4 }, outbox: [pending] });
+  assert.equal(mutations.length, 1);
+  assert.equal(mutations[0].record.deleted, true);
+  assert.equal(mutations[0].record.payload.notes, "after");
+  assert.equal(mutations[0].baseRevision, 4);
+});
+
+test("editing a conflicted record does not silently unblock its pending mutation", () => {
+  const record = { entityType: "reflection", entityId: "entry", deleted: false, payload: { notes: "before" }, revision: 4 };
+  const pending = { mutationId: "offline:conflict", baseRevision: 4, blocked: true, record };
+  const mutations = require("../renderer/continuous-sync").buildMutations([{ ...record, payload: { notes: "new local draft" } }], { records: [record], revisions: {}, outbox: [pending] });
+  assert.deepEqual(mutations, []);
+});
+
+test("a local save during a slow pull is queued and protected from remote overwrite", async () => {
+  const initial = { entityType: "reflection", entityId: "entry", deleted: false, payload: { notes: "before" }, revision: 1 };
+  const remote = { ...initial, payload: { notes: "other device" }, revision: 2 };
+  let local = initial;
+  let state = { enrolled: true, cursor: 1, records: [initial], revisions: { "reflection\u0000entry": 1 }, outbox: [] };
+  const commits = [];
+  const applied = [];
+  const sync = createContinuousSync({
+    api: {
+      syncStatus: async () => ({ signedIn: true, deviceId: "desktop-edit-during-pull" }),
+      syncOutboxState: async () => structuredClone(state),
+      syncOutboxQueue: async (mutations) => { state.outbox = mutations; },
+      syncPull: async () => {
+        local = { ...initial, payload: { notes: "saved while network was waiting" } };
+        return { records: [remote], cursor: 2, hasMore: false };
+      },
+      syncCommitPull: async (input) => commits.push(input),
+    },
+    legacySync: { collectConsistentSnapshot: async () => ({ records: [local] }) },
+    applyPulled: async (records) => { applied.push(...records); local = records[0]; },
+  });
+  await sync.syncOnce();
+  assert.equal(local.payload.notes, "saved while network was waiting");
+  assert.equal(state.outbox.length, 1);
+  assert.equal(state.outbox[0].record.payload.notes, "saved while network was waiting");
+  assert.equal(state.outbox[0].baseRevision, 1);
+  assert.deepEqual(applied, []);
+  assert.deepEqual(commits[0].deferredPullRecords, [remote]);
+});
+
 test("continuous sync creates a durable mutation with the known server revision and settles it", async () => {
   const deviceId = "desktop-continuous-device";
   const first = { id: "session-1", start: 1, end: 2, focusedMs: 1 };
@@ -318,6 +406,78 @@ test("switching from account A to enrolled account B hydrates B before detecting
 function identityForTest(record) {
   return `${record.entityType}\u0000${record.entityId}`;
 }
+
+function scheduledSyncHarness(overrides = {}) {
+  const scheduled = new Map();
+  let nextId = 0;
+  const events = [];
+  const api = {
+    syncStatus: async () => ({ signedIn: true, deviceId: "desktop-scheduler" }),
+    syncOutboxState: async () => ({ enrolled: true, cursor: 0, records: [], revisions: {}, outbox: [] }),
+    syncPull: async () => ({ records: [], cursor: 0, hasMore: false }),
+    syncCommitPull: async () => {},
+    ...overrides,
+  };
+  const sync = createContinuousSync({
+    api,
+    legacySync: { collectConsistentSnapshot: async () => ({ records: [] }) },
+    onStateChange: (state) => events.push(state),
+    timers: {
+      setTimeout: (callback, delay) => { const id = ++nextId; scheduled.set(id, { callback, delay }); return id; },
+      clearTimeout: (id) => scheduled.delete(id),
+    },
+  });
+  return { sync, api, scheduled, events };
+}
+
+test("automatic sync backs off after failures and returns to idle polling after recovery", async () => {
+  let failing = true;
+  const harness = scheduledSyncHarness({ syncPull: async () => {
+    if (failing) throw Object.assign(new Error("offline"), { code: "NETWORK_ERROR" });
+    return { records: [], cursor: 0, hasMore: false };
+  } });
+  try {
+    harness.sync.start();
+    await assert.rejects(harness.sync.syncOnce(), /offline/);
+    assert.deepEqual([...harness.scheduled.values()].map((item) => item.delay), [15000]);
+    await assert.rejects(harness.sync.syncOnce(), /offline/);
+    assert.deepEqual([...harness.scheduled.values()].map((item) => item.delay), [30000]);
+    failing = false;
+    await harness.sync.syncOnce();
+    assert.deepEqual([...harness.scheduled.values()].map((item) => item.delay), [60000]);
+    assert.equal(harness.events.at(-1).phase, "synced");
+    assert.ok(harness.events.at(-1).lastSyncedAt > 0);
+  } finally { harness.sync.stop(); }
+  assert.equal(harness.scheduled.size, 0);
+});
+
+test("automatic sync respects a server quota retry delay even when a local edit is saved", async () => {
+  const harness = scheduledSyncHarness({ syncPull: async () => {
+    throw Object.assign(new Error("quota exhausted"), { code: "SYNC_DAILY_READ_LIMIT", details: { retryAfterSeconds: 7200 } });
+  } });
+  try {
+    harness.sync.start();
+    await assert.rejects(harness.sync.syncOnce(), /quota exhausted/);
+    harness.sync.notifyLocalChange();
+    assert.deepEqual([...harness.scheduled.values()].map((item) => item.delay), [7200000]);
+    assert.equal(harness.events.at(-1).retryDelayMs, 7200000);
+  } finally { harness.sync.stop(); }
+});
+
+test("local saves debounce automatic sync while repeated start calls do not duplicate polling", async () => {
+  const harness = scheduledSyncHarness();
+  try {
+    harness.sync.start();
+    harness.sync.start();
+    await harness.sync.syncOnce();
+    harness.sync.notifyLocalChange();
+    harness.sync.notifyLocalChange();
+    assert.deepEqual([...harness.scheduled.values()].map((item) => item.delay), [2000]);
+    harness.sync.stop();
+    harness.sync.notifyLocalChange();
+    assert.equal(harness.scheduled.size, 0);
+  } finally { harness.sync.stop(); }
+});
 
 test("real legacy profile replacement switches from Alice daily date to Bob without uploading a tombstone", async () => {
   const legacy = require("../renderer/legacy-sync");

@@ -6,6 +6,48 @@ const path = require("node:path");
 
 const MODULE_PATH = "../renderer/desktop-sync-service";
 
+function signedInServiceForRequest(fetch, options = {}) {
+  let token = "existing-login";
+  const { createDesktopSyncService } = require(MODULE_PATH);
+  return {
+    token: () => token,
+    service: createDesktopSyncService({
+      fetch, ...options,
+      credentialStore: { loadToken: () => token, clearToken: () => { token = ""; } },
+      stateStore: { read: () => ({ gatewayUrl: "https://gateway.example", deviceId: "desktop-request-errors", activeScopeKey: "alice" }), update() {} },
+    }),
+  };
+}
+
+test("quota errors retain login and expose Retry-After for automatic recovery", async () => {
+  const { service, token } = signedInServiceForRequest(async () => Response.json(
+    { error: "SYNC_DAILY_READ_LIMIT", message: "Daily quota exceeded" },
+    { status: 503, headers: { "Retry-After": "7200" } },
+  ));
+  await assert.rejects(service.session(), (error) => {
+    assert.equal(error.code, "SYNC_DAILY_READ_LIMIT");
+    assert.equal(error.retryAfterSeconds, 7200);
+    assert.equal(error.details.error, "SYNC_DAILY_READ_LIMIT");
+    return true;
+  });
+  assert.equal(token(), "existing-login");
+});
+
+test("structured retry delay remains available without a Retry-After header", async () => {
+  const { service } = signedInServiceForRequest(async () => Response.json(
+    { error: "SYNC_DAILY_WRITE_LIMIT", retryAfterSeconds: 5000 }, { status: 503 },
+  ));
+  await assert.rejects(service.session(), (error) => error.retryAfterSeconds === 5000);
+});
+
+test("a connection lost while reading the response body becomes a recoverable network error", async () => {
+  const { service, token } = signedInServiceForRequest(async () => ({
+    ok: true, status: 200, headers: new Headers(), text: async () => { throw new TypeError("terminated"); },
+  }));
+  await assert.rejects(service.session(), (error) => error.code === "NETWORK_ERROR");
+  assert.equal(token(), "existing-login");
+});
+
 async function withTempDir(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepstudy-sync-test-"));
   try {

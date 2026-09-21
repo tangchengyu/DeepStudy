@@ -81,13 +81,19 @@ export interface TimerClaimInput {
 }
 
 export class GatewayError extends Error {
+  public readonly retryAfterSeconds: number | null
   constructor(
     public readonly status: number,
     public readonly code: string,
     public readonly details: unknown,
+    retryAfterSeconds?: number | null,
   ) {
     super(code)
     this.name = 'GatewayError'
+    const bodyRetry = details && typeof details === 'object' && 'retryAfterSeconds' in details
+      ? Number((details as { retryAfterSeconds: unknown }).retryAfterSeconds) : 0
+    const seconds = Number(retryAfterSeconds) || bodyRetry
+    this.retryAfterSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : null
   }
 }
 
@@ -166,7 +172,11 @@ export function createGatewayClient(options: GatewayClientOptions) {
       const errorCode = payload && typeof payload === 'object' && 'error' in payload
         ? String((payload as { error: unknown }).error)
         : `HTTP_${response.status}`
-      throw new GatewayError(response.status, errorCode, payload)
+      const retryHeader = response.headers.get('retry-after')
+      const retrySeconds = retryHeader
+        ? Number(retryHeader) || Math.max(0, Math.ceil((Date.parse(retryHeader) - Date.now()) / 1_000))
+        : null
+      throw new GatewayError(response.status, errorCode, payload, retrySeconds)
     }
     const signedToken = response.headers.get('set-auth-token')
     if (requestOptions.validateAuthPayload && !requestOptions.validateAuthPayload(payload)) {

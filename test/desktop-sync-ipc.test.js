@@ -45,7 +45,7 @@ const channels = [
 
 test("desktop sync exposes only named enrollment and synchronization IPC channels", () => {
   for (const channel of channels) {
-    assert.match(main, new RegExp(`ipcMain\\.handle\\(\\s*["']${channel}["']`), `main handler ${channel}`);
+    assert.match(main, new RegExp(`handleSyncIpc\\(\\s*["']${channel}["']`), `main handler ${channel}`);
     assert.match(preload, new RegExp(`ipcRenderer\\.invoke\\(\\s*["']${channel}["']`), `preload invocation ${channel}`);
   }
   assert.doesNotMatch(preload, /get(?:Bearer|Auth)?Token|credentialStore|sync:request|gateway:fetch/i);

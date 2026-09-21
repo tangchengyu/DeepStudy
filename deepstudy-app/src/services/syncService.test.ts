@@ -60,8 +60,7 @@ describe('connectivity-aware sync service', () => {
         .fn()
         .mockResolvedValueOnce({ results: [{
           mutationId: 'mutation-sync-1', status: 'applied', revision: 1, serverUpdatedAt: 2_000,
-        }] })
-        .mockResolvedValueOnce({ results: [{
+        }, {
           mutationId: 'mutation-sync-2',
           status: 'conflict',
           conflictId: 'conflict-1',
@@ -103,7 +102,7 @@ describe('connectivity-aware sync service', () => {
       conflicts: 1,
     })
     expect(client.registerDevice).toHaveBeenCalledWith('android-device-sync', expect.any(String), 'android')
-    expect(client.push).toHaveBeenCalledTimes(2)
+    expect(client.push).toHaveBeenCalledTimes(1)
     await expect(repository.listPendingMutations()).resolves.toEqual([])
     await expect(repository.getRecord('long_task', 'local-applied')).resolves.toMatchObject({ revision: 1 })
     await expect(database.outbox.get('mutation-sync-2')).resolves.toMatchObject({

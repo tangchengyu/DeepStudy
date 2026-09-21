@@ -268,7 +268,15 @@ export function createSyncRepository(
         if (!currentDevice) await setMetadataForScope(scopeKey, 'deviceId', deviceId)
 
         const mutations: PendingMutation[] = []
+        const savedOrder = await getMetadataForScope(scopeKey, 'lastMutationCreatedAt')
+        let lastCreatedAt = Number(savedOrder) || 0
+        if (savedOrder === null && inputs.length) {
+          for (const pending of await database.outbox.where('scopeKey').equals(scopeKey).toArray()) {
+            lastCreatedAt = Math.max(lastCreatedAt, pending.createdAt)
+          }
+        }
         for (const input of inputs) {
+          lastCreatedAt = Math.max(timestamp, lastCreatedAt + 1)
           const mutationId = resolvedOptions.createMutationId()
           const key = syncRecordKey(input.entityType, input.entityId, scopeKey)
           const current = await database.syncRecords.get(key)
@@ -292,7 +300,7 @@ export function createSyncRepository(
             operation: input.operation,
             baseRevision: record.revision,
             record,
-            createdAt: timestamp,
+            createdAt: lastCreatedAt,
             state: 'pending',
             scopeKey,
           }
@@ -300,6 +308,7 @@ export function createSyncRepository(
           await database.outbox.add(mutation)
           mutations.push(mutation)
         }
+        if (mutations.length) await setMetadataForScope(scopeKey, 'lastMutationCreatedAt', String(lastCreatedAt))
         for (const write of metadataWrites) {
           if (write.value === null) await removeMetadataForScope(scopeKey, write.key)
           else await setMetadataForScope(scopeKey, write.key, write.value)
@@ -424,6 +433,10 @@ export function createSyncRepository(
           key,
         }
           const current = await database.syncRecords.get(key)
+          if (current && normalized.revision <= current.revision) {
+            if (cursor !== undefined) await setMetadataForScope(scopeKey, 'cursor', cursor)
+            return { status: 'unchanged' as const }
+          }
           const pending = await database.outbox
             .where('[scopeKey+recordKey]')
             .equals([scopeKey, key])
@@ -448,6 +461,7 @@ export function createSyncRepository(
                 createdAt: resolvedOptions.now(),
                 scopeKey,
                 submittedLocal: pending.record,
+                reconciledGatewayStatus: 'local-pull-conflict',
               })
             }
             await database.outbox.put({ ...pending, state: 'conflict', scopeKey })
@@ -495,6 +509,29 @@ export function createSyncRepository(
                 serverUpdatedAt: acknowledgement.serverUpdatedAt,
               },
             })
+          }
+          // Older app versions could replay equal-time mutations out of order.
+          // Keep the latest local snapshot queued until that exact content is acknowledged.
+          if (record && !laterMutations.length && !sameRecordContent(record, mutation.record)) {
+            let repairId = resolvedOptions.createMutationId()
+            if (repairId === mutationId || await database.outbox.get(repairId)) repairId = crypto.randomUUID()
+            const createdAt = Math.max(
+              resolvedOptions.now(),
+              (Number(await getMetadataForScope(scopeKey, 'lastMutationCreatedAt')) || 0) + 1,
+            )
+            await database.outbox.add({
+              mutationId: repairId,
+              recordKey: record.key,
+              entityType: record.entityType,
+              entityId: record.entityId,
+              operation: record.deleted ? 'delete' : 'upsert',
+              baseRevision: acknowledgement.revision,
+              record: { ...record, revision: acknowledgement.revision, serverUpdatedAt: acknowledgement.serverUpdatedAt },
+              createdAt,
+              state: 'pending',
+              scopeKey,
+            })
+            await setMetadataForScope(scopeKey, 'lastMutationCreatedAt', String(createdAt))
           }
           if (acknowledgement.cursor !== undefined) {
             await setMetadataForScope(scopeKey, 'cursor', acknowledgement.cursor)

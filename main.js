@@ -5,6 +5,11 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { createAppReadyRunner } = require("./renderer/app-lifecycle");
+const { withSyncError } = require("./renderer/sync-ipc-result");
+
+function handleSyncIpc(channel, handler) {
+  ipcMain.handle(channel, withSyncError(handler));
+}
 const {
   createCredentialStore,
   createDesktopSyncService,
@@ -1408,42 +1413,42 @@ ipcMain.handle("long-tasks:move-to-daily-plan", (_event, payload = {}) => {
 });
 ipcMain.handle("reminders:acknowledge", acknowledgeReminders);
 
-ipcMain.handle("sync:config", (_event, input) => desktopSyncService.config(input));
-ipcMain.handle("sync:turnstile-verify", (_event, input) => openExternalTurnstileVerification(input));
-ipcMain.handle("sync:auth-register", (_event, input) => desktopSyncService.register(input));
-ipcMain.handle("sync:auth-sign-in", (_event, input) => desktopSyncService.signIn(input));
-ipcMain.handle("sync:auth-recover", (_event, input) => desktopSyncService.recover(input));
-ipcMain.handle("sync:auth-sign-out", () => desktopSyncService.signOut());
-ipcMain.handle("sync:session", () => desktopSyncService.session());
-ipcMain.handle("sync:status", () => desktopSyncService.status());
-ipcMain.handle("sync:device-register", (_event, input, expected) => desktopSyncService.registerDevice(input, expected));
-ipcMain.handle("sync:snapshot-capture-long-tasks", () => legacyBackupStore.captureLongTasks());
-ipcMain.handle("sync:snapshot-verify-long-tasks", (_event, fingerprint) => legacyBackupStore.verifyLongTasks(fingerprint));
-ipcMain.handle("sync:import-preview", (_event, records) => desktopSyncService.previewImport(records));
-ipcMain.handle("sync:import-commit", (_event, input, expected) => desktopSyncService.commitImport(input, expected));
-ipcMain.handle("sync:import-progress", () => desktopSyncService.importProgress());
-ipcMain.handle("sync:import-progress-save", (_event, progress) => desktopSyncService.saveImportProgress(progress));
-ipcMain.handle("sync:push", (_event, mutations, expected) => desktopSyncService.push(mutations, expected));
-ipcMain.handle("sync:pull", (_event, input) => desktopSyncService.pull(input));
-ipcMain.handle("sync:pull-commit", (_event, input) => desktopSyncService.commitPull(input));
-ipcMain.handle("sync:outbox-state", (_event, expected) => desktopSyncService.outboxState(expected));
-ipcMain.handle("sync:outbox-queue", (_event, mutations, expected) => desktopSyncService.queueOutbox(mutations, expected));
-ipcMain.handle("sync:outbox-settle", (_event, results, expected) => desktopSyncService.settleOutbox(results, expected));
-ipcMain.handle("sync:records-remember", (_event, records, expected) => desktopSyncService.recordPulled(records, expected));
-ipcMain.handle("sync:enrollment-finish", (_event, records) => desktopSyncService.finishEnrollment(records));
-ipcMain.handle("sync:conflicts", (_event, expected) => desktopSyncService.conflicts(expected));
-ipcMain.handle("sync:conflict-resolve", (_event, conflictId, input, expected) => desktopSyncService.resolveConflict(conflictId, input, expected));
-ipcMain.handle("sync:timer-current", (_event, expected) => desktopSyncService.currentTimer(expected));
-ipcMain.handle("sync:timer-claim", (_event, input, expected) => desktopSyncService.claimTimer(input, expected));
-ipcMain.handle("sync:timer-release", (_event, input, expected) => desktopSyncService.releaseTimer(input, expected));
-ipcMain.handle("sync:backup-create", (_event, snapshot) => legacyBackupStore.createBackup(snapshot));
-ipcMain.handle("sync:backup-write-long-tasks", (_event, tasks, backupId, longTaskImageChunks) => {
+handleSyncIpc("sync:config", (_event, input) => desktopSyncService.config(input));
+handleSyncIpc("sync:turnstile-verify", (_event, input) => openExternalTurnstileVerification(input));
+handleSyncIpc("sync:auth-register", (_event, input) => desktopSyncService.register(input));
+handleSyncIpc("sync:auth-sign-in", (_event, input) => desktopSyncService.signIn(input));
+handleSyncIpc("sync:auth-recover", (_event, input) => desktopSyncService.recover(input));
+handleSyncIpc("sync:auth-sign-out", () => desktopSyncService.signOut());
+handleSyncIpc("sync:session", () => desktopSyncService.session());
+handleSyncIpc("sync:status", () => desktopSyncService.status());
+handleSyncIpc("sync:device-register", (_event, input, expected) => desktopSyncService.registerDevice(input, expected));
+handleSyncIpc("sync:snapshot-capture-long-tasks", () => legacyBackupStore.captureLongTasks());
+handleSyncIpc("sync:snapshot-verify-long-tasks", (_event, fingerprint) => legacyBackupStore.verifyLongTasks(fingerprint));
+handleSyncIpc("sync:import-preview", (_event, records) => desktopSyncService.previewImport(records));
+handleSyncIpc("sync:import-commit", (_event, input, expected) => desktopSyncService.commitImport(input, expected));
+handleSyncIpc("sync:import-progress", () => desktopSyncService.importProgress());
+handleSyncIpc("sync:import-progress-save", (_event, progress) => desktopSyncService.saveImportProgress(progress));
+handleSyncIpc("sync:push", (_event, mutations, expected) => desktopSyncService.push(mutations, expected));
+handleSyncIpc("sync:pull", (_event, input) => desktopSyncService.pull(input));
+handleSyncIpc("sync:pull-commit", (_event, input) => desktopSyncService.commitPull(input));
+handleSyncIpc("sync:outbox-state", (_event, expected) => desktopSyncService.outboxState(expected));
+handleSyncIpc("sync:outbox-queue", (_event, mutations, expected) => desktopSyncService.queueOutbox(mutations, expected));
+handleSyncIpc("sync:outbox-settle", (_event, results, expected) => desktopSyncService.settleOutbox(results, expected));
+handleSyncIpc("sync:records-remember", (_event, records, expected) => desktopSyncService.recordPulled(records, expected));
+handleSyncIpc("sync:enrollment-finish", (_event, records) => desktopSyncService.finishEnrollment(records));
+handleSyncIpc("sync:conflicts", (_event, expected) => desktopSyncService.conflicts(expected));
+handleSyncIpc("sync:conflict-resolve", (_event, conflictId, input, expected) => desktopSyncService.resolveConflict(conflictId, input, expected));
+handleSyncIpc("sync:timer-current", (_event, expected) => desktopSyncService.currentTimer(expected));
+handleSyncIpc("sync:timer-claim", (_event, input, expected) => desktopSyncService.claimTimer(input, expected));
+handleSyncIpc("sync:timer-release", (_event, input, expected) => desktopSyncService.releaseTimer(input, expected));
+handleSyncIpc("sync:backup-create", (_event, snapshot) => legacyBackupStore.createBackup(snapshot));
+handleSyncIpc("sync:backup-write-long-tasks", (_event, tasks, backupId, longTaskImageChunks) => {
   const result = legacyBackupStore.writeLongTasks(tasks, backupId, longTaskImageChunks);
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send("long-tasks:changed", result);
   return result;
 });
-ipcMain.handle("sync:backup-read-long-tasks", () => legacyBackupStore.readLongTasks());
-ipcMain.handle("sync:backup-restore", (_event, backupId) => {
+handleSyncIpc("sync:backup-read-long-tasks", () => legacyBackupStore.readLongTasks());
+handleSyncIpc("sync:backup-restore", (_event, backupId) => {
   const result = legacyBackupStore.restoreBackup(backupId);
   const tasks = legacyBackupStore.readLongTasks();
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send("long-tasks:changed", tasks);

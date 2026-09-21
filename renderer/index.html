@@ -751,7 +751,9 @@
         </section>
         <section id="sync-wizard-manage" class="sync-data-section sync-wizard-section" hidden>
           <h3>同步状态与高级恢复</h3>
-          <p>日常使用只需要立即同步；冲突和备份恢复只在多端数据不一致或需要回滚时使用。</p>
+          <p>自动同步已开启。保存修改后会自动上传；空闲时约每分钟检查其他设备的更新，回到软件或恢复联网时会立即检查。Windows、Mac 和手机登录同一账号，各完成一次首次同步即可。</p>
+          <p id="sync-auto-status" class="settings-status" role="status" aria-live="polite">自动同步正在准备…</p>
+          <p>离线时可继续使用，联网后自动补传。仅同一条数据发生冲突时需要选择保留版本；切换设备前可确认上方的最近同步时间。</p>
           <div class="sync-actions">
             <button id="sync-pull" class="primary-btn" type="button">立即同步</button>
             <button id="sync-conflicts" class="secondary-btn" type="button">查看冲突</button>

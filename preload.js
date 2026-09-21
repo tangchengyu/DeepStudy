@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("electronAPI", {
+const electronAPI = {
   toggleAlwaysOnTop: () => ipcRenderer.invoke("window:toggle-always-on-top"),
   getAlwaysOnTop: () => ipcRenderer.invoke("window:get-always-on-top"),
   autoMinimize: () => ipcRenderer.invoke("window:auto-minimize"),
@@ -134,4 +134,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("reminders:cleared", listener);
     return () => ipcRenderer.removeListener("reminders:cleared", listener);
   },
-});
+};
+
+// Electron drops custom Error fields when crossing process/context boundaries.
+// A plain rejection keeps the error code and retry time available to the UI.
+for (const [name, invoke] of Object.entries(electronAPI)) {
+  if (!name.startsWith("sync")) continue;
+  electronAPI[name] = (...args) => Promise.resolve(invoke(...args)).then((result) => {
+    if (result?.__deepStudySyncError) throw result.__deepStudySyncError;
+    return result;
+  });
+}
+contextBridge.exposeInMainWorld("electronAPI", electronAPI);

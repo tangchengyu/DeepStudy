@@ -24,6 +24,23 @@
     return `desktop:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 12)}`;
   }
 
+  function* mutationBatches(mutations) {
+    const encoder = new TextEncoder();
+    let batch = [];
+    let bytes = 32;
+    for (const mutation of mutations) {
+      const size = encoder.encode(JSON.stringify(mutation)).byteLength + 1;
+      if (batch.length && (batch.length === 5 || bytes + size > 880000)) {
+        yield batch;
+        batch = [];
+        bytes = 32;
+      }
+      batch.push(mutation);
+      bytes += size;
+    }
+    if (batch.length) yield batch;
+  }
+
   function referencedImageIds(records) {
     const ids = new Set();
     for (const record of records) {
@@ -42,6 +59,7 @@
     const referencedImages = referencedImageIds(records);
     const mutations = [];
     for (const [key, record] of current) {
+      if (pending.get(key)?.blocked) continue;
       const previous = pending.get(key)?.record || known.get(key);
       if (semanticallyEqual(record, previous)) continue;
       mutations.push({
@@ -50,12 +68,14 @@
         record: { ...record, revision: Math.max(0, Number(state.revisions?.[key]) || 0), serverUpdatedAt: null },
       });
     }
-    for (const [key, previous] of known) {
-      if (previous.deleted || current.has(key) || pending.has(key)) continue;
+    const previousRecords = new Map(known);
+    for (const [key, mutation] of pending) previousRecords.set(key, mutation.record);
+    for (const [key, previous] of previousRecords) {
+      if (previous.deleted || current.has(key) || pending.get(key)?.blocked) continue;
       if (previous.entityType === "long_task_image_chunk" && referencedImages.has(previous.payload?.imageId)) continue;
       mutations.push({
         mutationId: mutationId(),
-        baseRevision: Math.max(0, Number(state.revisions?.[key] ?? previous.revision ?? 0) || 0),
+        baseRevision: Math.max(0, Number(pending.get(key)?.baseRevision ?? state.revisions?.[key] ?? previous.revision ?? 0) || 0),
         record: {
           ...previous,
           payload: previous.payload || {},
@@ -69,9 +89,29 @@
     return mutations;
   }
 
-  function createContinuousSync({ api, legacySync, storage, applyPulled = async () => {}, rollbackPulled = async () => {}, runExclusive = (work) => work(), intervalMs = 15000, onError = () => {} }) {
+  function createContinuousSync({ api, legacySync, storage, applyPulled = async () => {}, rollbackPulled = async () => {}, runExclusive = (work) => work(), intervalMs = 15000, idleIntervalMs = 60000, onError = () => {}, onStateChange = () => {}, timers = globalThis }) {
     let timer = null;
     let syncPromise = null;
+    let enabled = false;
+    let failures = 0;
+    let changedDuringSync = false;
+    let serverRetryNotBefore = 0;
+    let lastSyncedAt = 0;
+    const pollInterval = Math.max(5000, intervalMs);
+
+    function publish(state) {
+      onStateChange({ lastSyncedAt, ...state });
+    }
+
+    function schedule(delay) {
+      if (timer !== null) timers.clearTimeout(timer);
+      timer = null;
+      if (!enabled) return;
+      timer = timers.setTimeout(() => {
+        timer = null;
+        void syncOnce().catch(() => {});
+      }, delay);
+    }
 
     async function snapshot(deviceId) {
       return legacySync.collectConsistentSnapshot({
@@ -86,7 +126,6 @@
       const pending = Array.isArray(state.deferredPullRecords) ? state.deferredPullRecords : [];
       if (!pending.length || typeof api.syncCommitPull !== "function") return state;
       const blocked = new Set((state.outbox || [])
-        .filter((mutation) => mutation.blocked)
         .map((mutation) => identity(mutation.record)));
       const applicable = pending.filter((record) => !blocked.has(identity(record)));
       if (!applicable.length) return state;
@@ -148,7 +187,7 @@
       return api.syncOutboxState(binding);
     }
 
-    async function pullAndMerge(deviceId, binding, state) {
+    async function pullAndMerge(deviceId, binding, state, beforeNetwork) {
       const expectedOldCursor = Math.max(0, Number(state.cursor) || 0);
       let cursor = expectedOldCursor;
       const pulledRecords = [];
@@ -161,9 +200,18 @@
         if (!result.hasMore) break;
         if (next === previous) throw new Error("同步服务返回了无进展的拉取游标。");
       }
-      const blocked = new Set((state.outbox || [])
-        .filter((mutation) => mutation.blocked)
-        .map((mutation) => identity(mutation.record)));
+      // A user can save while a network request is waiting. Capture those edits
+      // before applying the response, so a remote version cannot overwrite them.
+      const latest = await snapshot(deviceId);
+      const before = new Map(beforeNetwork.map((record) => [identity(record), record]));
+      const current = new Map(latest.records.map((record) => [identity(record), record]));
+      const changed = new Set([...before.keys(), ...current.keys()].filter((key) => !semanticallyEqual(before.get(key), current.get(key))));
+      const concurrentMutations = buildMutations(latest.records, state).filter((mutation) => changed.has(identity(mutation.record)));
+      if (concurrentMutations.length) {
+        await api.syncOutboxQueue(concurrentMutations, binding);
+        state = await api.syncOutboxState(binding);
+      }
+      const blocked = new Set((state.outbox || []).map((mutation) => identity(mutation.record)));
       const combined = new Map();
       for (const record of [...(state.deferredPullRecords || []), ...pulledRecords]) {
         if (record?.entityType && record?.entityId) combined.set(identity(record), record);
@@ -216,15 +264,20 @@
         const durable = await api.syncOutboxState(binding);
         const outgoing = (durable.outbox || []).filter((mutation) => !mutation.blocked);
         let results = [];
-        for (let start = 0; start < outgoing.length; start += 20) {
-          const pushed = await api.syncPush(outgoing.slice(start, start + 20), binding);
+        for (const batch of mutationBatches(outgoing)) {
+          const pushed = await api.syncPush(batch, binding);
           const chunkResults = Array.isArray(pushed?.results) ? pushed.results : [];
           results.push(...chunkResults);
           if (chunkResults.length) await api.syncOutboxSettle(chunkResults, binding);
         }
         const afterPush = await api.syncOutboxState(binding);
-        const records = await pullAndMerge(status.deviceId, binding, afterPush);
-        return { mutations: mutations.length, results, records };
+        const records = await pullAndMerge(status.deviceId, binding, afterPush, local.records);
+        const settled = await api.syncOutboxState(binding);
+        return {
+          mutations: mutations.length, results, records,
+          pendingCount: (settled.outbox || []).filter((mutation) => !mutation.blocked).length,
+          conflictCount: (settled.outbox || []).filter((mutation) => mutation.blocked).length,
+        };
       } catch (error) {
         onError(error);
         throw error;
@@ -233,8 +286,33 @@
 
     function syncOnce() {
       if (syncPromise) return syncPromise;
+      if (timer !== null) timers.clearTimeout(timer);
+      timer = null;
+      changedDuringSync = false;
+      publish({ phase: "syncing" });
       const current = Promise.resolve().then(() => runExclusive(syncCore));
-      syncPromise = current.finally(() => {
+      syncPromise = current.then((result) => {
+        failures = 0;
+        serverRetryNotBefore = 0;
+        if (result.skipped) {
+          enabled = false;
+          publish({ phase: result.skipped });
+          return result;
+        }
+        lastSyncedAt = Date.now();
+        publish({ phase: "synced", ...result });
+        const active = result.mutations || result.results.length || result.records.length;
+        schedule(changedDuringSync || result.pendingCount ? 2000 : active ? pollInterval : Math.max(pollInterval, idleIntervalMs));
+        return result;
+      }, (error) => {
+        failures += 1;
+        const serverDelay = Math.max(0, Number(error?.retryAfterSeconds ?? error?.details?.retryAfterSeconds) || 0) * 1000;
+        serverRetryNotBefore = serverDelay ? Date.now() + serverDelay : 0;
+        const retryDelayMs = Math.max(serverDelay, Math.min(300000, pollInterval * (2 ** Math.min(5, failures - 1))));
+        publish({ phase: "retrying", error, retryDelayMs });
+        schedule(retryDelayMs);
+        throw error;
+      }).finally(() => {
         if (syncPromise === wrapped) syncPromise = null;
       });
       const wrapped = syncPromise;
@@ -244,10 +322,24 @@
     return {
       syncOnce,
       start() {
-        if (!timer) timer = setInterval(() => { void syncOnce().catch(() => {}); }, Math.max(5000, intervalMs));
+        if (enabled) return;
+        enabled = true;
         void syncOnce().catch(() => {});
       },
-      stop() { if (timer) clearInterval(timer); timer = null; },
+      notifyLocalChange() {
+        if (!enabled) return;
+        if (syncPromise) { changedDuringSync = true; return; }
+        if (!failures) schedule(2000);
+      },
+      wake() {
+        if (!enabled || Date.now() < serverRetryNotBefore) return;
+        void syncOnce().catch(() => {});
+      },
+      stop() {
+        enabled = false;
+        if (timer !== null) timers.clearTimeout(timer);
+        timer = null;
+      },
     };
   }
 

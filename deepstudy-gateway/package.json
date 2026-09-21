@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "vitest run test/crypto.test.ts",
-    "test:integration": "vitest run test/worker.test.ts",
+    "test:unit": "vitest run test/crypto.test.ts test/service-errors.test.ts",
+    "test:integration": "vitest run test/worker.test.ts test/sync-batch.test.ts test/sync-performance.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy --env production",

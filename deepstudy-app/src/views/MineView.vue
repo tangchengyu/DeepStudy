@@ -14,6 +14,8 @@ import {
 import { GatewayError } from '../services/gatewayClient'
 import { gatewaySettings } from '../services/gatewaySettings'
 import { switchGatewayOrigin } from '../services/gatewaySwitch'
+import { enableAccountSyncWhenReady } from '../services/accountSyncSetup'
+import { syncErrorMessage, syncStatusLabel } from '../services/syncPresentation'
 import type { RemoteImpactPreview, SyncRunStats } from '../services/syncService'
 import {
   checkForUpdates,
@@ -47,18 +49,15 @@ const signedIn = computed(() => account.status === 'signed-in' || account.status
 const displayName = computed(() => account.user?.username || account.user?.name || 'DeepStudy 用户')
 const firstSyncComplete = computed(() => importStatus.value === 'committed' || importStatus.value === 'skipped')
 const firstSyncRequired = computed(() => signedIn.value && !firstSyncComplete.value)
-const syncLabel = computed(() => ({
-  idle: syncState.lastSyncAt ? '已同步' : '等待首次同步',
-  offline: '离线，修改会保留',
-  syncing: '正在同步…',
-  error: '同步失败',
-})[syncState.phase])
+const syncLabel = computed(() => !signedIn.value ? '仅保存在本机' : syncStatusLabel(syncState))
+const syncError = computed(() => syncState.error ? syncErrorMessage(syncState.error) : null)
+const needsSignIn = computed(() => ['UNAUTHENTICATED', 'UNAUTHORIZED'].includes(syncState.error || ''))
 const importStatusLabel = computed(() => ({
   blocked: '需重新预览',
   previewed: '待确认',
   applying: '导入中',
   committed: '已完成',
-  skipped: '已跳过',
+  skipped: '已连接',
   '未开始': '未开始',
 } as Record<string, string>)[importStatus.value] || importStatus.value)
 const hasLocalImportChoices = computed(() => Boolean(
@@ -93,6 +92,7 @@ const firstSyncPreviewText = computed(() => {
 })
 
 function syncResultText(prefix: string, result: SyncRunStats) {
+  if (result.status === 'offline') return syncErrorMessage('OFFLINE')
   return `${prefix}：上传 ${result.pushed} 条；拉取核对 ${result.pulled} 条；写入本机 ${result.applied} 条；冲突 ${result.conflicts} 条。`
 }
 
@@ -115,7 +115,7 @@ function friendlyError(error: unknown) {
       RATE_LIMITED: '尝试次数过多，请稍后再试',
       UNAUTHENTICATED: '登录已失效，请重新登录',
       NETWORK_TIMEOUT: '同步服务响应超时，请检查网络后重试',
-    } as Record<string, string>)[error.code] || `请求失败：${error.code}`
+    } as Record<string, string>)[error.code] || syncErrorMessage(error.code)
   }
   if (error instanceof Error && error.message === 'OFFLINE') return '当前离线，冲突与待上传数据仍保留在本机'
   if (error instanceof Error) {
@@ -127,7 +127,7 @@ function friendlyError(error: unknown) {
     } as Record<string, string>)[error.message]
     if (conflictMessage) return conflictMessage
   }
-  return error instanceof Error ? error.message : String(error)
+  return error instanceof Error ? syncErrorMessage(error.message) : String(error)
 }
 
 async function loadGatewayConfig() {
@@ -240,12 +240,16 @@ async function afterSignIn() {
   authVisible.value = false
   localImportPreview.value = null
   remoteImpactPreview.value = null
+  const automaticReady = await enableAccountSyncWhenReady(syncRepository, mobileSyncService)
   importStatus.value = await syncRepository.getMetadata('importStatus') || '未开始'
-  if (firstSyncComplete.value) {
-    mobileSyncService.start()
-    actionMessage.value = '登录成功，已进入日常同步管理。'
-    await mobileSyncService.syncNow()
-    conflicts.value = await syncRepository.listConflicts()
+  if (automaticReady) {
+    actionMessage.value = '登录成功。此账号的修改会自动同步到手机和电脑。'
+    try {
+      await mobileSyncService.syncNow()
+      conflicts.value = await syncRepository.listConflicts()
+    } catch (error) {
+      actionMessage.value = friendlyError(error)
+    }
     return
   }
   actionMessage.value = '登录成功。请先预览并确认首次同步，本机数据会在确认前保持不变。'
@@ -286,7 +290,7 @@ async function confirmFirstSync() {
       : ''
     actionMessage.value = `首次同步完成：上传 ${result.imported} 条本机旧数据；拉取核对 ${syncResult.pulled} 条；写入本机 ${syncResult.applied} 条；冲突 ${syncResult.conflicts} 条。${conflictSuffix}`
   } catch (error) {
-    importStatus.value = 'blocked'
+    importStatus.value = await syncRepository.getMetadata('importStatus') || 'blocked'
     actionMessage.value = friendlyError(error)
   } finally {
     importingLocalData.value = false
@@ -375,7 +379,7 @@ async function manualSync() {
   try {
     const result = await mobileSyncService.syncNow()
     conflicts.value = await syncRepository.listConflicts()
-    actionMessage.value = syncResultText('同步完成', result)
+    actionMessage.value = syncResultText('本轮同步结束', result)
   } catch (error) {
     actionMessage.value = friendlyError(error)
   }
@@ -431,7 +435,7 @@ watch(() => syncState.conflicts, () => {
     >
       <header class="screen-heading">
         <h1>我的</h1>
-        <p>账号只保存登录凭据；任务继续本地优先，联网后再同步。</p>
+        <p>任务先保存在本机；登录同一账号后，手机和电脑自动同步。</p>
       </header>
 
       <section class="profile-card surface-card">
@@ -442,6 +446,15 @@ watch(() => syncState.conflicts, () => {
         <p v-else>{{ signedIn ? '已连接账号，支持多端同步' : '登录后可连接手机与电脑' }}</p>
       </div>
       <span class="connection-dot" :class="{ online: syncState.online }" :title="syncState.online ? '在线' : '离线'" />
+      </section>
+
+      <section v-if="signedIn && firstSyncComplete" class="details-card surface-card" aria-label="自动同步说明">
+        <p>Windows、Mac 和 Android 登录同一账号即可接续使用。修改保存后自动上传；回到应用、恢复联网时自动同步，前台每分钟检查其他设备的更新。</p>
+        <p>离线时可以继续编辑。换设备前，在当前设备确认“已同步”；另一台设备打开应用后会自动获取最新内容。</p>
+        <p v-if="syncState.conflicts">同一条内容在多台设备上同时修改时，两个版本都会保留，请在下方比较后选择。</p>
+        <p v-if="syncError" class="action-message" role="status">{{ syncError }}</p>
+        <p v-if="syncState.nextRetryAt">预计 {{ formatTime(syncState.nextRetryAt) }} 自动重试。</p>
+        <button v-if="needsSignIn" type="button" @click="openAuth">重新登录</button>
       </section>
 
       <section class="status-grid" aria-label="同步概览">
@@ -518,7 +531,8 @@ watch(() => syncState.conflicts, () => {
         @resolve="resolveConflict"
       />
 
-      <section class="gateway-card surface-card">
+      <details class="gateway-card surface-card">
+      <summary>高级：同步服务设置</summary>
       <label for="gateway-url">同步网关</label>
       <p>这里只是公开服务地址，不是密钥。账号密码和令牌不会写入此设置。</p>
       <div class="gateway-row">
@@ -526,7 +540,7 @@ watch(() => syncState.conflicts, () => {
         <button type="button" @click="saveGateway">保存</button>
       </div>
       <small v-if="gatewayMessage">{{ gatewayMessage }}</small>
-      </section>
+      </details>
 
       <p v-if="actionMessage" class="action-message" role="status">{{ actionMessage }}</p>
 

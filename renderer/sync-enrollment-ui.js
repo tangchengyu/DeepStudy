@@ -4,6 +4,7 @@
   const byId = (id) => document.getElementById(id);
   const modal = byId("sync-modal");
   const status = byId("sync-status");
+  const automaticStatus = byId("sync-auto-status");
   const recoveryCode = byId("sync-recovery-code");
   const recoveryWrap = byId("sync-recovery-code-wrap");
   const confirmImport = byId("sync-import-confirm");
@@ -28,6 +29,7 @@
   let turnstileAction = ACCOUNT_TURNSTILE_ACTION;
   let gatewayConfigTimer = 0;
   let turnstileTokenTimer = 0;
+  let sessionErrorVisible = false;
 
   function runProfileExclusive(work) {
     const result = profileOperation.then(work, work);
@@ -62,7 +64,7 @@
     applyPulled: async (records, _deviceId, options) => controller.applyRemoteRecords(records, options),
     rollbackPulled: async (backupId) => controller.restoreBackup(backupId),
     runExclusive: runProfileExclusive,
-    onError: (error) => setStatus(`后台同步失败：${error?.message || error}`, true),
+    onStateChange: renderAutomaticStatus,
   });
   const timerLease = window.DeepStudyTimerSync.createTimerLeaseManager({
     api: window.electronAPI,
@@ -115,8 +117,35 @@
   }
 
   function setStatus(message, isError = false) {
+    sessionErrorVisible = false;
     status.textContent = String(message || "");
     status.classList.toggle("error", isError);
+  }
+
+  function renderAutomaticStatus(state) {
+    let message = "自动同步已开启，正在检查更新…";
+    let isError = false;
+    if (state.phase === "retrying") {
+      const retryAt = new Date(Date.now() + state.retryDelayMs).toLocaleTimeString();
+      message = `${formatSyncError(state.error)} 本机数据已保留，将于 ${retryAt} 自动重试。`;
+      isError = true;
+    } else if (state.phase === "synced") {
+      const time = new Date(state.lastSyncedAt).toLocaleTimeString();
+      message = `自动同步已开启 · 最近已同步 ${time}`;
+      if (state.pendingCount) message += ` · ${state.pendingCount} 条修改等待上传`;
+      if (state.conflictCount) message += ` · ${state.conflictCount} 条冲突需要在“查看冲突”中选择保留版本`;
+      isError = Boolean(state.conflictCount);
+      if (state.records?.length) notifySyncApplied();
+      if (sessionErrorVisible) setStatus("连接已恢复，账号正在自动同步。");
+    } else if (state.phase === "signed-out") {
+      message = "登录账号后可开启自动同步。";
+      void refreshStatus();
+    } else if (state.phase === "not-enrolled") {
+      message = "完成一次首次同步后，将自动同步后续修改。";
+    }
+    automaticStatus.textContent = message;
+    automaticStatus.classList.toggle("error", isError);
+    byId("sync-account-open").title = message;
   }
 
   function setBusy(button, busy) {
@@ -148,7 +177,7 @@
   }
 
   function formatSyncError(error) {
-    const code = String(error?.code || error?.details?.error || error?.message || "");
+    const rawCode = String(error?.code || error?.details?.error || error?.message || "");
     const messages = {
       INVALID_PASSWORD: passwordRuleText("密码"),
       INVALID_RECOVERY_REQUEST: `恢复信息不符合要求：请检查用户名、恢复码和新密码。${passwordRuleText("新密码")}`,
@@ -158,7 +187,16 @@
       TURNSTILE_REJECTED: "人机验证已过期或未通过，请重新打开浏览器验证。",
       RATE_LIMITED: "操作太频繁，请稍后再试。",
       USERNAME_EXISTS: "这个用户名已经被注册，请换一个用户名或直接登录。",
+      UNAUTHORIZED: "登录已过期，请重新登录，保存的本机数据会保留。",
+      INTERNAL_ERROR: "同步服务暂时不可用，请稍后重试。",
+      NETWORK_ERROR: "暂时无法连接同步服务，请检查网络连接。",
+      NETWORK_TIMEOUT: "同步服务响应超时，请稍后重试。",
+      SYNC_DAILY_READ_LIMIT: "同步服务今日读取额度已用完，额度恢复后会继续同步。",
+      SYNC_DAILY_WRITE_LIMIT: "同步服务今日写入额度已用完，额度恢复后会继续同步。",
+      SYNC_STORAGE_LIMIT: "同步服务存储空间已满，需要服务管理员处理后继续同步。本机资料仍然保留。",
+      REQUEST_TOO_LARGE: "本次同步数据超过单次传输限制。本机资料仍然保留，请联系维护者处理，无需反复退出账号。",
     };
+    const code = Object.keys(messages).find((key) => rawCode === key || new RegExp(`\\b${key}\\b`).test(rawCode));
     return messages[code] || error?.message || String(error);
   }
 
@@ -297,7 +335,8 @@
       const nextStep = local.enrollmentComplete ? "" : "请先完成首次同步本机数据。";
       setStatus(`已登录${session.user?.username ? `：${session.user.username}` : ""}。${nextStep}${storageNote}`);
     } catch (error) {
-      setStatus(error?.message || String(error), true);
+      setStatus(formatSyncError(error), true);
+      sessionErrorVisible = true;
       timerSection.hidden = true;
       return;
     }
@@ -315,7 +354,7 @@
         setStatus("本机上次计时已结束，但云端租约暂未释放；联网后将自动重试。", true);
       }
     } catch (error) {
-      setStatus(error?.message || String(error), true);
+      setStatus(formatSyncError(error), true);
     }
   }
 
@@ -511,6 +550,7 @@
       confirmImport.disabled = true;
       previewResult.textContent = `已应用 ${result.apply.appliedRecords} 条；本地备份编号：${result.apply.backupId}`;
       notifySyncApplied();
+      await refreshStatus();
       continuousSync.start();
     }
   });
@@ -542,11 +582,25 @@
     }
   });
   window.addEventListener("deepstudy:timer-publish", (event) => { void timerLease.publish(event.detail?.action, event.detail?.timer); });
-  window.addEventListener("online", () => { if (!profileTransitioning) void continuousSync.syncOnce().catch(() => {}); });
+  const syncedStorageKeys = new Set(Object.values(window.DeepStudyLegacySync.LEGACY_STORAGE_KEYS));
+  window.addEventListener("deepstudy:local-data-changed", (event) => {
+    if (!profileTransitioning && syncedStorageKeys.has(event.detail?.key)) continuousSync.notifyLocalChange();
+  });
+  window.electronAPI.onLongTasksChanged?.(() => {
+    if (!profileTransitioning) continuousSync.notifyLocalChange();
+  });
+  window.addEventListener("online", () => { if (!profileTransitioning) continuousSync.wake(); });
+  let lastFocusSync = 0;
+  window.addEventListener("focus", () => {
+    if (!profileTransitioning && Date.now() - lastFocusSync >= 5000) {
+      lastFocusSync = Date.now();
+      continuousSync.wake();
+    }
+  });
   void controller.status().then(async (state) => {
     if (state.signedIn && state.enrollmentComplete) {
-      await refreshStatus();
       continuousSync.start();
+      await refreshStatus();
     }
   }).catch((error) => setStatus(error?.message || String(error), true));
 })();

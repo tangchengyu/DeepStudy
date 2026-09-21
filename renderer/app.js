@@ -22,7 +22,10 @@ function readJSON(key, fallback) {
   }
 }
 function writeJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  const serialized = JSON.stringify(value);
+  if (localStorage.getItem(key) === serialized) return;
+  localStorage.setItem(key, serialized);
+  window.dispatchEvent(new CustomEvent("deepstudy:local-data-changed", { detail: { key } }));
 }
 function createId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -2694,10 +2697,14 @@ const Reflections = (() => {
     render();
   }
   function reloadFromStorage() {
+    const previous = items.find((item) => editingId
+      ? item.id === editingId
+      : item.date === todayKey() && !item.kind?.startsWith("completed-task"));
+    const hasDraft = input.value !== (previous?.content || "");
     items = readJSON(KEYS.reflections, []);
     selectedIds.clear();
     if (!items.some((item) => item.id === editingId)) editingId = null;
-    if (!editingId) {
+    if (!editingId && !hasDraft) {
       const today = items.find(
         (item) => item.date === todayKey() && !item.kind?.startsWith("completed-task"),
       );

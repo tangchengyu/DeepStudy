@@ -10,6 +10,7 @@ import { createGatewayClient } from './gatewayClient'
 import { gatewaySettings } from './gatewaySettings'
 import { createFocusTimerService } from './focusTimerService'
 import { createSyncService } from './syncService'
+import { enableAccountSyncWhenReady } from './accountSyncSetup'
 
 export const gatewayClient = createGatewayClient({
   getBaseUrl: gatewaySettings.getBaseUrl,
@@ -23,14 +24,17 @@ const accountMetadata = {
 }
 
 let timerServiceForScopeChange: ReturnType<typeof createFocusTimerService> | null = null
+let syncServiceForScopeChange: ReturnType<typeof createSyncService> | null = null
 
 export const accountCoordinator = createAuthCoordinator(gatewayClient, accountMetadata, {
   getScope: gatewaySettings.getBaseUrl,
   async onIdentityChanged(identity) {
+    syncServiceForScopeChange?.stop()
     syncRepository.setActiveScope(identity
       ? createAccountSyncScope(identity.origin, identity.userId)
       : LOCAL_QUARANTINE_SCOPE)
     await timerServiceForScopeChange?.reloadScope(Boolean(identity))
+    await syncServiceForScopeChange?.refreshState()
   },
 })
 export const connectivityMonitor = createBrowserConnectivityMonitor()
@@ -45,6 +49,7 @@ export const mobileSyncService = createSyncService({
   client: gatewayClient,
   connectivity: connectivityMonitor,
 })
+syncServiceForScopeChange = mobileSyncService
 
 let initialization: Promise<void> | null = null
 
@@ -54,15 +59,9 @@ export function initializeAppServices() {
       await accountCoordinator.initialize()
       await mobileFocusTimerService.initialize()
       await mobileSyncService.refreshState()
-      const importStatus = await syncRepository.getMetadata('importStatus')
-      const firstSyncComplete = importStatus === 'committed' || importStatus === 'skipped'
       if (accountCoordinator.state.status === 'signed-in'
         || accountCoordinator.state.status === 'offline-session') {
-        if (!firstSyncComplete) return
-        mobileSyncService.start()
-        if (connectivityMonitor.isOnline()) {
-          void mobileSyncService.syncNow().catch(() => undefined)
-        }
+        await enableAccountSyncWhenReady(syncRepository, mobileSyncService)
       }
     })()
   }

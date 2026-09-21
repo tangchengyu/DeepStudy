@@ -31,6 +31,44 @@ afterEach(async () => {
 })
 
 describe('offline-first sync repository', () => {
+  it('preserves edit order across same-millisecond writes and a clock rollback after reopening', async () => {
+    const name = testDatabaseName()
+    const database = createSyncDatabase(name)
+    const ids = ['z-first', 'a-second']
+    const repository = createSyncRepository(database, {
+      now: () => 1_000,
+      createMutationId: () => ids.shift()!,
+    })
+    await repository.enqueueBatch([
+      { entityType: 'long_task', entityId: 'ordered', operation: 'upsert', payload: { title: 'first' } },
+      { entityType: 'long_task', entityId: 'ordered', operation: 'upsert', payload: { title: 'second' } },
+    ])
+    database.close()
+    const reopened = createSyncDatabase(name)
+    const laterRepository = createSyncRepository(reopened, {
+      now: () => 500,
+      createMutationId: () => '0-third',
+    })
+    await laterRepository.enqueueUpsert('long_task', 'ordered', { title: 'third' })
+    expect((await laterRepository.listPushableMutations()).map((item) => item.record.payload.title))
+      .toEqual(['first', 'second', 'third'])
+    reopened.close()
+  })
+
+  it('does not turn an acknowledged server echo into a conflict with a newer local edit', async () => {
+    const database = createSyncDatabase(testDatabaseName())
+    const repository = deterministicRepository(database)
+    const first = await repository.enqueueUpsert('long_task', 'echo', { title: 'uploaded' })
+    await repository.acknowledgeMutation(first.mutationId, { revision: 3, serverUpdatedAt: 2_000 })
+    await repository.enqueueUpsert('long_task', 'echo', { title: 'edited during pull' })
+    await repository.applyRemoteRecord({ ...first.record, revision: 3, serverUpdatedAt: 2_000 }, '3')
+    expect(await repository.conflictCount()).toBe(0)
+    expect(await repository.listPendingMutations()).toHaveLength(1)
+    expect((await repository.getRecord('long_task', 'echo'))?.payload.title).toBe('edited during pull')
+    expect(await repository.getCursor()).toBe('3')
+    database.close()
+  })
+
   it('isolates device, cursor, records, outbox and conflicts by gateway origin plus account identity', async () => {
     const database = createSyncDatabase(testDatabaseName())
     let deviceSequence = 0

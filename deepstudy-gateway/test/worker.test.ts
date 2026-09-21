@@ -578,7 +578,7 @@ describe("gateway", () => {
     expect(firstCommit.status).toBe(200);
     preview = await firstCommit.json<typeof preview>();
     expect(preview.status).toBe("applying");
-    expect(preview.nextIndex).toBe(20);
+    expect(preview.nextIndex).toBe(5);
 
     const staleCommit = await jsonRequest("/v1/imports/commit", {
       importId: preview.importId,

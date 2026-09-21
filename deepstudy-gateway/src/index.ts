@@ -34,6 +34,7 @@ import { syncRoutes } from "./sync";
 import { timerRoutes } from "./timer";
 import { importRoutes } from "./imports";
 import { cleanupGatewayData } from "./cleanup";
+import { syncAvailabilityError } from "./service-errors";
 
 const app = new Hono<{ Bindings: Env }>();
 type AppContext = Context<{ Bindings: Env }>;
@@ -44,7 +45,7 @@ app.use("*", async (c, next) => {
     origin: (origin) => origins.includes(origin) ? origin : origins[0] || "",
     allowHeaders: ["Content-Type", "Authorization", "X-Device-Id"],
     allowMethods: ["GET", "POST", "OPTIONS"],
-    exposeHeaders: ["Content-Length", "set-auth-token"],
+    exposeHeaders: ["Content-Length", "set-auth-token", "Retry-After"],
     credentials: true,
     maxAge: 600
   })(c, next);
@@ -466,6 +467,11 @@ app.onError((error, c) => {
     return c.json({ error: "REQUEST_TOO_LARGE", limitBytes: error.limitBytes }, 413);
   }
   console.error("gateway request failed", error);
+  const availability = syncAvailabilityError(error);
+  if (availability) {
+    if (availability.retryAfterSeconds) c.header("Retry-After", String(availability.retryAfterSeconds));
+    return c.json(availability, 503);
+  }
   return c.json({ error: "INTERNAL_ERROR" }, 500);
 });
 
