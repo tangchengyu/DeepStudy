@@ -70,4 +70,70 @@ describe('ConflictList', () => {
       '学习', '35 分钟', '想刷手机', '今天保持专注', '把注意力带回来', '灵魂按摩间', 'unknownNested', 'safe',
     ]) expect(wrapper.text()).toContain(expected)
   })
+
+  it('explains metadata-only conflicts and highlights the fields that actually differ', () => {
+    const record = {
+      key: 'reflection:item-1', entityType: 'reflection' as const, entityId: 'item-1',
+      payload: { content: '相同内容', updatedAt: 100 }, deleted: false,
+      revision: 1, clientUpdatedAt: 100, serverUpdatedAt: 100, deviceId: 'phone',
+    }
+    const wrapper = mount(ConflictList, {
+      props: {
+        busyId: null,
+        conflicts: [
+          {
+            id: 'metadata-only', mutationId: null, recordKey: record.key,
+            entityType: record.entityType, entityId: record.entityId,
+            local: record,
+            remote: {
+              ...record,
+              payload: { ...record.payload, updatedAt: 200 },
+              revision: 2, serverUpdatedAt: 200, deviceId: 'desktop',
+            },
+            status: 'open', createdAt: 1,
+          },
+          {
+            id: 'real-change', mutationId: null, recordKey: 'long_task:item-2',
+            entityType: 'long_task', entityId: 'item-2',
+            local: { ...record, key: 'long_task:item-2', entityType: 'long_task', entityId: 'item-2', payload: { title: '本机标题', notes: '本机备注' } },
+            remote: { ...record, key: 'long_task:item-2', entityType: 'long_task', entityId: 'item-2', payload: { title: '云端标题', notes: '云端备注' } },
+            status: 'open', createdAt: 2,
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain('内容相同，仅同步版本信息不同')
+    expect(wrapper.text()).toContain('标题')
+    expect(wrapper.text()).toContain('本机标题')
+    expect(wrapper.text()).toContain('云端标题')
+    expect(wrapper.text()).toContain('备注')
+  })
+
+  it('offers bulk local and cloud choices and emits one explicit bulk action', async () => {
+    const local = {
+      key: 'reflection:item-1', entityType: 'reflection' as const, entityId: 'item-1',
+      payload: { content: '本机' }, deleted: false, revision: 1,
+      clientUpdatedAt: 1, serverUpdatedAt: 1, deviceId: 'phone',
+    }
+    const wrapper = mount(ConflictList, {
+      props: {
+        conflicts: [{
+          id: 'conflict-1', mutationId: null, recordKey: local.key,
+          entityType: local.entityType, entityId: local.entityId, local,
+          remote: { ...local, payload: { content: '云端' }, revision: 2 },
+          status: 'open', createdAt: 1,
+        }],
+        busyId: null,
+      },
+    })
+
+    await wrapper.get('[data-testid="keep-all-local"]').trigger('click')
+    await wrapper.get('[data-testid="keep-all-remote"]').trigger('click')
+
+    expect(wrapper.emitted('resolveAll')).toEqual([
+      ['keep_local'],
+      ['keep_remote'],
+    ])
+  })
 })

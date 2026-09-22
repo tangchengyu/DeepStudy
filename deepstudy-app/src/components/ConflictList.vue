@@ -8,7 +8,77 @@ defineProps<{
 
 const emit = defineEmits<{
   resolve: [id: string, resolution: 'keep_local' | 'keep_remote']
+  resolveAll: [resolution: 'keep_local' | 'keep_remote']
 }>()
+
+const IGNORED_PAYLOAD_FIELDS = new Set(['updatedAt', 'clientUpdatedAt', 'serverUpdatedAt'])
+
+function comparableRecord(record: SyncRecordEnvelope | null) {
+  if (!record) return { deleted: true, payload: null }
+  return {
+    deleted: Boolean(record.deleted),
+    payload: Object.fromEntries(
+      Object.entries(record.payload).filter(([key]) => !IGNORED_PAYLOAD_FIELDS.has(key)),
+    ),
+  }
+}
+
+function stableValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableValue).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableValue(item)}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'undefined'
+}
+
+function sameContent(conflict: SyncConflictRecord) {
+  return stableValue(comparableRecord(conflict.local)) === stableValue(comparableRecord(conflict.remote))
+}
+
+type FlatRecord = Record<string, unknown>
+
+function flatten(value: unknown, prefix = '', output: FlatRecord = {}) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length) {
+      for (const [key, item] of entries) flatten(item, prefix ? `${prefix}.${key}` : key, output)
+      return output
+    }
+  }
+  output[prefix || '值'] = value
+  return output
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  deleted: '删除状态', title: '标题', text: '文本', content: '内容', notes: '备注', note: '备注',
+  workType: '工作类型', category: '类别', state: '状态', date: '日期', priority: '优先级',
+  durationMs: '时长（毫秒）', durationMinutes: '时长（分钟）', plannedAt: '计划时间',
+  startedAt: '开始时间', start: '开始时间', occurredAt: '发生时间', timestamp: '发生时间',
+}
+
+function fieldLabel(path: string) {
+  const field = path.replace(/^payload\./, '')
+  return FIELD_LABELS[field] ?? field.replaceAll('.', ' › ')
+}
+
+function displayValue(value: unknown) {
+  if (value === undefined) return '（无此字段）'
+  if (value === null || value === '') return '（空）'
+  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  return String(value)
+}
+
+function changedFields(conflict: SyncConflictRecord) {
+  const local = flatten(comparableRecord(conflict.local))
+  const remote = flatten(comparableRecord(conflict.remote))
+  return [...new Set([...Object.keys(local), ...Object.keys(remote)])]
+    .filter((path) => stableValue(local[path]) !== stableValue(remote[path]))
+    .map((path) => ({ path, label: fieldLabel(path), local: local[path], remote: remote[path] }))
+}
 
 function recordTitle(record: SyncRecordEnvelope | null) {
   if (!record) return '云端已不存在此项目'
@@ -119,6 +189,21 @@ function safeJson(record: SyncRecordEnvelope | null) {
       </div>
       <span>{{ conflicts.length }}</span>
     </header>
+    <div class="bulk-actions" aria-label="批量处理冲突">
+      <button
+        data-testid="keep-all-remote"
+        type="button"
+        :disabled="busyId !== null || conflicts.length === 0"
+        @click="emit('resolveAll', 'keep_remote')"
+      >全部使用云端</button>
+      <button
+        class="primary"
+        data-testid="keep-all-local"
+        type="button"
+        :disabled="busyId !== null || conflicts.length === 0"
+        @click="emit('resolveAll', 'keep_local')"
+      >全部使用本机</button>
+    </div>
     <article v-for="conflict in conflicts" :key="conflict.id" class="conflict-card">
       <div class="conflict-kind">{{ conflict.entityType }} · {{ conflict.entityId }}</div>
       <p v-if="conflict.status === 'resolving'" class="resolution-pending">
@@ -127,6 +212,19 @@ function safeJson(record: SyncRecordEnvelope | null) {
       <p v-else-if="conflict.reconciledGatewayStatus" class="resolution-pending">
         云端已由其他操作更新。本机修改仍保留，请比较最新版本后重新选择。
       </p>
+      <p v-if="sameContent(conflict)" class="same-content">
+        内容相同，仅同步版本信息不同。任选一项都不会改变实际内容。
+      </p>
+      <div v-else class="field-diff" aria-label="不同字段">
+        <div class="diff-heading" aria-hidden="true">
+          <span>不同字段</span><span>本机</span><span>云端</span>
+        </div>
+        <div v-for="field in changedFields(conflict)" :key="field.path" class="diff-row">
+          <strong>{{ field.label }}</strong>
+          <span>{{ displayValue(field.local) }}</span>
+          <span>{{ displayValue(field.remote) }}</span>
+        </div>
+      </div>
       <div class="version-grid">
         <section>
           <small>本机版本</small>
@@ -214,6 +312,32 @@ function safeJson(record: SyncRecordEnvelope | null) {
   padding: 0.9rem;
 }
 
+.bulk-actions {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.bulk-actions button,
+.conflict-actions button {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+  min-height: 2.7rem;
+}
+
+.bulk-actions button.primary,
+.conflict-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.bulk-actions button:disabled,
+.conflict-actions button:disabled {
+  opacity: 0.5;
+}
+
 .conflict-kind {
   color: var(--text-muted);
   font-size: 0.7rem;
@@ -228,6 +352,48 @@ function safeJson(record: SyncRecordEnvelope | null) {
   line-height: 1.4;
   margin: 0.45rem 0 0;
   padding: 0.45rem 0.55rem;
+}
+
+.same-content {
+  background: #eef8f2;
+  border-radius: 0.65rem;
+  color: #276444;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  margin: 0.6rem 0 0;
+  padding: 0.55rem 0.65rem;
+}
+
+.field-diff {
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+  margin-top: 0.65rem;
+  overflow: hidden;
+}
+
+.diff-heading,
+.diff-row {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: minmax(4.2rem, 0.75fr) repeat(2, minmax(0, 1fr));
+  padding: 0.5rem 0.6rem;
+}
+
+.diff-heading {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+}
+
+.diff-row {
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.diff-row strong,
+.diff-row span {
+  overflow-wrap: anywhere;
 }
 
 .version-grid {
@@ -300,20 +466,11 @@ function safeJson(record: SyncRecordEnvelope | null) {
   margin-top: 0.75rem;
 }
 
-.conflict-actions button {
-  background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-radius: 0.75rem;
-  min-height: 2.7rem;
-}
-
-.conflict-actions button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.conflict-actions button:disabled {
-  opacity: 0.5;
+@media (max-width: 390px) {
+  .diff-heading,
+  .diff-row {
+    grid-template-columns: minmax(3.5rem, 0.65fr) repeat(2, minmax(0, 1fr));
+    padding-inline: 0.45rem;
+  }
 }
 </style>

@@ -27,3 +27,10 @@ test("mobile account page includes version update checking in Mine", () => {
   assert.match(mineView, /当前已是最新版本/);
   assert.match(mineView, /Android 会打开安装包下载/);
 });
+
+test("mobile account page wires conflict bulk choices to sequential resolution", () => {
+  assert.match(mineView, /@resolve-all="resolveAllConflicts"/);
+  assert.match(mineView, /async function resolveAllConflicts/);
+  assert.match(mineView, /for \(const conflict of pending\)/);
+  assert.match(mineView, /批量处理完成/);
+});

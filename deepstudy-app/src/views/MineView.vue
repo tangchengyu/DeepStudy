@@ -403,6 +403,44 @@ async function resolveConflict(id: string, resolution: 'keep_local' | 'keep_remo
   }
 }
 
+async function resolveAllConflicts(resolution: 'keep_local' | 'keep_remote') {
+  const pending = [...conflicts.value]
+  if (!pending.length) return
+  if (resolution === 'keep_remote' && !window.confirm(
+    `将对 ${pending.length} 个冲突全部采用云端版本，并放弃对应的本机修改，确认继续吗？`,
+  )) return
+
+  resolvingConflictId.value = 'bulk'
+  const failures: string[] = []
+  let completed = 0
+  try {
+    for (const conflict of pending) {
+      actionMessage.value = `正在批量处理 ${completed + failures.length + 1}/${pending.length}…`
+      try {
+        await mobileSyncService.resolveConflict(conflict.id, resolution)
+        completed += 1
+      } catch (error) {
+        failures.push(`${conflict.entityType} · ${conflict.entityId}：${friendlyError(error)}`)
+      }
+    }
+    if (completed) {
+      try {
+        await mobileSyncService.syncNow()
+      } catch (error) {
+        failures.push(`同步：${friendlyError(error)}`)
+      }
+    }
+    conflicts.value = await syncRepository.listConflicts()
+    actionMessage.value = failures.length
+      ? `批量处理完成 ${completed}/${pending.length}；${failures.length} 项未完成：${failures.join('；')}`
+      : `批量处理完成：已${resolution === 'keep_local' ? '保留本机' : '采用云端'} ${completed} 项`
+  } catch (error) {
+    actionMessage.value = `批量处理已停止：${friendlyError(error)}`
+  } finally {
+    resolvingConflictId.value = null
+  }
+}
+
 async function signOut() {
   mobileSyncService.stop()
   try {
@@ -529,6 +567,7 @@ watch(() => syncState.conflicts, () => {
         :conflicts="conflicts"
         :busy-id="resolvingConflictId"
         @resolve="resolveConflict"
+        @resolve-all="resolveAllConflicts"
       />
 
       <details class="gateway-card surface-card">
