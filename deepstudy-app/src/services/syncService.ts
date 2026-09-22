@@ -205,6 +205,10 @@ export function createSyncService(options: SyncServiceOptions) {
       } catch (error) {
         lastError = error
         if (!retryable(error) || attempt === 2 || !options.connectivity.isOnline()) throw error
+        // A request timeout has already consumed the full network deadline.
+        // Let the durable automatic scheduler retry later instead of keeping
+        // the UI in "syncing" for several consecutive timeout windows.
+        if (error instanceof GatewayError && error.code === 'NETWORK_TIMEOUT') throw error
         if (error instanceof GatewayError && error.retryAfterSeconds) throw error
         await delay(250 * (2 ** attempt))
       }
@@ -308,12 +312,21 @@ export function createSyncService(options: SyncServiceOptions) {
       const pulled = await withRetry(() => options.client.pull(deviceId, cursor))
       assertCurrentRun()
       stats.pulled += pulled.records.length
+      let pageApplied = 0
+      let pageConflicts = 0
+      const changedEntityTypes = new Set<string>()
       for (const record of pulled.records) {
         const normalized = normalizeRecord(record, scopeKey)
         if (!await options.repository.hasOpenConflict(normalized.key)) {
           const result = await options.repository.applyRemoteRecord(normalized)
-          if (result.status === 'applied') stats.applied += 1
-          else if (result.status === 'conflict') stats.pullConflicts += 1
+          if (result.status === 'applied') {
+            stats.applied += 1
+            pageApplied += 1
+            changedEntityTypes.add(record.entityType)
+          } else if (result.status === 'conflict') {
+            stats.pullConflicts += 1
+            pageConflicts += 1
+          }
         }
       }
       const nextCursor = String(pulled.cursor)
@@ -321,6 +334,14 @@ export function createSyncService(options: SyncServiceOptions) {
       cursor = nextCursor
       assertCurrentRun()
       await options.repository.setCursor(cursor)
+      if (pageApplied || pageConflicts) {
+        notifySyncDataChanged({
+          source: 'sync-pull-page',
+          applied: pageApplied,
+          conflicts: pageConflicts,
+          entityTypes: [...changedEntityTypes].sort(),
+        })
+      }
       hasMore = pulled.hasMore
     }
 

@@ -17,6 +17,86 @@ afterEach(async () => {
 })
 
 describe('connectivity-aware sync service', () => {
+  it('does not repeat a full request timeout inside one synchronization pass', async () => {
+    const database = databaseForTest()
+    const repository = createSyncRepository(database, {
+      createDeviceId: () => 'android-device-timeout',
+    })
+    const client = {
+      registerDevice: vi.fn(async () => { throw new GatewayError(0, 'NETWORK_TIMEOUT', null) }),
+      push: vi.fn(),
+      pull: vi.fn(),
+      conflicts: vi.fn(),
+      resolveConflict: vi.fn(),
+    }
+    const service = createSyncService({
+      repository,
+      client,
+      connectivity: { isOnline: () => true, subscribe: () => () => undefined },
+      delay: async () => undefined,
+    })
+
+    await expect(service.syncNow()).rejects.toMatchObject({ code: 'NETWORK_TIMEOUT' })
+
+    expect(client.registerDevice).toHaveBeenCalledTimes(1)
+    expect(service.state.phase).toBe('error')
+    database.close()
+  })
+
+  it('notifies visible views as soon as pulled daily tasks are durable locally', async () => {
+    const database = databaseForTest()
+    const repository = createSyncRepository(database, {
+      createDeviceId: () => 'android-device-daily-pull',
+    })
+    let releaseConflicts!: () => void
+    const client = {
+      registerDevice: vi.fn(async () => ({ ok: true as const })),
+      push: vi.fn(),
+      pull: vi.fn(async () => ({
+        records: [{
+          entityType: 'daily_task' as const,
+          entityId: 'remote-today',
+          payload: { id: 'remote-today', text: '移动端应立即显示', date: '2026-09-22' },
+          deleted: false,
+          revision: 1,
+          clientUpdatedAt: 1,
+          serverUpdatedAt: 2,
+          deviceId: 'desktop-device',
+        }],
+        cursor: 1,
+        hasMore: false,
+      })),
+      conflicts: vi.fn(() => new Promise<{ conflicts: [] }>((resolve) => {
+        releaseConflicts = () => resolve({ conflicts: [] })
+      })),
+      resolveConflict: vi.fn(),
+    }
+    const service = createSyncService({
+      repository,
+      client,
+      connectivity: { isOnline: () => true, subscribe: () => () => undefined },
+      delay: async () => undefined,
+    })
+    const changes: unknown[] = []
+    const listener = (event: Event) => changes.push((event as CustomEvent).detail)
+    window.addEventListener('deepstudy:sync-data-changed', listener)
+    const run = service.syncNow()
+
+    try {
+      await vi.waitFor(() => expect(client.conflicts).toHaveBeenCalledTimes(1))
+      expect(await repository.getRecord('daily_task', 'remote-today')).toBeDefined()
+      expect(changes).toEqual([expect.objectContaining({
+        source: 'sync-pull-page',
+        entityTypes: ['daily_task'],
+      })])
+    } finally {
+      releaseConflicts()
+      await run
+      window.removeEventListener('deepstudy:sync-data-changed', listener)
+      database.close()
+    }
+  })
+
   it('does not lose a durable outbox item while offline', async () => {
     const database = databaseForTest()
     const repository = createSyncRepository(database, {

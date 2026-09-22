@@ -28,12 +28,12 @@ let syncServiceForScopeChange: ReturnType<typeof createSyncService> | null = nul
 
 export const accountCoordinator = createAuthCoordinator(gatewayClient, accountMetadata, {
   getScope: gatewaySettings.getBaseUrl,
-  async onIdentityChanged(identity) {
+  async onIdentityChanged(identity, context) {
     syncServiceForScopeChange?.stop()
     syncRepository.setActiveScope(identity
       ? createAccountSyncScope(identity.origin, identity.userId)
       : LOCAL_QUARANTINE_SCOPE)
-    await timerServiceForScopeChange?.reloadScope(Boolean(identity))
+    await timerServiceForScopeChange?.reloadScope(Boolean(identity) && context?.refreshRemote !== false)
     await syncServiceForScopeChange?.refreshState()
   },
 })
@@ -51,19 +51,68 @@ export const mobileSyncService = createSyncService({
 })
 syncServiceForScopeChange = mobileSyncService
 
-let initialization: Promise<void> | null = null
+interface AppServiceInitializerDependencies {
+  account: {
+    state: { status: string }
+    restoreCachedSession(): Promise<unknown>
+    refreshSession(): Promise<unknown>
+  }
+  timer: { initialize(): Promise<unknown> }
+  sync: { refreshState(): Promise<unknown> }
+  enableSync(): Promise<unknown>
+}
+
+function hasCachedAccount(status: string) {
+  return status === 'signed-in' || status === 'offline-session'
+}
+
+export function createAppServiceInitializer(dependencies: AppServiceInitializerDependencies) {
+  let initialization: Promise<void> | null = null
+  let backgroundInitialization: Promise<void> | null = null
+
+  function startBackground() {
+    if (!backgroundInitialization) {
+      backgroundInitialization = (async () => {
+        await Promise.allSettled([
+          dependencies.account.refreshSession(),
+          dependencies.timer.initialize(),
+        ])
+        await dependencies.sync.refreshState()
+        if (hasCachedAccount(dependencies.account.state.status)) {
+          await dependencies.enableSync()
+        }
+      })()
+    }
+    return backgroundInitialization
+  }
+
+  return {
+    initialize() {
+      if (!initialization) {
+        initialization = (async () => {
+          await dependencies.account.restoreCachedSession()
+          await dependencies.sync.refreshState()
+          if (hasCachedAccount(dependencies.account.state.status)) {
+            await dependencies.enableSync()
+          }
+          void startBackground().catch(() => undefined)
+        })()
+      }
+      return initialization
+    },
+    waitForBackground() {
+      return backgroundInitialization ?? Promise.resolve()
+    },
+  }
+}
+
+const appServiceInitializer = createAppServiceInitializer({
+  account: accountCoordinator,
+  timer: mobileFocusTimerService,
+  sync: mobileSyncService,
+  enableSync: () => enableAccountSyncWhenReady(syncRepository, mobileSyncService),
+})
 
 export function initializeAppServices() {
-  if (!initialization) {
-    initialization = (async () => {
-      await accountCoordinator.initialize()
-      await mobileFocusTimerService.initialize()
-      await mobileSyncService.refreshState()
-      if (accountCoordinator.state.status === 'signed-in'
-        || accountCoordinator.state.status === 'offline-session') {
-        await enableAccountSyncWhenReady(syncRepository, mobileSyncService)
-      }
-    })()
-  }
-  return initialization
+  return appServiceInitializer.initialize()
 }

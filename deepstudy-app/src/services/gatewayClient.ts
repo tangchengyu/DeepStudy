@@ -133,7 +133,7 @@ function mutationForWire(mutation: PendingMutation) {
 
 export function createGatewayClient(options: GatewayClientOptions) {
   const fetchFn = options.fetchFn ?? fetch
-  const requestTimeoutMs = Math.max(1_000, Number(options.requestTimeoutMs) || 60_000)
+  const requestTimeoutMs = Math.max(1_000, Number(options.requestTimeoutMs) || 12_000)
 
   async function request<T>(path: string, requestOptions: RequestOptions = {}): Promise<T> {
     const baseUrl = normalizedBaseUrl(options.getBaseUrl())
@@ -149,6 +149,7 @@ export function createGatewayClient(options: GatewayClientOptions) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null
     const timeout = controller ? window.setTimeout(() => controller.abort(), requestTimeoutMs) : null
     let response: Response
+    let payload: unknown
     try {
       response = await fetchFn(`${baseUrl}${path}`, {
         method: requestOptions.method ?? 'GET',
@@ -156,6 +157,10 @@ export function createGatewayClient(options: GatewayClientOptions) {
         body: requestOptions.body ? JSON.stringify(requestOptions.body) : undefined,
         signal: controller?.signal,
       })
+      const responseType = response.headers.get('content-type') ?? ''
+      payload = responseType.includes('application/json')
+        ? await response.json()
+        : await response.text()
     } catch (error) {
       if (controller?.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
         throw new GatewayError(0, 'NETWORK_TIMEOUT', null)
@@ -164,10 +169,6 @@ export function createGatewayClient(options: GatewayClientOptions) {
     } finally {
       if (timeout) window.clearTimeout(timeout)
     }
-    const responseType = response.headers.get('content-type') ?? ''
-    const payload: unknown = responseType.includes('application/json')
-      ? await response.json()
-      : await response.text()
     if (!response.ok) {
       const errorCode = payload && typeof payload === 'object' && 'error' in payload
         ? String((payload as { error: unknown }).error)

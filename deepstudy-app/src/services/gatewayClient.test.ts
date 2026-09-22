@@ -131,6 +131,67 @@ describe('gateway client', () => {
     expect(aborted).toBe(true)
   })
 
+  it('uses a short default timeout for networks that report online but cannot reach the gateway', async () => {
+    vi.useFakeTimers()
+    let aborted = false
+    const client = createGatewayClient({
+      getBaseUrl: () => 'https://gateway.example.test',
+      tokenStorage: {
+        read: vi.fn(async () => 'secure-token'),
+        save: vi.fn(async () => undefined),
+        clear: vi.fn(async () => undefined),
+      },
+      fetchFn: vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          aborted = true
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        })
+      })),
+    })
+    const request = client.pull('android-device-default-timeout', '0', 1).catch((error) => error)
+
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    try {
+      expect(aborted).toBe(true)
+      await expect(request).resolves.toMatchObject({ code: 'NETWORK_TIMEOUT' })
+    } finally {
+      await vi.advanceTimersByTimeAsync(60_000)
+      await request
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the timeout active while a response body is still downloading', async () => {
+    let bodyAborted = false
+    const client = createGatewayClient({
+      getBaseUrl: () => 'https://gateway.example.test',
+      requestTimeoutMs: 5,
+      tokenStorage: {
+        read: vi.fn(async () => 'secure-token'),
+        save: vi.fn(async () => undefined),
+        clear: vi.fn(async () => undefined),
+      },
+      fetchFn: vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"records":[]'))
+            init?.signal?.addEventListener('abort', () => {
+              bodyAborted = true
+              controller.error(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+            })
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )),
+    })
+
+    await expect(client.pull('android-device-stalled-body', '0', 1)).rejects.toMatchObject({
+      code: 'NETWORK_TIMEOUT',
+    })
+    expect(bodyAborted).toBe(true)
+  })
+
   it('fails registration closed when the gateway omits the one-time recovery code', async () => {
     const tokenStorage = {
       read: vi.fn(async () => null),

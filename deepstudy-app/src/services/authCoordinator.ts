@@ -23,7 +23,10 @@ export function createAuthCoordinator(
   metadata: AccountMetadata,
   options: {
     getScope?: () => string
-    onIdentityChanged?: (identity: { origin: string; userId: string } | null) => void | Promise<void>
+    onIdentityChanged?: (
+      identity: { origin: string; userId: string } | null,
+      context?: { refreshRemote: boolean },
+    ) => void | Promise<void>
   } = {},
 ) {
   const state = reactive<AuthState>({
@@ -34,75 +37,139 @@ export function createAuthCoordinator(
     error: null,
   })
 
-  async function rememberUser(user: GatewayUser) {
-    const origin = options.getScope?.() ?? ''
-    await options.onIdentityChanged?.({ origin, userId: user.id })
+  let authGeneration = 0
+
+  function beginAuthOperation() {
+    return {
+      generation: ++authGeneration,
+      origin: options.getScope?.() ?? '',
+    }
+  }
+
+  function isCurrentAuthOperation(operation: { generation: number; origin: string }) {
+    return operation.generation === authGeneration
+      && operation.origin === (options.getScope?.() ?? '')
+  }
+
+  async function rememberUser(
+    user: GatewayUser,
+    operation = beginAuthOperation(),
+  ) {
+    if (!isCurrentAuthOperation(operation)) return false
+    await options.onIdentityChanged?.(
+      { origin: operation.origin, userId: user.id },
+      { refreshRemote: true },
+    )
+    if (!isCurrentAuthOperation(operation)) return false
     state.user = user
     state.status = 'signed-in'
     const writes = [
       metadata.setMetadata('accountUserId', user.id),
       metadata.setMetadata('accountUsername', userName(user)),
     ]
-    if (options.getScope) writes.push(metadata.setMetadata('accountOrigin', origin))
+    if (options.getScope) writes.push(metadata.setMetadata('accountOrigin', operation.origin))
     await Promise.all(writes)
+    return true
   }
 
-  async function applySignInResult(result: SignInResult) {
-    await rememberUser(result.user)
+  async function applySignInResult(
+    result: SignInResult,
+    operation: { generation: number; origin: string },
+  ) {
+    await rememberUser(result.user, operation)
     return result
   }
 
-  return {
-    state,
-    async initialize() {
-      const [cachedId, cachedUsername, cachedOrigin] = await Promise.all([
-        metadata.getMetadata('accountUserId'),
-        metadata.getMetadata('accountUsername'),
-        metadata.getMetadata('accountOrigin'),
-      ])
-      const scopeMatches = !options.getScope || cachedOrigin === options.getScope()
-      if (cachedId && !scopeMatches) {
-        await Promise.all([
-          metadata.removeMetadata('accountUserId'),
-          metadata.removeMetadata('accountUsername'),
-          metadata.removeMetadata('accountOrigin'),
+  let cachedSessionRestoration: Promise<AuthState> | null = null
+
+  function restoreCachedSession() {
+    if (!cachedSessionRestoration) {
+      cachedSessionRestoration = (async () => {
+        const [cachedId, cachedUsername, cachedOrigin] = await Promise.all([
+          metadata.getMetadata('accountUserId'),
+          metadata.getMetadata('accountUsername'),
+          metadata.getMetadata('accountOrigin'),
         ])
-        await options.onIdentityChanged?.(null)
-      }
-      if (options.getScope && (!cachedId || !scopeMatches)) {
-        await options.onIdentityChanged?.(null)
-        state.user = null
-        state.status = 'signed-out'
-        state.error = null
-        return state
-      }
-      try {
-        const session = await client.session()
-        await rememberUser(session.user)
-      } catch (error) {
-        if (error instanceof GatewayError && error.status === 401) {
-          state.user = null
-          state.status = 'signed-out'
+        const scopeMatches = !options.getScope || cachedOrigin === options.getScope()
+        if (cachedId && !scopeMatches) {
           await Promise.all([
             metadata.removeMetadata('accountUserId'),
             metadata.removeMetadata('accountUsername'),
             metadata.removeMetadata('accountOrigin'),
           ])
-          await options.onIdentityChanged?.(null)
-        } else if (cachedId && scopeMatches) {
-          await options.onIdentityChanged?.({ origin: options.getScope?.() ?? '', userId: cachedId })
+          await options.onIdentityChanged?.(null, { refreshRemote: false })
+          state.user = null
+          state.status = 'signed-out'
+          state.error = null
+          return state
+        }
+        if (cachedId) {
+          await options.onIdentityChanged?.(
+            { origin: options.getScope?.() ?? '', userId: cachedId },
+            { refreshRemote: false },
+          )
           state.user = { id: cachedId, username: cachedUsername }
           state.status = 'offline-session'
-        } else {
-          state.status = 'signed-out'
+          state.error = null
+          return state
         }
-        state.error = error instanceof Error ? error.message : String(error)
+        if (options.getScope) await options.onIdentityChanged?.(null, { refreshRemote: false })
+        state.user = null
+        state.status = 'signed-out'
+        state.error = null
+        return state
+      })()
+    }
+    return cachedSessionRestoration
+  }
+
+  async function refreshSession() {
+    await restoreCachedSession()
+    if (options.getScope && state.status === 'signed-out') return state
+    const operation = beginAuthOperation()
+    const cachedId = state.user?.id ?? null
+    const cachedUsername = state.user?.username ?? state.user?.name ?? null
+    try {
+      const session = await client.session()
+      if (!isCurrentAuthOperation(operation)) return state
+      await rememberUser(session.user, operation)
+      if (!isCurrentAuthOperation(operation)) return state
+      state.error = null
+    } catch (error) {
+      if (!isCurrentAuthOperation(operation)) return state
+      if (error instanceof GatewayError && error.status === 401) {
+        state.user = null
+        state.status = 'signed-out'
+        await Promise.all([
+          metadata.removeMetadata('accountUserId'),
+          metadata.removeMetadata('accountUsername'),
+          metadata.removeMetadata('accountOrigin'),
+        ])
+        await options.onIdentityChanged?.(null, { refreshRemote: false })
+      } else if (cachedId) {
+        state.user = { id: cachedId, username: cachedUsername }
+        state.status = 'offline-session'
+      } else {
+        state.status = 'signed-out'
       }
-      return state
+      state.error = error instanceof Error ? error.message : String(error)
+    }
+    return state
+  }
+
+  return {
+    state,
+    restoreCachedSession,
+    refreshSession,
+    async initialize() {
+      await restoreCachedSession()
+      return refreshSession()
     },
     async register(username: string, password: string, turnstileToken: string) {
+      const operation = beginAuthOperation()
       state.error = null
       const result = await client.register(username, password, turnstileToken) as RegistrationResult
+      if (!isCurrentAuthOperation(operation)) return result
       if (!result.recoveryCode?.trim()) {
         state.status = 'signed-out'
         state.user = null
@@ -113,17 +180,21 @@ export function createAuthCoordinator(
           metadata.removeMetadata('accountUsername'),
           metadata.removeMetadata('accountOrigin'),
         ])
-        await options.onIdentityChanged?.(null)
+        await options.onIdentityChanged?.(null, { refreshRemote: false })
         throw new Error('RECOVERY_CODE_MISSING')
       }
       state.pendingRecoveryCode = result.recoveryCode
       state.recoveryReason = 'new-account'
-      await rememberUser(result.user)
+      await rememberUser(result.user, operation)
       return result
     },
     async signIn(username: string, password: string, turnstileToken: string) {
+      const operation = beginAuthOperation()
       state.error = null
-      return applySignInResult(await client.signIn(username, password, turnstileToken))
+      return applySignInResult(
+        await client.signIn(username, password, turnstileToken),
+        operation,
+      )
     },
     async recover(
       username: string,
@@ -131,8 +202,10 @@ export function createAuthCoordinator(
       newPassword: string,
       turnstileToken: string,
     ) {
+      const operation = beginAuthOperation()
       state.error = null
       const result = await client.recover(username, recoveryCode, newPassword, turnstileToken)
+      if (!isCurrentAuthOperation(operation)) return result
       state.pendingRecoveryCode = result.recoveryCode
       state.recoveryReason = 'rotated'
       return result
@@ -144,20 +217,23 @@ export function createAuthCoordinator(
       return true
     },
     async signOut() {
+      const operation = beginAuthOperation()
       try {
         await client.signOut()
       } finally {
-        state.status = 'signed-out'
-        state.user = null
-        state.pendingRecoveryCode = null
-        state.recoveryReason = null
-        state.error = null
-        await Promise.all([
-          metadata.removeMetadata('accountUserId'),
-          metadata.removeMetadata('accountUsername'),
-          metadata.removeMetadata('accountOrigin'),
-        ])
-        await options.onIdentityChanged?.(null)
+        if (isCurrentAuthOperation(operation)) {
+          state.status = 'signed-out'
+          state.user = null
+          state.pendingRecoveryCode = null
+          state.recoveryReason = null
+          state.error = null
+          await Promise.all([
+            metadata.removeMetadata('accountUserId'),
+            metadata.removeMetadata('accountUsername'),
+            metadata.removeMetadata('accountOrigin'),
+          ])
+          await options.onIdentityChanged?.(null, { refreshRemote: false })
+        }
       }
     },
   }

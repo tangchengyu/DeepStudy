@@ -16,6 +16,154 @@ afterEach(async () => {
 })
 
 describe('account authentication coordinator', () => {
+  it('restores the cached account scope without waiting for remote session validation', async () => {
+    const databaseName = `deepstudy-auth-${crypto.randomUUID()}`
+    databases.push(databaseName)
+    const database = createSyncDatabase(databaseName)
+    const repository = createSyncRepository(database)
+    await repository.setMetadata('accountUserId', 'cached-user')
+    await repository.setMetadata('accountUsername', 'alice')
+    await repository.setMetadata('accountOrigin', 'https://gateway.example.test')
+    let resolveSession!: (value: { user: { id: string; username: string } }) => void
+    const client = {
+      register: vi.fn(), signIn: vi.fn(), recover: vi.fn(), signOut: vi.fn(),
+      session: vi.fn(() => new Promise<{ user: { id: string; username: string } }>((resolve) => {
+        resolveSession = resolve
+      })),
+    }
+    const identities: Array<{ origin: string; userId: string } | null> = []
+    const remoteRefreshes: Array<boolean | undefined> = []
+    const coordinator = createAuthCoordinator(client, repository, {
+      getScope: () => 'https://gateway.example.test',
+      onIdentityChanged(identity, context) {
+        identities.push(identity)
+        remoteRefreshes.push(context?.refreshRemote)
+      },
+    })
+
+    await coordinator.restoreCachedSession()
+
+    expect(client.session).not.toHaveBeenCalled()
+    expect(coordinator.state).toMatchObject({
+      status: 'offline-session',
+      user: { id: 'cached-user', username: 'alice' },
+    })
+    expect(identities).toEqual([{ origin: 'https://gateway.example.test', userId: 'cached-user' }])
+    expect(remoteRefreshes).toEqual([false])
+
+    const refresh = coordinator.refreshSession()
+    await vi.waitFor(() => expect(client.session).toHaveBeenCalledTimes(1))
+    resolveSession({ user: { id: 'cached-user', username: 'alice' } })
+    await refresh
+    expect(coordinator.state.status).toBe('signed-in')
+    database.close()
+  })
+
+  it('ignores a late background session success after sign-out', async () => {
+    const databaseName = `deepstudy-auth-${crypto.randomUUID()}`
+    databases.push(databaseName)
+    const database = createSyncDatabase(databaseName)
+    const repository = createSyncRepository(database)
+    await repository.setMetadata('accountUserId', 'cached-user')
+    await repository.setMetadata('accountUsername', 'alice')
+    await repository.setMetadata('accountOrigin', 'https://gateway.example.test')
+    let resolveSession!: (value: { user: { id: string; username: string } }) => void
+    const client = {
+      register: vi.fn(), signIn: vi.fn(), recover: vi.fn(),
+      signOut: vi.fn(async () => ({ success: true })),
+      session: vi.fn(() => new Promise<{ user: { id: string; username: string } }>((resolve) => {
+        resolveSession = resolve
+      })),
+    }
+    const coordinator = createAuthCoordinator(client, repository, {
+      getScope: () => 'https://gateway.example.test',
+    })
+    await coordinator.restoreCachedSession()
+    const refresh = coordinator.refreshSession()
+    await vi.waitFor(() => expect(client.session).toHaveBeenCalledTimes(1))
+
+    await coordinator.signOut()
+    resolveSession({ user: { id: 'cached-user', username: 'alice' } })
+    await refresh
+
+    expect(coordinator.state.status).toBe('signed-out')
+    expect(coordinator.state.user).toBeNull()
+    await expect(repository.getMetadata('accountUserId')).resolves.toBeNull()
+    database.close()
+  })
+
+  it('ignores a late background session success after another account signs in', async () => {
+    const databaseName = `deepstudy-auth-${crypto.randomUUID()}`
+    databases.push(databaseName)
+    const database = createSyncDatabase(databaseName)
+    const repository = createSyncRepository(database)
+    await repository.setMetadata('accountUserId', 'old-user')
+    await repository.setMetadata('accountUsername', 'alice')
+    await repository.setMetadata('accountOrigin', 'https://gateway.example.test')
+    let resolveSession!: (value: { user: { id: string; username: string } }) => void
+    const client = {
+      register: vi.fn(), recover: vi.fn(), signOut: vi.fn(),
+      signIn: vi.fn(async () => ({ user: { id: 'new-user', username: 'bob' } })),
+      session: vi.fn(() => new Promise<{ user: { id: string; username: string } }>((resolve) => {
+        resolveSession = resolve
+      })),
+    }
+    const coordinator = createAuthCoordinator(client, repository, {
+      getScope: () => 'https://gateway.example.test',
+    })
+    await coordinator.restoreCachedSession()
+    const refresh = coordinator.refreshSession()
+    await vi.waitFor(() => expect(client.session).toHaveBeenCalledTimes(1))
+
+    await coordinator.signIn('bob', 'password', 'challenge')
+    resolveSession({ user: { id: 'old-user', username: 'alice' } })
+    await refresh
+
+    expect(coordinator.state).toMatchObject({
+      status: 'signed-in',
+      user: { id: 'new-user', username: 'bob' },
+    })
+    await expect(repository.getMetadata('accountUserId')).resolves.toBe('new-user')
+    database.close()
+  })
+
+  it('does not bind a late session response to a newly selected gateway origin', async () => {
+    const databaseName = `deepstudy-auth-${crypto.randomUUID()}`
+    databases.push(databaseName)
+    const database = createSyncDatabase(databaseName)
+    const repository = createSyncRepository(database)
+    await repository.setMetadata('accountUserId', 'old-user')
+    await repository.setMetadata('accountUsername', 'alice')
+    await repository.setMetadata('accountOrigin', 'https://old.example.test')
+    let origin = 'https://old.example.test'
+    let resolveSession!: (value: { user: { id: string; username: string } }) => void
+    const identities: Array<{ origin: string; userId: string } | null> = []
+    const client = {
+      register: vi.fn(), signIn: vi.fn(), recover: vi.fn(), signOut: vi.fn(),
+      session: vi.fn(() => new Promise<{ user: { id: string; username: string } }>((resolve) => {
+        resolveSession = resolve
+      })),
+    }
+    const coordinator = createAuthCoordinator(client, repository, {
+      getScope: () => origin,
+      onIdentityChanged(identity) {
+        identities.push(identity)
+      },
+    })
+    await coordinator.restoreCachedSession()
+    const refresh = coordinator.refreshSession()
+    await vi.waitFor(() => expect(client.session).toHaveBeenCalledTimes(1))
+
+    origin = 'https://new.example.test'
+    resolveSession({ user: { id: 'old-user', username: 'alice' } })
+    await refresh
+
+    expect(identities).toEqual([{ origin: 'https://old.example.test', userId: 'old-user' }])
+    await expect(repository.getMetadata('accountOrigin')).resolves.toBe('https://old.example.test')
+    expect(coordinator.state.status).toBe('offline-session')
+    database.close()
+  })
+
   it('keeps the one-time recovery code in memory until the user confirms it is saved', async () => {
     const databaseName = `deepstudy-auth-${crypto.randomUUID()}`
     databases.push(databaseName)
