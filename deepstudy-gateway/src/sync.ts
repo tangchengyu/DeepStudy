@@ -70,6 +70,48 @@ async function storedRecord(db: D1Database, userId: string, entityType: string, 
   `).bind(userId, entityType, entityId).first<StoredRecord>();
 }
 
+function payloadForComparison(payload: Record<string, unknown>) {
+  const { updatedAt: _updatedAt, ...content } = payload;
+  return content;
+}
+
+function sameRecordContent(record: MutationInput["record"], current: StoredRecord) {
+  return (record.deleted ? 1 : 0) === current.deleted
+    && (record.legacySourceId ?? null) === current.legacy_source_id
+    && stableStringify(payloadForComparison(record.payload))
+      === stableStringify(payloadForComparison(JSON.parse(current.payload) as Record<string, unknown>));
+}
+
+async function acknowledgeMatchingRecord(
+  db: D1Database,
+  userId: string,
+  mutation: MutationInput,
+  current: StoredRecord,
+) {
+  const result = {
+    mutationId: mutation.mutationId,
+    status: "applied",
+    entityType: mutation.record.entityType,
+    entityId: mutation.record.entityId,
+    revision: current.revision,
+    serverUpdatedAt: current.server_updated_at,
+    unchanged: true,
+  };
+  try {
+    await db.prepare(`
+      INSERT INTO sync_mutations (user_id, mutation_id, applied_revision, result_json, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(userId, mutation.mutationId, current.revision, JSON.stringify(result), Date.now()).run();
+    return result;
+  } catch (error) {
+    const concurrentReceipt = await db.prepare(
+      "SELECT result_json FROM sync_mutations WHERE user_id = ? AND mutation_id = ?"
+    ).bind(userId, mutation.mutationId).first<{ result_json: string }>();
+    if (concurrentReceipt) return JSON.parse(concurrentReceipt.result_json) as Record<string, unknown>;
+    throw error;
+  }
+}
+
 async function recordConflict(
   db: D1Database,
   userId: string,
@@ -134,6 +176,9 @@ export async function applyMutation(
 
   const current = await storedRecord(db, userId, mutation.record.entityType, mutation.record.entityId);
   if ((current?.revision ?? 0) !== mutation.baseRevision) {
+    if (current && sameRecordContent(mutation.record, current)) {
+      return acknowledgeMatchingRecord(db, userId, mutation, current);
+    }
     return recordConflict(db, userId, mutation, current);
   }
 
