@@ -79,7 +79,10 @@
             <span class="long-task-launch-mark" aria-hidden="true"></span>
             长期任务
           </button>
-          <button id="sync-account-open" class="tool-btn" type="button">账号同步</button>
+          <button id="sync-account-open" class="tool-btn sync-account-button" type="button">
+            <span>账号同步</span>
+            <span id="sync-conflict-count" class="sync-conflict-count" aria-label="待处理冲突" hidden>0</span>
+          </button>
           <label class="aot-label"
             ><input id="always-on-top" type="checkbox" /> 窗口置顶</label
           >
@@ -764,7 +767,17 @@
             <label>备份编号<input id="sync-backup-id" autocomplete="off" spellcheck="false" placeholder="粘贴同步完成时显示的备份编号" /></label>
             <button id="sync-backup-restore" class="secondary-btn" type="button">恢复该备份</button>
           </div>
-          <div id="sync-conflict-list" class="sync-conflict-list"></div>
+          <div id="sync-conflict-toolbar" class="sync-conflict-toolbar" hidden>
+            <div>
+              <strong>批量处理当前冲突</strong>
+              <span id="sync-conflict-progress" role="status" aria-live="polite"></span>
+            </div>
+            <div class="sync-actions">
+              <button id="sync-conflicts-keep-remote" class="secondary-btn" type="button">全部保留云端</button>
+              <button id="sync-conflicts-keep-local" class="primary-btn" type="button">全部保留本机</button>
+            </div>
+          </div>
+          <div id="sync-conflict-list" class="sync-conflict-list" aria-live="polite"></div>
         </section>
         <section id="sync-timer-section" class="sync-data-section" hidden>
           <h3>另一台设备正在计时</h3>
@@ -787,6 +800,7 @@
     <script src="sync-enrollment.js"></script>
     <script src="timer-sync-runtime.js"></script>
     <script src="conflict-view.js"></script>
+    <script src="conflict-actions.js"></script>
     <script src="i18n.js"></script>
     <script src="app.js"></script>
     <script src="continuous-sync.js"></script>

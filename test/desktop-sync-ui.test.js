@@ -167,9 +167,15 @@ test("account transition pauses the engine and releases the old timer lease befo
 });
 
 test("conflicts safely render both complete payloads and use stable receipt operation IDs", () => {
-  assert.match(script, /content\.textContent = JSON\.stringify/);
+  assert.match(html, /id="sync-conflict-count"/);
+  assert.match(html, /id="sync-conflicts-keep-local"/);
+  assert.match(html, /id="sync-conflicts-keep-remote"/);
+  assert.match(script, /DeepStudyConflictView\.compareRecords/);
+  assert.match(script, /内容相同，仅同步版本信息不同/);
+  assert.match(script, /function renderConflictCount/);
+  assert.match(script, /resolveAllConflicts/);
+  assert.match(script, /await refreshConflicts\(\)/);
   assert.match(script, /本机版本/);
   assert.match(script, /云端版本/);
-  assert.match(script, /operationId: `desktop:resolve:\$\{conflict\.id\}:keep_remote`/);
-  assert.match(script, /const mutationId = `desktop:resolve:\$\{conflict\.id\}:keep_local`/);
+  assert.match(css, /\.sync-conflict-row\.is-different/);
 });

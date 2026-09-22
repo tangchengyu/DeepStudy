@@ -10,6 +10,10 @@
   const confirmImport = byId("sync-import-confirm");
   const previewResult = byId("sync-preview-result");
   const conflictList = byId("sync-conflict-list");
+  const conflictToolbar = byId("sync-conflict-toolbar");
+  const conflictProgress = byId("sync-conflict-progress");
+  const keepAllRemote = byId("sync-conflicts-keep-remote");
+  const keepAllLocal = byId("sync-conflicts-keep-local");
   const deviceRetry = byId("sync-device-retry");
   const timerSection = byId("sync-timer-section");
   const timerSummary = byId("sync-timer-summary");
@@ -30,6 +34,8 @@
   let gatewayConfigTimer = 0;
   let turnstileTokenTimer = 0;
   let sessionErrorVisible = false;
+  let currentConflicts = [];
+  let automaticConflictScan = null;
 
   function runProfileExclusive(work) {
     const result = profileOperation.then(work, work);
@@ -122,6 +128,24 @@
     status.classList.toggle("error", isError);
   }
 
+  function renderConflictCount(value) {
+    const count = Math.max(0, Number(value) || 0);
+    const badge = byId("sync-conflict-count");
+    const accountButton = byId("sync-account-open");
+    badge.textContent = String(count);
+    badge.hidden = count === 0;
+    accountButton.classList.toggle("has-conflicts", count > 0);
+    accountButton.setAttribute("aria-label", count > 0 ? `账号同步，${count} 条待处理冲突` : "账号同步");
+  }
+
+  function scheduleAutomaticConflictScan() {
+    if (automaticConflictScan) return;
+    automaticConflictScan = new Promise((resolve) => setTimeout(resolve, 0))
+      .then(() => refreshConflicts({ autoResolve: true }))
+      .catch((error) => setStatus(formatSyncError(error), true))
+      .finally(() => { automaticConflictScan = null; });
+  }
+
   function renderAutomaticStatus(state) {
     let message = "自动同步已开启，正在检查更新…";
     let isError = false;
@@ -135,10 +159,13 @@
       if (state.pendingCount) message += ` · ${state.pendingCount} 条修改等待上传`;
       if (state.conflictCount) message += ` · ${state.conflictCount} 条冲突需要在“查看冲突”中选择保留版本`;
       isError = Boolean(state.conflictCount);
+      renderConflictCount(state.conflictCount);
+      if (state.conflictCount) scheduleAutomaticConflictScan();
       if (state.records?.length) notifySyncApplied();
       if (sessionErrorVisible) setStatus("连接已恢复，账号正在自动同步。");
     } else if (state.phase === "signed-out") {
       message = "登录账号后可开启自动同步。";
+      renderConflictCount(0);
       void refreshStatus();
     } else if (state.phase === "not-enrolled") {
       message = "完成一次首次同步后，将自动同步后续修改。";
@@ -313,6 +340,7 @@
 
   async function refreshStatus() {
     const local = await controller.status();
+    renderConflictCount(local.blockedConflictCount);
     byId("sync-gateway-url").value ||= local.gatewayUrl || "";
     byId("sync-username").value ||= local.username || "";
     const storageNote = local.credentialStorage?.warning ? ` ${local.credentialStorage.warning}` : "";
@@ -321,6 +349,7 @@
       importSection.hidden = true;
       manageSection.hidden = true;
       sessionBadge.textContent = "尚未登录";
+      renderConflictCount(0);
       setStatus(`尚未登录。${storageNote}`);
       timerSection.hidden = true;
       return;
@@ -389,10 +418,73 @@
     return button;
   }
 
-  async function refreshConflicts() {
-    const result = await controller.conflicts();
+  function conflictValue(value) {
+    if (value === undefined) return "（不存在）";
+    if (value === null) return "null";
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  }
+
+  function appendComparisonRows(container, rows, className = "") {
+    for (const row of rows) {
+      const line = document.createElement("div");
+      line.className = `sync-conflict-row is-different ${className}`.trim();
+      const path = document.createElement("code");
+      const local = document.createElement("pre");
+      const remote = document.createElement("pre");
+      path.textContent = row.path;
+      local.textContent = conflictValue(row.local);
+      remote.textContent = conflictValue(row.remote);
+      line.append(path, local, remote);
+      container.append(line);
+    }
+  }
+
+  function appendFullRecord(container, label, record) {
+    const section = document.createElement("section");
+    const heading = document.createElement("strong");
+    const content = document.createElement("pre");
+    heading.textContent = label;
+    content.textContent = JSON.stringify(record ?? null, null, 2);
+    section.append(heading, content);
+    container.append(section);
+  }
+
+  function resolveConflictRecord(conflict, resolution) {
+    return controller.resolveConflict(
+      conflict.id,
+      window.DeepStudyConflictActions.resolutionInput(conflict, resolution),
+    );
+  }
+
+  async function refreshConflicts({ autoResolve = true } = {}) {
+    let result = await controller.conflicts();
+    let conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
+    if (autoResolve) {
+      const identical = conflicts.filter((conflict) => (
+        window.DeepStudyConflictView.compareRecords(conflict.local, conflict.remote).contentEqual
+      ));
+      if (identical.length) {
+        const settled = await window.DeepStudyConflictActions.resolveAllConflicts({
+          conflicts: identical,
+          resolution: "keep_remote",
+          resolve: (conflict, resolution) => runProfileExclusive(() => resolveConflictRecord(conflict, resolution)),
+        });
+        if (settled.resolved.length) {
+          await continuousSync.syncOnce();
+          notifySyncApplied();
+          result = await controller.conflicts();
+          conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
+        }
+        if (settled.failed.length) {
+          setStatus(`${settled.failed.length} 条内容相同的旧冲突暂未自动收敛，请稍后重试。`, true);
+        }
+      }
+    }
+    currentConflicts = conflicts;
+    renderConflictCount(conflicts.length);
     conflictList.replaceChildren();
-    const conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
+    conflictToolbar.hidden = conflicts.length === 0;
+    conflictProgress.textContent = "";
     if (!conflicts.length) {
       const empty = document.createElement("p");
       empty.textContent = "没有待处理冲突。";
@@ -404,40 +496,87 @@
       item.className = "sync-conflict-item";
       const summary = document.createElement("p");
       summary.textContent = `${conflict.entityType} / ${conflict.entityId}`;
-      const versions = document.createElement("div");
-      versions.className = "sync-conflict-versions";
-      for (const [label, record] of [["本机版本", conflict.local], ["云端版本", conflict.remote]]) {
-        const section = document.createElement("section");
-        const heading = document.createElement("strong");
-        const content = document.createElement("pre");
-        heading.textContent = label;
-        content.textContent = JSON.stringify(record?.payload ?? record ?? null, null, 2);
-        section.append(heading, content);
-        versions.append(section);
+      const comparison = window.DeepStudyConflictView.compareRecords(conflict.local, conflict.remote);
+      const comparisonPanel = document.createElement("div");
+      comparisonPanel.className = "sync-conflict-comparison";
+      const labels = document.createElement("div");
+      labels.className = "sync-conflict-row sync-conflict-labels";
+      labels.append(document.createElement("span"));
+      for (const label of ["本机版本", "云端版本"]) {
+        const strong = document.createElement("strong");
+        strong.textContent = label;
+        labels.append(strong);
       }
+      comparisonPanel.append(labels);
+      if (comparison.contentEqual) {
+        const notice = document.createElement("p");
+        notice.className = "sync-conflict-equal";
+        notice.textContent = "内容相同，仅同步版本信息不同；DeepStudy 会安全采用云端同步状态。";
+        comparisonPanel.append(notice);
+      } else {
+        appendComparisonRows(comparisonPanel, comparison.rows);
+      }
+      const metadata = document.createElement("details");
+      const metadataSummary = document.createElement("summary");
+      const metadataRows = document.createElement("div");
+      metadataSummary.textContent = `同步信息差异（${comparison.metadataRows.length}）`;
+      appendComparisonRows(metadataRows, comparison.metadataRows, "is-metadata");
+      metadata.append(metadataSummary, metadataRows);
+      const full = document.createElement("details");
+      const fullSummary = document.createElement("summary");
+      const versions = document.createElement("div");
+      fullSummary.textContent = "查看完整数据";
+      versions.className = "sync-conflict-versions";
+      appendFullRecord(versions, "本机版本", conflict.local);
+      appendFullRecord(versions, "云端版本", conflict.remote);
+      full.append(fullSummary, versions);
       const actions = document.createElement("div");
       actions.className = "sync-actions";
       actions.append(
         conflictButton("保留云端", "secondary-btn", async (event) => {
-          const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.resolveConflict(conflict.id, {
-            resolution: "keep_remote",
-            operationId: `desktop:resolve:${conflict.id}:keep_remote`,
-          })), "冲突已解决。");
+          const result = await action(event.currentTarget, () => runProfileExclusive(() => resolveConflictRecord(conflict, "keep_remote")), "冲突已解决。");
           if (result) { await continuousSync.syncOnce(); notifySyncApplied(); await refreshConflicts(); }
         }),
         conflictButton("保留本机", "primary-btn", async (event) => {
-          const mutationId = `desktop:resolve:${conflict.id}:keep_local`;
-          const result = await action(event.currentTarget, () => runProfileExclusive(() => controller.resolveConflict(conflict.id, {
-            resolution: "keep_local",
-            mutationId,
-            operationId: mutationId,
-            expectedRemoteRevision: Number(conflict.remote?.revision) || 0,
-          })), "本机版本已保存到云端。");
+          const result = await action(event.currentTarget, () => runProfileExclusive(() => resolveConflictRecord(conflict, "keep_local")), "本机版本已保存到云端。");
           if (result) { await continuousSync.syncOnce(); notifySyncApplied(); await refreshConflicts(); }
         }),
       );
-      item.append(summary, versions, actions);
+      item.append(summary, comparisonPanel, metadata, full, actions);
       conflictList.append(item);
+    }
+  }
+
+  async function resolveAllConflicts(resolution) {
+    if (!currentConflicts.length) return;
+    if (resolution === "keep_remote" && !window.confirm(
+      `全部保留云端会放弃 ${currentConflicts.length} 条记录尚未上传的本机修改，确认继续吗？`,
+    )) return;
+    setBusy(keepAllRemote, true);
+    setBusy(keepAllLocal, true);
+    const choice = resolution === "keep_local" ? "本机" : "云端";
+    try {
+      const settled = await window.DeepStudyConflictActions.resolveAllConflicts({
+        conflicts: [...currentConflicts],
+        resolution,
+        resolve: (conflict, selected) => runProfileExclusive(() => resolveConflictRecord(conflict, selected)),
+        onProgress: ({ completed, total }) => {
+          conflictProgress.textContent = `正在处理 ${completed}/${total}…`;
+        },
+      });
+      if (settled.resolved.length) {
+        await continuousSync.syncOnce();
+        notifySyncApplied();
+      }
+      await refreshConflicts({ autoResolve: false });
+      if (settled.failed.length) {
+        setStatus(`已保留 ${settled.resolved.length} 条${choice}版本；${settled.failed.length} 条处理失败并已保留在列表中。`, true);
+      } else {
+        setStatus(`已将 ${settled.resolved.length} 条冲突全部保留为${choice}版本。`);
+      }
+    } finally {
+      setBusy(keepAllRemote, false);
+      setBusy(keepAllLocal, false);
     }
   }
 
@@ -445,6 +584,7 @@
     modal.hidden = false;
     await refreshStatus();
     await loadGatewayConfig();
+    if (!manageSection.hidden) await refreshConflicts();
   });
   byId("sync-close").addEventListener("click", () => { if (mayCloseRecoveryNotice()) modal.hidden = true; });
   byId("sync-gateway-url").addEventListener("input", scheduleGatewayConfigLoad);
@@ -571,6 +711,8 @@
   byId("sync-conflicts").addEventListener("click", async (event) => {
     await action(event.currentTarget, refreshConflicts, "冲突列表已刷新。");
   });
+  keepAllRemote.addEventListener("click", () => { void resolveAllConflicts("keep_remote"); });
+  keepAllLocal.addEventListener("click", () => { void resolveAllConflicts("keep_local"); });
   byId("sync-backup-restore").addEventListener("click", async (event) => {
     const backupId = byId("sync-backup-id").value.trim();
     if (!backupId) return setStatus("请输入备份编号。", true);
