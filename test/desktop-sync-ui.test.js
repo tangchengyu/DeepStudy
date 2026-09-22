@@ -145,10 +145,16 @@ test("focus and rest timers publish claim, throttled updates, and release withou
   assert.match(timerScript, /takeover: false/);
   assert.match(timerScript, /syncReleaseTimer/);
   assert.match(timerScript, /action === "heartbeat"/);
+  assert.match(html, /id="timer-sync-status"/);
+  assert.match(appScript, /正在启动/);
+  assert.match(appScript, /deepstudy:timer-offline/);
+  assert.match(appScript, /visibilitychange/);
+  assert.match(appScript, /refreshFromClock/);
+  assert.match(script, /deepstudy:timer-blocked/);
 });
 
 test("losing a timer lease pauses the old device before showing explicit takeover", () => {
-  const blockedStart = script.indexOf("onBlocked: () =>");
+  const blockedStart = script.indexOf("onBlocked: (remote) =>");
   const blockedEnd = script.indexOf("onError:", blockedStart);
   const blocked = script.slice(blockedStart, blockedEnd);
   assert.match(blocked, /deepstudy:before-sync-apply/);

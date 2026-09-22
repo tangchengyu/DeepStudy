@@ -73,6 +73,7 @@
     getStatus,
     onBlocked = () => {},
     onError = () => {},
+    onOffline = () => {},
     now = () => Date.now(),
     schedule = (work, delay) => setTimeout(work, delay),
     heartbeatIntervalMs = 5000,
@@ -160,7 +161,21 @@
       if (action !== "retry") pendingUpdate = null;
       const publishedAt = now();
       if (action === "heartbeat" && publishedAt - lastPublishAt < heartbeatIntervalMs) return true;
-      const local = await getStatus();
+      const unavailable = (error) => {
+        if (action === "claim" || action === "heartbeat") lastPublishAt = publishedAt;
+        onError(error);
+        if (action === "claim") {
+          onOffline(error);
+          return true;
+        }
+        return false;
+      };
+      let local;
+      try {
+        local = await getStatus();
+      } catch (error) {
+        return unavailable(error);
+      }
       if (!local.signedIn || !local.enrollmentComplete) return true;
 
       let expectedLeaseVersion = ownedTimer?.scopeKey === local.scopeKey
@@ -189,6 +204,7 @@
 
         const readback = await currentTimer(local);
         if (!timerMatches(readback, timer, local.deviceId)) {
+          const blockedByOtherDevice = Boolean(readback && readback.ownerDeviceId !== local.deviceId);
           if (readback?.ownerDeviceId === local.deviceId) {
             retainUncertain(readback, local, "uncertainUpdate");
             ownedTimer.uncertain = true;
@@ -199,8 +215,12 @@
             retainUncertain(readback, local, "uncertain");
             if (readback) onBlocked(readback);
           }
-          onError(requestError || new Error("计时器回读与本次操作不一致"));
-          return false;
+          const error = requestError || new Error("计时器回读与本次操作不一致");
+          if (blockedByOtherDevice) {
+            onError(error);
+            return false;
+          }
+          return unavailable(error);
         }
 
         pendingUpdate = null;
@@ -213,8 +233,7 @@
           pendingUpdate = { scopeKey: local.scopeKey, leaseVersion: ownedTimer.leaseVersion, timer: { ...timer } };
           scheduleUpdateRetry(pendingUpdate);
         }
-        onError(error);
-        return false;
+        return unavailable(error);
       }
     }
 

@@ -330,6 +330,28 @@
   margin-bottom: 6px;
 }
 
+.timer-sync-status {
+  background: #edf8f2;
+  border: 1px solid #9bc8af;
+  border-radius: 9px;
+  color: #255d43;
+  font-size: 13px;
+  margin: 10px 0;
+  padding: 9px 12px;
+}
+
+.timer-sync-status.warning {
+  background: #fff8e6;
+  border-color: #e2b85b;
+  color: #714b08;
+}
+
+.timer-sync-status.error {
+  background: #fff0f1;
+  border-color: #e3a4aa;
+  color: #8f1720;
+}
+
 .sync-backup-restore {
   display: flex;
   align-items: end;

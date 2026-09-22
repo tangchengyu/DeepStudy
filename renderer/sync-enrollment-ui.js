@@ -75,12 +75,16 @@
   const timerLease = window.DeepStudyTimerSync.createTimerLeaseManager({
     api: window.electronAPI,
     getStatus: () => controller.status(),
-    onBlocked: () => {
+    onBlocked: (remote) => {
       window.dispatchEvent(new CustomEvent("deepstudy:before-sync-apply"));
+      window.dispatchEvent(new CustomEvent("deepstudy:timer-blocked", { detail: { timer: remote } }));
       timerSection.hidden = false;
       timerSummary.textContent = "另一台设备正在计时；请明确点击“接管并继续”后再继续本机计时。";
     },
     onError: (error) => setStatus(`计时器同步未接管：${error?.message || error}`, true),
+    onOffline: (error) => window.dispatchEvent(new CustomEvent("deepstudy:timer-offline", {
+      detail: { message: error?.message || String(error) },
+    })),
   });
   window.DeepStudyTimerLease = {
     claim: (timer) => timerLease.claim(timer),

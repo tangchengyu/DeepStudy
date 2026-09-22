@@ -1851,6 +1851,36 @@ async function claimActiveTimer(timer) {
   return window.DeepStudyTimerLease.claim(timer);
 }
 
+const TimerFeedback = (() => {
+  const status = $("#timer-sync-status");
+  let offlineStart = false;
+  function show(message, tone = "") {
+    status.textContent = message;
+    status.className = `timer-sync-status ${tone}`.trim();
+    status.hidden = false;
+  }
+  function starting(mode) {
+    offlineStart = false;
+    show(`正在启动${mode === "rest" ? "休息" : "专注"}计时…`);
+  }
+  function started(mode) {
+    if (offlineStart) {
+      show(`${mode === "rest" ? "休息" : "专注"}计时已在本机开始；联网后会自动恢复同步。`, "warning");
+    } else {
+      show(`${mode === "rest" ? "休息" : "专注"}计时已开始。`);
+    }
+  }
+  function blocked() {
+    show("另一台设备正在计时，本机没有启动。请在账号同步中选择“接管并继续”。", "error");
+  }
+  window.addEventListener("deepstudy:timer-offline", () => {
+    offlineStart = true;
+    show("同步服务暂时不可用，将在本机继续计时；联网后自动重试。", "warning");
+  });
+  window.addEventListener("deepstudy:timer-blocked", blocked);
+  return { starting, started, blocked };
+})();
+
 const FocusMode = (() => {
   let selectedMs = 25 * 60000,
     remaining = selectedMs,
@@ -1862,7 +1892,8 @@ const FocusMode = (() => {
     sessionStart = 0,
     sessionFocusedMs = 0,
     sessionTypes = new Set(),
-    pausedByModal = false;
+    pausedByModal = false,
+    startPending = false;
   const startGate = window.DeepStudyTimerSync.createSingleFlightGate();
   const display = $("#focus-timer");
   const durationModal = $("#focus-duration-modal");
@@ -1873,12 +1904,14 @@ const FocusMode = (() => {
   }
   function render() {
     display.textContent = formatClock(remaining).slice(3);
-    $("#focus-start").textContent = running
+    $("#focus-start").textContent = startPending
+      ? "正在启动…"
+      : running
       ? tr("focusRunning")
       : remaining < selectedMs
         ? tr("continueFocus")
         : tr("startFocus");
-    $("#focus-start").disabled = running;
+    $("#focus-start").disabled = running || startPending;
     $("#focus-pause").disabled = !running;
   }
   function recordSegment() {
@@ -1919,30 +1952,38 @@ const FocusMode = (() => {
   function beginFocus() {
     return startGate.run(async () => {
       if (running || remaining <= 0) return;
-      const claimAt = Date.now();
-      const granted = await claimActiveTimer({
-        mode: "focus", status: "running", targetEndAt: claimAt + remaining,
-        remainingMs: Math.max(0, Math.round(remaining)), plannedMs: Math.max(1, Math.round(selectedMs)),
-        sessionStartAt: sessionStart || claimAt, segmentStartAt: claimAt,
-        accumulatedMs: Math.max(0, Math.round(sessionFocusedMs)), workType: type(),
-      });
-      if (!granted) return;
-      running = true;
-      target = Date.now() + remaining;
-      segmentStart = Date.now();
-      segmentType = type();
-      sessionTypes.add(segmentType);
-      if (!sessionStart) sessionStart = Date.now();
-      timer = setInterval(tick, 200);
-      FocusTracker.log("focus-started", {
-        type:
-          sessionTypes.size > 1
-            ? "mixed"
-            : (sessionTypes.values().next().value ?? type()),
-        types: [...sessionTypes],
-        plannedMinutes: selectedMs / 60000,
-      });
+      startPending = true;
+      TimerFeedback.starting("focus");
       render();
+      try {
+        const claimAt = Date.now();
+        const granted = await claimActiveTimer({
+          mode: "focus", status: "running", targetEndAt: claimAt + remaining,
+          remainingMs: Math.max(0, Math.round(remaining)), plannedMs: Math.max(1, Math.round(selectedMs)),
+          sessionStartAt: sessionStart || claimAt, segmentStartAt: claimAt,
+          accumulatedMs: Math.max(0, Math.round(sessionFocusedMs)), workType: type(),
+        });
+        if (!granted) { TimerFeedback.blocked(); return; }
+        running = true;
+        target = Date.now() + remaining;
+        segmentStart = Date.now();
+        segmentType = type();
+        sessionTypes.add(segmentType);
+        if (!sessionStart) sessionStart = Date.now();
+        timer = setInterval(tick, 200);
+        FocusTracker.log("focus-started", {
+          type:
+            sessionTypes.size > 1
+              ? "mixed"
+              : (sessionTypes.values().next().value ?? type()),
+          types: [...sessionTypes],
+          plannedMinutes: selectedMs / 60000,
+        });
+        TimerFeedback.started("focus");
+      } finally {
+        startPending = false;
+        render();
+      }
     });
   }
   async function start() {
@@ -2114,7 +2155,10 @@ const FocusMode = (() => {
     if (running) timer = setInterval(tick, 200);
     render();
   }
-  return { pauseForModal, resumeAfterModal, checkpoint, pauseForSync, adoptRemoteTimer };
+  function refreshFromClock() {
+    if (running) tick();
+  }
+  return { pauseForModal, resumeAfterModal, checkpoint, pauseForSync, adoptRemoteTimer, refreshFromClock };
 })();
 
 const DistractionModal = (() => {
@@ -2196,12 +2240,13 @@ const RestMode = (() => {
     timer = null,
     segmentStart = 0,
     completedSegments = [],
-    restStart = 0;
+    restStart = 0,
+    startPending = false;
   const startGate = window.DeepStudyTimerSync.createSingleFlightGate();
   function render() {
     $("#rest-timer").textContent = formatFlexibleClock(remaining);
-    $("#rest-start").disabled = running || remaining <= 0;
-    $("#rest-start").textContent = remaining < total ? tr("continueRest") : tr("startRest");
+    $("#rest-start").disabled = running || startPending || remaining <= 0;
+    $("#rest-start").textContent = startPending ? "正在启动…" : remaining < total ? tr("continueRest") : tr("startRest");
     $("#rest-pause").disabled = !running;
   }
   function captureSegment() {
@@ -2238,22 +2283,30 @@ const RestMode = (() => {
   function start() {
     return startGate.run(async () => {
       if (running || remaining <= 0) return;
-      const claimAt = Date.now();
-      const accumulated = completedSegments.reduce((sum, segment) => sum + segment.durationMs, 0);
-      const granted = await claimActiveTimer({
-        mode: "rest", status: "running", targetEndAt: claimAt + remaining,
-        remainingMs: Math.max(0, Math.round(remaining)), plannedMs: Math.max(1, Math.round(total)),
-        sessionStartAt: restStart || claimAt, segmentStartAt: claimAt,
-        accumulatedMs: Math.max(0, Math.round(accumulated)), workType: "rest",
-      });
-      if (!granted) return;
-      running = true;
-      target = Date.now() + remaining;
-      segmentStart = Date.now();
-      if (!restStart) restStart = segmentStart;
-      timer = setInterval(tick, 200);
-      FocusTracker.log("rest-started");
+      startPending = true;
+      TimerFeedback.starting("rest");
       render();
+      try {
+        const claimAt = Date.now();
+        const accumulated = completedSegments.reduce((sum, segment) => sum + segment.durationMs, 0);
+        const granted = await claimActiveTimer({
+          mode: "rest", status: "running", targetEndAt: claimAt + remaining,
+          remainingMs: Math.max(0, Math.round(remaining)), plannedMs: Math.max(1, Math.round(total)),
+          sessionStartAt: restStart || claimAt, segmentStartAt: claimAt,
+          accumulatedMs: Math.max(0, Math.round(accumulated)), workType: "rest",
+        });
+        if (!granted) { TimerFeedback.blocked(); return; }
+        running = true;
+        target = Date.now() + remaining;
+        segmentStart = Date.now();
+        if (!restStart) restStart = segmentStart;
+        timer = setInterval(tick, 200);
+        FocusTracker.log("rest-started");
+        TimerFeedback.started("rest");
+      } finally {
+        startPending = false;
+        render();
+      }
     });
   }
   function pause() {
@@ -2387,8 +2440,20 @@ const RestMode = (() => {
     if (running) timer = setInterval(tick, 200);
     render();
   }
-  return { pauseForSync, adoptRemoteTimer };
+  function refreshFromClock() {
+    if (running) tick();
+  }
+  return { pauseForSync, adoptRemoteTimer, refreshFromClock };
 })();
+
+function refreshTimersFromClock() {
+  FocusMode.refreshFromClock();
+  RestMode.refreshFromClock();
+}
+window.addEventListener("focus", refreshTimersFromClock);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshTimersFromClock();
+});
 
 window.addEventListener("deepstudy:before-sync-apply", () => {
   FocusMode.pauseForSync();

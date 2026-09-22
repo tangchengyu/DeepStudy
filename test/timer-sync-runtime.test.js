@@ -59,7 +59,7 @@ test("single-flight start gate runs only one claim while the first start is pend
   assert.equal(await second, "started");
 });
 
-test("claim accepts ownership only after current-timer readback matches owner, mode, status, and payload", async () => {
+test("a same-device readback mismatch permits local start while marking cloud state uncertain", async () => {
   const expected = timer();
   let current = { ...expected, ownerDeviceId: "desktop-a", leaseVersion: 7, remainingMs: 9_999 };
   const manager = createTimerLeaseManager({
@@ -72,7 +72,7 @@ test("claim accepts ownership only after current-timer readback matches owner, m
     schedule: () => {},
   });
 
-  assert.equal(await manager.claim(expected), false);
+  assert.equal(await manager.claim(expected), true);
   assert.equal(manager.getOwnedTimer().uncertain, true);
 
   current = { ...expected, ownerDeviceId: "desktop-a", leaseVersion: 8 };
@@ -81,12 +81,56 @@ test("claim accepts ownership only after current-timer readback matches owner, m
   assert.equal(manager.getOwnedTimer().uncertain, undefined);
 });
 
-test("claim rejects a successful response when readback changed owner, mode, or status", async () => {
+test("an unavailable sync service permits local timer start and reports offline state", async () => {
+  const offline = [];
+  const errors = [];
+  let now = 1_000;
+  let reads = 0;
+  const manager = createTimerLeaseManager({
+    getStatus: async () => signedInStatus(),
+    api: {
+      syncCurrentTimer: async () => { reads += 1; throw new Error("network unavailable"); },
+      syncClaimTimer: async () => { throw new Error("network unavailable"); },
+      syncReleaseTimer: async () => ({}),
+    },
+    now: () => now,
+    onOffline: (error) => offline.push(error.message),
+    onError: (error) => errors.push(error.message),
+    schedule: () => {},
+  });
+
+  assert.equal(await manager.claim(timer()), true);
+  assert.deepEqual(offline, ["network unavailable"]);
+  assert.deepEqual(errors, ["network unavailable"]);
+  assert.equal(reads, 1);
+
+  now = 2_000;
+  assert.equal(await manager.publish("heartbeat", timer()), true);
+  assert.equal(reads, 1);
+  now = 7_000;
+  assert.equal(await manager.publish("heartbeat", timer()), false);
+  assert.equal(reads, 2);
+});
+
+test("a local status lookup failure does not prevent an offline timer start", async () => {
+  const offline = [];
+  const manager = createTimerLeaseManager({
+    getStatus: async () => { throw new Error("status IPC unavailable"); },
+    api: {},
+    onOffline: (error) => offline.push(error.message),
+    schedule: () => {},
+  });
+
+  assert.equal(await manager.claim(timer()), true);
+  assert.deepEqual(offline, ["status IPC unavailable"]);
+});
+
+test("only a confirmed other-device owner blocks local start", async () => {
   const expected = timer();
-  for (const readback of [
-    { ...expected, ownerDeviceId: "desktop-b", leaseVersion: 2 },
-    { ...expected, ownerDeviceId: "desktop-a", leaseVersion: 2, mode: "rest" },
-    { ...expected, ownerDeviceId: "desktop-a", leaseVersion: 2, status: "paused" },
+  for (const [readback, allowed] of [
+    [{ ...expected, ownerDeviceId: "desktop-b", leaseVersion: 2 }, false],
+    [{ ...expected, ownerDeviceId: "desktop-a", leaseVersion: 2, mode: "rest" }, true],
+    [{ ...expected, ownerDeviceId: "desktop-a", leaseVersion: 2, status: "paused" }, true],
   ]) {
     const manager = createTimerLeaseManager({
       getStatus: async () => signedInStatus(),
@@ -97,7 +141,7 @@ test("claim rejects a successful response when readback changed owner, mode, or 
       },
       schedule: () => {},
     });
-    assert.equal(await manager.claim(expected), false);
+    assert.equal(await manager.claim(expected), allowed);
   }
 });
 
