@@ -42,6 +42,60 @@ test("first-import preview is read-only", async () => {
   assert.equal(writes.length, 0);
 });
 
+test("first import defers large image chunks to continuous byte-batched sync", async () => {
+  const localTask = record("long-with-image", {
+    id: "long-with-image",
+    notes: "![image](deepstudy-image://large.png)",
+  });
+  const imageChunk = {
+    entityType: "long_task_image_chunk",
+    entityId: "large.png:0",
+    payload: { imageId: "large.png", index: 0, total: 1, data: "x".repeat(950_000) },
+    deleted: false,
+    revision: 0,
+    clientUpdatedAt: 7,
+    serverUpdatedAt: null,
+    deviceId: "desktop-device-test",
+    legacySourceId: "long-task-images:large.png",
+  };
+  let previewRecords;
+  let appliedRecords;
+  let collected = 0;
+  const api = {
+    syncStatus: async () => ({ deviceId: "desktop-device-test", cursor: 0, scopeKey: "scope", authGeneration: 1 }),
+    syncPreviewImport: async (records) => {
+      previewRecords = records;
+      return {
+        importId: "import-with-image", snapshotHash: "hash-core", status: "committed",
+        nextIndex: 1, totalItems: 1, counts: {}, conflicts: [],
+      };
+    },
+    syncPull: async () => ({ records: [{ ...localTask, revision: 1, serverUpdatedAt: 8 }], cursor: 2, hasMore: false }),
+    syncSaveImportProgress: async () => {},
+    syncFinishEnrollment: async () => ({ enrolled: true }),
+  };
+  const legacySync = {
+    collectConsistentSnapshot: async () => {
+      collected += 1;
+      return { records: [localTask, imageChunk] };
+    },
+    applyPulledSnapshot: async ({ records }) => {
+      appliedRecords = records;
+      return { backupId: "backup-with-image", appliedRecords: records.length };
+    },
+  };
+  const controller = createEnrollmentController({ api, legacySync, storage: {} });
+
+  const preview = await controller.previewFirstImport();
+  const result = await controller.commitFirstImport();
+
+  assert.deepEqual(previewRecords.map((item) => item.entityType), ["long_task"]);
+  assert.equal(preview.deferredRecords, 1);
+  assert.deepEqual(appliedRecords.map((item) => item.entityType), ["long_task"]);
+  assert.equal(collected, 3);
+  assert.equal(result.import.status, "committed");
+});
+
 test("first import rechecks the snapshot, commits every chunk, verifies cloud readback, then applies", async () => {
   const localRecord = record("long-1");
   const calls = [];

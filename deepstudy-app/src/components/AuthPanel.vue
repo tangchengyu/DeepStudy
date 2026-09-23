@@ -72,6 +72,11 @@ function changeMode(next: Mode) {
   mode.value = next
 }
 
+function acceptTurnstileToken(token: string) {
+  turnstileToken.value = token
+  if (token) localError.value = null
+}
+
 function submit() {
   localError.value = null
   const normalizedUsername = username.value.trim()
@@ -200,7 +205,7 @@ function submit() {
           :key="`${mode}-${challengeSequence}`"
           :site-key="siteKey"
           :action="mode"
-          @token="turnstileToken = $event"
+          @token="acceptTurnstileToken"
           @error="localError = $event"
         />
       </section>

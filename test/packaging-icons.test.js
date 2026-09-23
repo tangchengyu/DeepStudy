@@ -8,6 +8,9 @@ const pkg = require("../package.json");
 const mobilePkg = require("../deepstudy-app/package.json");
 const packScript = fs.readFileSync(path.join(root, "scripts", "pack.js"), "utf8");
 const androidBuildGradle = fs.readFileSync(path.join(root, "deepstudy-app", "android", "app", "build.gradle"), "utf8");
+const androidMainActivity = fs.readFileSync(path.join(
+  root, "deepstudy-app", "android", "app", "src", "main", "java", "com", "deepstudy", "focus", "MainActivity.java",
+), "utf8");
 
 function pngDimensions(filePath) {
   const data = fs.readFileSync(filePath);
@@ -16,14 +19,24 @@ function pngDimensions(filePath) {
 }
 
 test("master desktop package uses the next public master version", () => {
-  assert.equal(pkg.version, "1.2.54");
+  assert.equal(pkg.version, "1.2.55");
   assert.doesNotMatch(pkg.version, /local/i);
 });
 
 test("Android pilot package uses the same public version as the desktop app", () => {
   assert.equal(mobilePkg.version, pkg.version);
   assert.match(androidBuildGradle, new RegExp(`versionName "${pkg.version}"`));
-  assert.match(androidBuildGradle, /versionCode 1254/);
+  assert.match(androidBuildGradle, /versionCode 1255/);
+});
+
+test("Android WebView enables the storage and cookie capabilities required by Turnstile", () => {
+  assert.match(androidMainActivity, /if \(bridge == null\) \{\s*return;\s*\}/);
+  assert.match(androidMainActivity, /if \(webView == null\) \{\s*return;\s*\}/);
+  assert.match(androidMainActivity, /setJavaScriptEnabled\(true\)/);
+  assert.match(androidMainActivity, /setDomStorageEnabled\(true\)/);
+  assert.match(androidMainActivity, /setAcceptCookie\(true\)/);
+  assert.match(androidMainActivity, /setAcceptThirdPartyCookies\(webView, true\)/);
+  assert.match(androidMainActivity, /setUserAgentString\(webSettings\.getUserAgentString\(\)\)/);
 });
 
 test("packaging uses the DeepStudy clock icon on macOS and Windows", () => {

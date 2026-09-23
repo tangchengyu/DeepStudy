@@ -3,10 +3,18 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.DeepStudySyncEnrollment = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  const DEFERRED_FIRST_IMPORT_ENTITY_TYPES = new Set(["long_task_image_chunk"]);
+
   function canonicalJson(value) {
     if (value === null || typeof value !== "object") return JSON.stringify(value);
     if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
     return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+
+  function firstImportRecords(records) {
+    return (Array.isArray(records) ? records : []).filter(
+      (record) => !DEFERRED_FIRST_IMPORT_ENTITY_TYPES.has(record?.entityType),
+    );
   }
 
   function createEnrollmentController({ api, legacySync, storage, deviceName, platform = "desktop", beforeApply = async () => {}, onImportProgress = () => {} }) {
@@ -48,7 +56,11 @@
         }
       }
       const snapshot = await collect();
-      const preview = await api.syncPreviewImport(snapshot.records);
+      const records = firstImportRecords(snapshot.records);
+      const preview = {
+        ...await api.syncPreviewImport(records),
+        deferredRecords: snapshot.records.length - records.length,
+      };
       pending = { snapshot, preview };
       if (typeof api.syncSaveImportProgress === "function") {
         await api.syncSaveImportProgress({ ...preview, snapshot: { records: snapshot.records } });
@@ -87,7 +99,7 @@
         `${conflict.entityType}\u0000${conflict.entityId}`,
         conflict.forkEntityId,
       ]));
-      for (const local of snapshot.records) {
+      for (const local of firstImportRecords(snapshot.records)) {
         const originalIdentity = `${local.entityType}\u0000${local.entityId}`;
         let expectedId = conflicts.get(originalIdentity) || local.entityId;
         // Preview summaries intentionally cap conflict details. When it is truncated,

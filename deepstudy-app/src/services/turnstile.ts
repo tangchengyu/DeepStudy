@@ -70,20 +70,35 @@ const loadTurnstileScript = createTurnstileScriptLoader({
   getApi: () => window.turnstile,
 })
 
+export function createTurnstileWidgetOptions(options: TurnstileChallengeOptions): Record<string, unknown> {
+  return {
+    sitekey: options.siteKey,
+    action: options.action,
+    theme: 'light',
+    size: 'flexible',
+    retry: 'auto',
+    'refresh-expired': 'auto',
+    'refresh-timeout': 'auto',
+    callback: options.onToken,
+    'expired-callback': () => options.onToken(''),
+    'error-callback': (code: string) => {
+      const errorCode = String(code || 'unknown')
+      options.onError(`人机验证失败（Cloudflare 错误码 ${errorCode}），请检查网络或更新 Android System WebView 后重试`)
+      return true
+    },
+    'unsupported-callback': () => {
+      options.onError('当前 Android System WebView 不支持安全验证，请更新后重试')
+      return true
+    },
+  }
+}
+
 export const browserTurnstileAdapter: TurnstileAdapter = {
   async render(container, options) {
     await loadTurnstileScript()
     const api = window.turnstile
     if (!api) throw new Error('人机验证暂不可用')
-    const widgetId = api.render(container, {
-      sitekey: options.siteKey,
-      action: options.action,
-      theme: 'light',
-      size: 'flexible',
-      callback: options.onToken,
-      'expired-callback': () => options.onToken(''),
-      'error-callback': () => options.onError('人机验证失败，请重试'),
-    })
+    const widgetId = api.render(container, createTurnstileWidgetOptions(options))
     return () => api.remove(widgetId)
   },
 }

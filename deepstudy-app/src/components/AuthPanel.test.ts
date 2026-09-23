@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import AuthPanel from './AuthPanel.vue'
 
 const TurnstileStub = {
-  template: '<button data-testid="challenge" @click="$emit(\'token\', \'challenge-token\')">verify</button>',
+  template: `<div>
+    <button data-testid="challenge" @click="$emit('token', 'challenge-token')">verify</button>
+    <button data-testid="challenge-error" @click="$emit('error', 'temporary challenge error')">fail</button>
+  </div>`,
 }
 
 describe('AuthPanel', () => {
@@ -43,5 +46,17 @@ describe('AuthPanel', () => {
     await wrapper.get('[data-testid="mode-recover"]').trigger('click')
     expect(wrapper.text()).toContain('恢复密码')
     expect(wrapper.find('input[autocomplete="one-time-code"]').exists()).toBe(true)
+  })
+
+  it('clears a transient challenge error after Turnstile returns a valid token', async () => {
+    const wrapper = mount(AuthPanel, {
+      props: { siteKey: 'site-key', minimumPasswordLength: 10, busy: false, error: null },
+      global: { stubs: { TurnstileChallenge: TurnstileStub } },
+    })
+
+    await wrapper.get('[data-testid="challenge-error"]').trigger('click')
+    expect(wrapper.text()).toContain('temporary challenge error')
+    await wrapper.get('[data-testid="challenge"]').trigger('click')
+    expect(wrapper.text()).not.toContain('temporary challenge error')
   })
 })

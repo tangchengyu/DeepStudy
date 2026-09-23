@@ -401,7 +401,9 @@
     const merged = Math.max(0, Number(counts.merged) || 0);
     const upload = additions + conflicts;
     const writeback = merged || Math.max(local, cloud);
-    previewResult.textContent = `本机旧数据 ${local} 条；账号已有 ${cloud} 条；将上传到账号 ${upload} 条；将写回本机 ${writeback} 条；重复 ${duplicates} 条；需要手动比较 ${conflicts} 条。`;
+    const deferred = Math.max(0, Number(preview?.deferredRecords) || 0);
+    const deferredText = deferred > 0 ? `；图片分片 ${deferred} 条将在首次同步完成后自动分批上传` : "";
+    previewResult.textContent = `本机旧数据 ${local} 条；账号已有 ${cloud} 条；将上传到账号 ${upload} 条；将写回本机 ${writeback} 条；重复 ${duplicates} 条；需要手动比较 ${conflicts} 条${deferredText}。`;
     confirmImport.textContent = previewConfirmLabel({ local, cloud, upload, writeback });
     confirmImport.disabled = false;
   }

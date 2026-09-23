@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createPlatformTurnstileAdapter, createTurnstileScriptLoader } from './turnstile'
+import {
+  createPlatformTurnstileAdapter,
+  createTurnstileScriptLoader,
+  createTurnstileWidgetOptions,
+} from './turnstile'
 
 describe('Turnstile platform adapter', () => {
   it('routes native and browser WebView challenges through replaceable adapters', async () => {
@@ -46,5 +50,23 @@ describe('Turnstile platform adapter', () => {
     secondScript.dispatchEvent(new Event('load'))
     await expect(second).resolves.toBeUndefined()
     secondScript.remove()
+  })
+
+  it('reports the Cloudflare error code and enables automatic challenge recovery', () => {
+    const onError = vi.fn()
+    const options = createTurnstileWidgetOptions({
+      siteKey: 'site-key',
+      action: 'sign-in',
+      onToken: vi.fn(),
+      onError,
+    })
+
+    expect(options).toMatchObject({
+      retry: 'auto',
+      'refresh-expired': 'auto',
+      'refresh-timeout': 'auto',
+    })
+    expect((options['error-callback'] as (code: string) => boolean)('300030')).toBe(true)
+    expect(onError).toHaveBeenCalledWith('人机验证失败（Cloudflare 错误码 300030），请检查网络或更新 Android System WebView 后重试')
   })
 })
