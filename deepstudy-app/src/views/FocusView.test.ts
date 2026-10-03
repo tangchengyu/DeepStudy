@@ -153,7 +153,7 @@ describe('focus timer screen', () => {
     await wrapper.get('button[aria-label="播放 木鱼白噪音"]').trigger('click')
     await flushPromises()
     expect(players).toHaveLength(1)
-    expect(players[0].src).toContain('muyu')
+    expect(players[0].src).toMatch(/\/renderer\/assets\/audio\/muyu\.mp3(?:\?|$)/)
     expect(players[0].loop).toBe(true)
     expect(players[0].play).toHaveBeenCalledTimes(1)
 
@@ -162,6 +162,18 @@ describe('focus timer screen', () => {
 
     await wrapper.get('input[aria-label="白噪音音量"]').setValue('40')
     expect(players[0].volume).toBeCloseTo(0.4)
+
+    await wrapper.get('button[aria-label="播放 雨声白噪音"]').trigger('click')
+    await flushPromises()
+    expect(players).toHaveLength(2)
+    expect(players[1].src).toMatch(/\/renderer\/assets\/audio\/rain\.mp3(?:\?|$)/)
+    expect(players[1].loop).toBe(true)
+    expect(players[1].play).toHaveBeenCalledTimes(1)
+    expect(players[1].playbackRate).toBe(1.5)
+    expect(players[1].volume).toBeCloseTo(0.4)
+    expect(players[0].paused).toBe(true)
+    expect(players[0].currentTime).toBe(0)
+    wrapper.unmount()
   })
 
   it('shows desktop-matched breathing practice in rest mode', async () => {

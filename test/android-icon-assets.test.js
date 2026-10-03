@@ -111,8 +111,17 @@ test("Android adaptive launcher foreground leaves safe transparent padding", () 
   assert.ok(png.height - 1 - bounds.bottom >= margin, "bottom foreground margin is too small");
 });
 
-test("mobile focus white-noise imports use tracked audio assets", () => {
-  assert.match(focusView, /assets\/audio\/muyu\.wav\?url/);
-  assert.match(focusView, /assets\/audio\/rain\.wav\?url/);
-  assert.doesNotMatch(focusView, /assets\/audio\/(?:muyu|rain)\.mp3\?url/);
+test("mobile focus shares the desktop white-noise files without legacy copies", () => {
+  const desktopHtml = fs.readFileSync(path.join(root, "renderer", "index.html"), "utf8");
+  for (const track of ["muyu", "rain"]) {
+    const desktopSource = desktopHtml.match(new RegExp(`<audio id="audio-${track}" src="([^"]+)"`));
+    const mobileSource = focusView.match(new RegExp(`import ${track}AudioUrl from '([^']+)\\?url'`));
+    assert.ok(desktopSource, `Desktop ${track} source must exist`);
+    assert.ok(mobileSource, `Mobile ${track} import must exist`);
+    const desktopFile = path.resolve(root, "renderer", desktopSource[1]);
+    const mobileFile = path.resolve(root, "deepstudy-app", "src", "views", mobileSource[1]);
+    assert.equal(mobileFile, desktopFile, `${track} must use the same file on mobile and desktop`);
+    assert.ok(fs.statSync(mobileFile).size > 0);
+    assert.ok(!fs.existsSync(path.join(root, "deepstudy-app", "src", "assets", "audio", `${track}.wav`)), "Legacy mobile WAV must be removed");
+  }
 });
